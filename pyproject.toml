@@ -3,32 +3,36 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "fedvaeexample"
+name = "GeraFed"
 version = "1.0.0"
-description = "Federated Variational Autoencoder Example with PyTorch and Flower"
-license = "Apache-2.0"
+description = "Data Augmentation para Dados Heterogêneos em Aprendizado Federado"
+license = ""
 dependencies = [
     "flwr[simulation]>=1.12.0",
     "flwr-datasets[vision]>=0.3.0",
-    "torch==2.2.1",
-    "torchvision==0.17.1",
+    "tensorflow==2.17.1",
 ]
 
 [tool.hatch.build.targets.wheel]
 packages = ["."]
 
 [tool.flwr.app]
-publisher = "flwrlabs"
+publisher = "gustavoguaragna"
 
 [tool.flwr.app.components]
-serverapp = "fedvaeexample.server_app:app"
-clientapp = "fedvaeexample.client_app:app"
+serverapp = "Simulation.server_app:app"
+clientapp = "Simulation.client_app:app"
 
 [tool.flwr.app.config]
-num-server-rounds = 5
-local-epochs = 2
-learning-rate = 0.001
-dataset = "mnist"  # Alterar para "cifar10" conforme necessário
+num_rodadas = 5
+epocas_alvo = 2
+epocas_gen = 2
+num_dadossint = 10
+learn_rate_alvo = 0.001
+learn_rate_gen = 0.001
+modelo_alvo = "mlp"
+modelo_gen = "gan"
+dataset = "mnist"
 
 [tool.flwr.federations]
 default = "local-simulation"

@@ -1,4 +1,4 @@
-"""fedvae: A Flower app for Federated Variational Autoencoder."""
+"""GeraFed: um framework para balancear dados heterogêneos em aprendizado federado."""
 
 from collections import OrderedDict
 

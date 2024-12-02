@@ -1,6 +1,6 @@
 # client_app.py
 
-"""fedvaeexample: A Flower / PyTorch app for Federated Variational Autoencoder."""
+"""GeraFed: um framework para balancear dados heterogêneos em aprendizado federado."""
 
 import torch
 from fedvaeexample.task import Net, get_weights, load_data, set_weights, test, train
