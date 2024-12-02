@@ -25,6 +25,9 @@ clientapp = "Simulation.client_app:app"
 
 [tool.flwr.app.config]
 num_rodadas = 5
+num_clientes = 10
+tam_ruido = 10
+tam_batch = 64
 epocas_alvo = 2
 epocas_gen = 2
 num_dadossint = 10

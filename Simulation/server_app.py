@@ -2,16 +2,17 @@
 
 """GeraFed: um framework para balancear dados heterogêneos em aprendizado federado."""
 
-from fedvaeexample.task import Net, get_weights, set_weights
+#from fedvaeexample.task import Net, get_weights, set_weights
 from flwr.common import Context, ndarrays_to_parameters, parameters_to_ndarrays
 from flwr.server import ServerApp, ServerAppComponents, ServerConfig
 from flwr.server.strategy import FedAvg
-import torch
+import tensorflow as tf
 import os  # Importar para verificar a existência de arquivos
+import logging
 
 class FedAvg_Save(FedAvg):
-    def __init__(self, dataset, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, dataset, num_clientes **kwargs):
+        super().__init__(min_available_clients=num_clientes, **kwargs)
         self.dataset = dataset
 
     def aggregate_fit(self, server_round, results, failures):
@@ -57,8 +58,23 @@ def server_fn(context: Context) -> ServerAppComponents:
     """Construct components for ServerApp."""
 
     # Lê a configuração
-    num_rounds = context.run_config["num-server-rounds"]
-    dataset = context.run_config["dataset"]  # Novo parâmetro
+    num_rounds = context.run_config["num_rodadas"]
+    dataset = context.run_config["dataset"] 
+    num_clientes = context.run_config["num_clientes"]
+    cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+    generator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
+    discriminator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
+    classes = 10
+    channels = 1
+    img_size = 64 # Novo parâmetro
+
+
+    # Torne os logs do TensorFlow menos detalhados
+    os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
+
+    # Configure logging to display client-side information
+    logging.basicConfig(level=logging.DEBUG)
 
     # Define o caminho do checkpoint inicial (opcional)
     initial_model_path = f"model_round_0_{dataset}.pt"  # Ajuste conforme necessário
@@ -77,7 +93,7 @@ def server_fn(context: Context) -> ServerAppComponents:
     parameters = ndarrays_to_parameters(ndarrays)
 
     # Define a estratégia usando a estratégia personalizada
-    strategy = FedAvg_Save(initial_parameters=parameters, dataset=dataset)
+    strategy = FedAvg_Save(initial_parameters=parameters, dataset=dataset, num_clientes=num_clientes)
     config = ServerConfig(num_rounds=num_rounds)
 
     return ServerAppComponents(strategy=strategy, config=config)

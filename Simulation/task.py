@@ -114,7 +114,7 @@ class Net(nn.Module):
 fds = None  # Cache FederatedDataset
 
 
-def load_data(partition_id, num_partitions, dataset="mnist"):
+def load_data(partition_id, num_partitions, dataset="mnist", tam_batch=32):
     """Load partition dataset (MNIST or CIFAR10)."""
     # Only initialize FederatedDataset once
     global fds
@@ -154,8 +154,8 @@ def load_data(partition_id, num_partitions, dataset="mnist"):
         return batch
 
     partition_train_test = partition_train_test.with_transform(apply_transforms)
-    trainloader = DataLoader(partition_train_test["train"], batch_size=32, shuffle=True)
-    testloader = DataLoader(partition_train_test["test"], batch_size=32)
+    trainloader = DataLoader(partition_train_test["train"], batch_size=tam_batch, shuffle=True)
+    testloader = DataLoader(partition_train_test["test"], batch_size=tam_batch)
     return trainloader, testloader
 
 

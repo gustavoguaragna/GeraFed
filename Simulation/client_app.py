@@ -10,12 +10,13 @@ from flwr.common import Context
 
 
 class FedVaeClient(NumPyClient):
-    def __init__(self, trainloader, testloader, local_epochs, learning_rate, dataset):
+    def __init__(self, trainloader, testloader, local_epochs, learning_rate, dataset, tam_ruido):
         self.net = Net(dataset=dataset)
         self.trainloader = trainloader
         self.testloader = testloader
         self.local_epochs = local_epochs
         self.lr = learning_rate
+        self.tam_ruido = tam_ruido
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.dataset = dataset
 
@@ -45,14 +46,16 @@ def client_fn(context: Context):
     # Read the node_config to fetch data partition associated to this node
     partition_id = context.node_config["partition-id"]
     num_partitions = context.node_config["num-partitions"]
+    tam_batch = context.node_config["tam_batch"]
 
     # Read the run_config to fetch hyperparameters relevant to this run
     dataset = context.run_config["dataset"]  # Novo parâmetro
-    trainloader, testloader = load_data(partition_id, num_partitions, dataset=dataset)
+    trainloader, testloader = load_data(partition_id, num_partitions, dataset=dataset, tam_batch=tam_batch)
     local_epochs = context.run_config["local-epochs"]
     learning_rate = context.run_config["learning-rate"]
+    tam_ruido = context.run_config["tam_ruido"]
 
-    return FedVaeClient(trainloader, testloader, local_epochs, learning_rate, dataset).to_client()
+    return FedVaeClient(trainloader, testloader, local_epochs, learning_rate, dataset, tam_ruido).to_client()
 
 
 app = ClientApp(client_fn=client_fn)
