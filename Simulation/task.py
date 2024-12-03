@@ -5,9 +5,23 @@ from collections import OrderedDict
 from flwr_datasets import FederatedDataset
 from flwr_datasets.partitioner import IidPartitioner
 
+import tensorflow as tf
 from tensorflow.keras import layers
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, Concatenate
+
+cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+generator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
+discriminator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
+
+def discriminator_loss(real_output, fake_output):
+    real_loss = cross_entropy(tf.ones_like(real_output), real_output)
+    fake_loss = cross_entropy(tf.zeros_like(fake_output), fake_output)
+    total_loss = real_loss + fake_loss
+    return total_loss
+
+def generator_loss(fake_output):
+    return cross_entropy(tf.ones_like(fake_output), fake_output)
 
 def define_discriminator(img_size, classes, batch_size):
     image_input = Input(shape=(img_size*img_size,))
@@ -58,8 +72,6 @@ def define_generator(noise_dim, classes, batch_size, img_size):
 
 def define_gan(generator, discriminator, noise_dim, classes):
     #discriminator.trainable = False  # Freeze discriminator's weights during generator training
-
-
     noise_input = Input(shape=(noise_dim,))
     label_input = Input(shape=(classes,))
     gen_output = generator([noise_input, label_input])
@@ -115,9 +127,3 @@ def load_data(partition_id, num_partitions, dataset="mnist", tam_batch=32):
     trainloader = DataLoader(partition_train_test["train"], batch_size=tam_batch, shuffle=True)
     testloader = DataLoader(partition_train_test["test"], batch_size=tam_batch)
     return trainloader, testloader
-
-
-def generate(net, image):
-    """Reproduce the input with trained VAE."""
-    with torch.no_grad():
-        return net.forward(image)

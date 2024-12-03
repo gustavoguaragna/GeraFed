@@ -3,7 +3,7 @@
 """GeraFed: um framework para balancear dados heterogêneos em aprendizado federado."""
 
 import tensorflow as tf
-from Simulation.task import define_discriminator, define_generator, define_gan, load_data
+from Simulation.task import define_discriminator, define_generator, define_gan, load_data, discriminator_loss, generator_loss, discriminator_optimizer, generator_optimizer
 
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import Context
@@ -46,9 +46,7 @@ class GanClient(NumPyClient):
 
     def fit(self, parameters, config):
         try:
-          print("setando param")
           self.set_weights(parameters)
-          embedding_layer = tf.keras.layers.Embedding(input_dim=classes, output_dim=classes)
           self.gen_losses = []
           self.disc_losses = []
           for i, data in enumerate(self.x_train_ds):
@@ -57,17 +55,17 @@ class GanClient(NumPyClient):
               # ---------------------
 
               # Generate random noise
-              noise = tf.random.normal([batch_size, noise_dim])
+              noise = tf.random.normal([self.tam_batch, self.tam_ruido])
 
               # Generate random labels for fake images (integer labels)
-              x_fake_labels = tf.random.uniform([batch_size], minval=0, maxval=classes, dtype=tf.int32)
+              x_fake_labels = tf.random.uniform([self.tam_batch], minval=0, maxval=self.classes, dtype=tf.int32)
 
               # One-hot encode the fake labels
-              x_fake_labels_one_hot = tf.one_hot(x_fake_labels, depth=classes)
+              x_fake_labels_one_hot = tf.one_hot(x_fake_labels, depth=self.classes)
 
               # One-hot encode the real labels from the dataset
               real_labels = data[1]
-              real_labels_one_hot = tf.one_hot(real_labels, depth=classes)
+              real_labels_one_hot = tf.one_hot(real_labels, depth=self.classes)
 
               # Flatten the real images
               real_images = tf.reshape(data[0], [tf.shape(data[0])[0], -1])  # Shape: (batch_size, img_size * img_size)
@@ -140,14 +138,14 @@ class GanClient(NumPyClient):
         try:
           self.set_weights(parameters)
 
-          noise = tf.random.normal([batch_size, noise_dim])
-          x_fake_labels = tf.random.uniform([batch_size], minval=0, maxval=classes, dtype=tf.int32)
-          x_fake_labels_one_hot = tf.one_hot(x_fake_labels, depth=classes)
+          noise = tf.random.normal([self.tam_batch, self.tam_ruido])
+          x_fake_labels = tf.random.uniform([self.tam_batch], minval=0, maxval=self.classes, dtype=tf.int32)
+          x_fake_labels_one_hot = tf.one_hot(x_fake_labels, depth=self.classes)
 
           generated_images = self.generator([noise, x_fake_labels_one_hot], training=False)
 
           real_labels = self.y_train[:300]
-          real_labels_one_hot = tf.one_hot(real_labels, depth=classes)
+          real_labels_one_hot = tf.one_hot(real_labels, depth=self.classes)
           real_images = tf.reshape(self.x_train[:300], [tf.shape(self.x_train[:300])[0], -1])
 
           real_output = self.discriminator([real_images, real_labels_one_hot], training=False)
@@ -168,36 +166,6 @@ class GanClient(NumPyClient):
           # Return a default loss value and proceed
           return float('inf'), len(self.x_train), {}
         
-
-class FedVaeClient(NumPyClient):
-    def __init__(self, trainloader, testloader, local_epochs, learning_rate, dataset, tam_ruido):
-        self.net = Net(dataset=dataset)
-        self.trainloader = trainloader
-        self.testloader = testloader
-        self.local_epochs = local_epochs
-        self.lr = learning_rate
-        self.tam_ruido = tam_ruido
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.dataset = dataset
-
-    def fit(self, parameters, config):
-        """Train the model with data of this client."""
-        set_weights(self.net, parameters)
-        train(
-            self.net,
-            self.trainloader,
-            epochs=self.local_epochs,
-            learning_rate=self.lr,
-            device=self.device,
-            dataset=self.dataset
-        )
-        return get_weights(self.net), len(self.trainloader), {}
-
-    def evaluate(self, parameters, config):
-        """Evaluate the model on the data this client has."""
-        set_weights(self.net, parameters)
-        loss = test(self.net, self.testloader, self.device, dataset=self.dataset)
-        return float(loss), len(self.testloader), {}
 
 
 def client_fn(context: Context):

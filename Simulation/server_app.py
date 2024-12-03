@@ -79,9 +79,6 @@ def server_fn(context: Context) -> ServerAppComponents:
     num_rounds = context.run_config["num_rodadas"]
     dataset = context.run_config["dataset"] 
     num_clientes = context.run_config["num_clientes"]
-    cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
-    generator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
-    discriminator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
     classes = context.run_config["classes"]
     tam_img = context.run_config["tam_img"]
     tam_batch = context.run_config["tam_batch"]
