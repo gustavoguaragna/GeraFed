@@ -10,6 +10,8 @@ from tensorflow.keras import layers
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, Concatenate
 
+import math
+
 cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
 generator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
 discriminator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
@@ -81,49 +83,32 @@ def define_gan(generator, discriminator, noise_dim, classes):
     return gan
 
 
-fds = None  # Cache FederatedDataset
+def load_data(num_clientes):
+    """Download and partitions the MNIST dataset."""
+
+    (x_train, y_train), _ = tf.keras.datasets.mnist.load_data()
+
+    x_train = x_train.astype('float32')
+    x_train = x_train / 255.0
+    x_train = (x_train - 0.5)/0.5
+    x_train = tf.expand_dims(x_train, axis=-1)
+    x_train = tf.image.resize(x_train, [64, 64])
+    x_train = tf.transpose(x_train, perm=[0, 3, 1, 2])
 
 
-def load_data(partition_id, num_partitions, dataset="mnist", tam_batch=32):
-    """Load partition dataset (MNIST or CIFAR10)."""
-    # Only initialize FederatedDataset once
-    global fds
-    if fds is None:
-        partitioner = IidPartitioner(num_partitions=num_partitions)
-        if dataset == "mnist":
-            fds = FederatedDataset(
-                dataset="mnist",
-                partitioners={"train": partitioner},
-            )
-        elif dataset == "cifar10":
-            fds = FederatedDataset(
-                dataset="uoft-cs/cifar10",
-                partitioners={"train": partitioner},
-            )
-        else:
-            raise ValueError(f"Dataset {dataset} not supported")
-    partition = fds.load_partition(partition_id)
-    # Divide data on each node: 80% train, 20% test
-    partition_train_test = partition.train_test_split(test_size=0.2, seed=42)
-    if dataset == "mnist":
-        pytorch_transforms = Compose(
-            [ToTensor(), Normalize((0.5,), (0.5,))]  # MNIST has 1 channel
-        )
-    elif dataset == "cifar10":
-        pytorch_transforms = Compose(
-            [ToTensor(), Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]  # CIFAR-10 has 3 channels
-        )
+    partitions = []
+    # We keep all partitions equal-sized in this example
+    partition_size_train = math.floor(len(x_train) / num_clientes)
+    #partition_size_test = math.floor(len(x_test) / NUM_CLIENTS)
+    for cid in range(num_clientes):
+        # Split dataset into non-overlapping NUM_CLIENT partitions
+        idxtrain_from, idxtrain_to = int(cid) * partition_size_train, (int(cid) + 1) * partition_size_train
 
-    def apply_transforms(batch, dataset=dataset):
-        if dataset == "mnist":
-          imagem = "image"
-        elif dataset == "cifar10":
-          imagem = "img"
-        """Apply transforms to the partition from FederatedDataset."""
-        batch[imagem] = [pytorch_transforms(img) for img in batch[imagem]]
-        return batch
+        x_train_partition = x_train[idxtrain_from:idxtrain_to]
+        y_train_partition = y_train[idxtrain_from:idxtrain_to]
 
-    partition_train_test = partition_train_test.with_transform(apply_transforms)
-    trainloader = DataLoader(partition_train_test["train"], batch_size=tam_batch, shuffle=True)
-    testloader = DataLoader(partition_train_test["test"], batch_size=tam_batch)
-    return trainloader, testloader
+        partitions.append((x_train_partition, y_train_partition))
+
+    print("dataset loaded")
+
+    return partitions

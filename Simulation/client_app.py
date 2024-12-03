@@ -167,23 +167,33 @@ class GanClient(NumPyClient):
           return float('inf'), len(self.x_train), {}
         
 
-
-def client_fn(context: Context):
+def client_fn(cid: str, context: Context):
     """Construct a Client that will be run in a ClientApp."""
-
-    # Read the node_config to fetch data partition associated to this node
-    partition_id = context.node_config["partition-id"]
-    num_partitions = context.node_config["num-partitions"]
-    tam_batch = context.node_config["tam_batch"]
 
     # Read the run_config to fetch hyperparameters relevant to this run
     dataset = context.run_config["dataset"]  # Novo parâmetro
-    trainloader, testloader = load_data(partition_id, num_partitions, dataset=dataset, tam_batch=tam_batch)
     local_epochs = context.run_config["local-epochs"]
     learning_rate = context.run_config["learning-rate"]
     tam_ruido = context.run_config["tam_ruido"]
+    tam_batch = context.run_config["tam_batch"]
+    num_clientes = context.run_config["num_clientes"]
+    classes = context.run_config["classes"]
+    tam_img = context.run_config["tam_img"]
+    dataset_partitions = load_data(num_clientes=num_clientes)
 
-    return FedVaeClient(trainloader, testloader, local_epochs, learning_rate, dataset, tam_ruido).to_client()
+    x_train = dataset_partitions[int(cid)][0]
+    y_train = dataset_partitions[int(cid)][1]
+
+    return GanClient(x_train=x_train,
+                     y_train=y_train,
+                     local_epochs=local_epochs, 
+                     learning_rate=learning_rate, 
+                     dataset=dataset, 
+                     tam_ruido=tam_ruido,
+                     classes=classes,
+                     tam_batch=tam_batch,
+                     tam_img=tam_img).to_client()
+
 
 
 app = ClientApp(client_fn=client_fn)
