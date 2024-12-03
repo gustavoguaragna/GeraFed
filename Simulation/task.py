@@ -56,6 +56,18 @@ def define_generator(noise_dim, classes, batch_size, img_size):
     generator = Model([noise_input, label_input], output)
     return generator
 
+def define_gan(generator, discriminator, noise_dim, classes):
+    #discriminator.trainable = False  # Freeze discriminator's weights during generator training
+
+
+    noise_input = Input(shape=(noise_dim,))
+    label_input = Input(shape=(classes,))
+    gen_output = generator([noise_input, label_input])
+    gan_output = discriminator([gen_output, label_input])
+
+    gan = Model([noise_input, label_input], gan_output)
+    return gan
+
 
 fds = None  # Cache FederatedDataset
 
@@ -105,56 +117,7 @@ def load_data(partition_id, num_partitions, dataset="mnist", tam_batch=32):
     return trainloader, testloader
 
 
-def train(net, trainloader, epochs, learning_rate, device, dataset="mnist"):
-    """Train the network on the training set."""
-    if dataset == "mnist":
-      imagem = "image"
-    elif dataset == "cifar10":
-      imagem = "img"
-    net.to(device)  # move model to GPU if available
-    optimizer = torch.optim.SGD(net.parameters(), lr=learning_rate, momentum=0.9)
-    for _ in range(epochs):
-        for batch in trainloader:
-            images = batch[imagem]
-            images = images.to(device)
-            optimizer.zero_grad()
-            recon_images, mu, logvar = net(images)
-            recon_loss = F.mse_loss(recon_images, images)
-            kld_loss = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
-            loss = recon_loss + 0.05 * kld_loss
-            loss.backward()
-            optimizer.step()
-
-
-def test(net, testloader, device, dataset="mnist"):
-    """Validate the network on the entire test set."""
-    if dataset == "mnist":
-      imagem = "image"
-    elif dataset == "cifar10":
-      imagem = "img"
-    total, loss = 0, 0.0
-    with torch.no_grad():
-        for batch in testloader:
-            images = batch[imagem].to(device)
-            recon_images, mu, logvar = net(images)
-            recon_loss = F.mse_loss(recon_images, images)
-            kld_loss = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
-            loss += recon_loss + kld_loss
-            total += len(images)
-    return loss / total
-
-
 def generate(net, image):
     """Reproduce the input with trained VAE."""
     with torch.no_grad():
         return net.forward(image)
-
-
-def get_weights(net):
-    return [val.cpu().numpy() for _, val in net.state_dict().items()]
-
-
-def set_weights(net, parameters):
-    params_dict = zip(net.state_dict().keys(), parameters)
-    state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
-    net.load_state_dict(state_dict, strict=True)
