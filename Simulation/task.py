@@ -2,113 +2,59 @@
 
 from collections import OrderedDict
 
-import torch
-import torch.nn.functional as F
 from flwr_datasets import FederatedDataset
 from flwr_datasets.partitioner import IidPartitioner
-from torch import nn
-from torch.utils.data import DataLoader
-from torchvision.transforms import Compose, Normalize, ToTensor
 
+from tensorflow.keras import layers
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Input, Concatenate
 
-class Flatten(nn.Module):
-    """Flattens input by reshaping it into a one-dimensional tensor."""
+def define_discriminator(img_size, classes, batch_size):
+    image_input = Input(shape=(img_size*img_size,))
+    label_input = Input(shape=(classes,))
+    disc_input = Concatenate()([image_input, label_input])
 
-    def forward(self, input):
-        return input.view(input.size(0), -1)
+    x = layers.Dense(batch_size*2*2*2, use_bias=True)(disc_input)
+    x = layers.LeakyReLU(0.2)(x)
 
+    x = layers.Dense(batch_size*2*2, use_bias=True)(x)
+    x = layers.Dropout(0.4)(x)
+    x = layers.LeakyReLU(0.2)(x)
 
-class UnFlatten(nn.Module):
-    """Unflattens a tensor converting it to a desired shape."""
+    x = layers.Dense(batch_size*2, use_bias=True)(x)
+    x = layers.Dropout(0.4)(x)
+    x = layers.LeakyReLU(0.2)(x)
 
-    def __init__(self, target_shape):
-        super().__init__()
-        self.target_shape = target_shape
+    x = layers.Dense(batch_size, use_bias=True)(x)
+    output = layers.Dense(1, activation='sigmoid')(x)
 
-    def forward(self, input):
-        return input.view(*self.target_shape)
+    discriminator = Model([image_input, label_input], output)
+    return discriminator
 
+def define_generator(noise_dim, classes, batch_size, img_size):
+    noise_input = Input(shape=(noise_dim,))
+    label_input = Input(shape=(classes,))
+    gen_input = Concatenate()([noise_input, label_input])
 
-class Net(nn.Module):
-    def __init__(self, dataset="mnist", z_dim=10) -> None:
-        super().__init__()
-        if dataset == "mnist":
-            in_channels = 1
-            out_channels = 1
-            self.encoder = nn.Sequential(
-                nn.Conv2d(
-                    in_channels=1, out_channels=6, kernel_size=4, stride=2
-                ),  # [batch,6,13,13]
-                nn.ReLU(),
-                nn.Conv2d(
-                    in_channels=6, out_channels=16, kernel_size=5, stride=2
-                ),  # [batch,16,5,5]
-                nn.ReLU(),
-                Flatten(),
-            )
-            h_dim = 16 * 5 * 5  # 400
-            self.fc1 = nn.Linear(h_dim, z_dim)
-            self.fc2 = nn.Linear(h_dim, z_dim)
-            self.fc3 = nn.Linear(z_dim, h_dim)
-            self.decoder = nn.Sequential(
-                UnFlatten((-1, 16, 5, 5)),  # [batch,16,5,5]
-                nn.ConvTranspose2d(in_channels=16, out_channels=6, kernel_size=5, stride=2),  # [batch,6,15,15]
-                nn.ReLU(),
-                nn.ConvTranspose2d(in_channels=6, out_channels=1, kernel_size=4, stride=2),  # [batch,1,28,28]
-                nn.Tanh(),
-            )
-        elif dataset == "cifar10":
-            in_channels = 3
-            out_channels = 3
-            self.encoder = nn.Sequential(
-                nn.Conv2d(
-                    in_channels=3, out_channels=6, kernel_size=4, stride=2
-                ),  # [batch,6,15,15]
-                nn.ReLU(),
-                nn.Conv2d(
-                    in_channels=6, out_channels=16, kernel_size=5, stride=2
-                ),  # [batch,16,6,6]
-                nn.ReLU(),
-                Flatten(),
-            )
-            h_dim = 16 * 6 * 6  # 576
-            self.fc1 = nn.Linear(h_dim, z_dim)
-            self.fc2 = nn.Linear(h_dim, z_dim)
-            self.fc3 = nn.Linear(z_dim, h_dim)
-            self.decoder = nn.Sequential(
-                UnFlatten((-1, 16, 6, 6)),  # [batch,16,6,6]
-                nn.ConvTranspose2d(in_channels=16, out_channels=6, kernel_size=5, stride=2),  # [batch,6,15,15]
-                nn.ReLU(),
-                nn.ConvTranspose2d(in_channels=6, out_channels=3, kernel_size=4, stride=2),  # [batch,3,32,32]
-                nn.Tanh(),
-            )
-        else:
-            raise ValueError(f"Dataset {dataset} not supported")
+    x = layers.Dense(batch_size, use_bias=True)(gen_input)
+    x = layers.LeakyReLU(0.2)(x)
 
-    def reparametrize(self, h):
-        """Reparametrization layer of VAE."""
-        mu, logvar = self.fc1(h), self.fc2(h)
-        std = torch.exp(logvar / 2)
-        eps = torch.randn_like(std)
-        z = mu + std * eps
-        return z, mu, logvar
+    x = layers.Dense(batch_size*2, use_bias=True)(x)
+    x = layers.BatchNormalization(epsilon=0.00001, momentum=0.1)(x)
+    x = layers.LeakyReLU(0.2)(x)
 
-    def encode(self, x):
-        """Encoder of the VAE."""
-        h = self.encoder(x)
-        z, mu, logvar = self.reparametrize(h)
-        return z, mu, logvar
+    x = layers.Dense(batch_size*2*2, use_bias=True)(x)
+    x = layers.BatchNormalization(epsilon=0.00001, momentum=0.1)(x)
+    x = layers.LeakyReLU(0.2)(x)
 
-    def decode(self, z):
-        """Decoder of the VAE."""
-        z = self.fc3(z)
-        z = self.decoder(z)
-        return z
+    x = layers.Dense(batch_size*2*2*2, use_bias=True)(x)
+    x = layers.BatchNormalization(epsilon=0.00001, momentum=0.1)(x)
+    x = layers.LeakyReLU(0.2)(x)
 
-    def forward(self, x):
-        z, mu, logvar = self.encode(x)
-        z_decode = self.decode(z)
-        return z_decode, mu, logvar
+    output = layers.Dense(img_size*img_size, activation='tanh')(x)
+
+    generator = Model([noise_input, label_input], output)
+    return generator
 
 
 fds = None  # Cache FederatedDataset

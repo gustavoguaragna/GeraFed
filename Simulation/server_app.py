@@ -2,7 +2,7 @@
 
 """GeraFed: um framework para balancear dados heterogêneos em aprendizado federado."""
 
-#from fedvaeexample.task import Net, get_weights, set_weights
+from Simulation.task import define_generator, define_discriminator, get_weights
 from flwr.common import Context, ndarrays_to_parameters, parameters_to_ndarrays
 from flwr.server import ServerApp, ServerAppComponents, ServerConfig
 from flwr.server.strategy import FedAvg
@@ -11,9 +11,13 @@ import os  # Importar para verificar a existência de arquivos
 import logging
 
 class FedAvg_Save(FedAvg):
-    def __init__(self, dataset, num_clientes **kwargs):
+    def __init__(self, dataset, num_clientes, classes, tam_batch, tam_img, tam_ruido, **kwargs):
         super().__init__(min_available_clients=num_clientes, **kwargs)
         self.dataset = dataset
+        self.classes = classes
+        self.tam_batch = tam_batch
+        self.tam_img = tam_img
+        self.tam_ruido = tam_ruido
 
     def aggregate_fit(self, server_round, results, failures):
         # Agrega os resultados da rodada
@@ -21,7 +25,8 @@ class FedAvg_Save(FedAvg):
 
         if aggregated_parameters is not None:
             # Salva o modelo após a agregação
-            self.save_model(aggregated_parameters, server_round)
+            if (server_round % 5) == 0:
+                self.save_model(aggregated_parameters, server_round)
 
         return aggregated_parameters, aggregated_metrics
 
@@ -36,15 +41,28 @@ class FedAvg_Save(FedAvg):
 
     def save_model(self, parameters, server_round):
         # Converte os parâmetros para ndarrays
-        ndarrays = parameters_to_ndarrays(parameters)
-        # Cria uma instância do modelo
-        model = Net(dataset=self.dataset)
-        # Define os pesos do modelo
-        set_weights(model, ndarrays)
-        # Salva o modelo no disco com o nome específico do dataset
-        model_path = f"model_round_{server_round}_{self.dataset}.pt"
-        torch.save(model.state_dict(), model_path)
-        print(f"Modelo salvo em {model_path}")
+        weights = parameters_to_ndarrays(parameters)
+
+        # Reconstruct the models
+        generator = define_generator(noise_dim=self.tam_ruido,
+                                     classes=self.classes, 
+                                     batch_size=self.tam_batch,
+                                     img_size=self.tam_img)
+        discriminator = define_discriminator(img_size=self.tam_img,
+                                             classes=self.classes,
+                                             batch_size=self.tam_batch)
+
+        # Set the weights
+        generator_num_weights = len(generator.get_weights())
+        generator_weights = weights[:generator_num_weights]
+        discriminator_weights = weights[generator_num_weights:]
+
+        generator.set_weights(generator_weights)
+        discriminator.set_weights(discriminator_weights)
+
+        generator.save(f'generator_model_round{server_round}.h5')       # Saves architecture and weights
+        discriminator.save(f'discriminator_model_round{server_round}.h5')
+        print(f"Modelo salvo")
 
     def save_loss(self, loss, server_round):
         # Salva a perda em um arquivo de texto específico do dataset
@@ -64,9 +82,11 @@ def server_fn(context: Context) -> ServerAppComponents:
     cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
     generator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
     discriminator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
-    classes = 10
-    channels = 1
-    img_size = 64 # Novo parâmetro
+    classes = context.run_config["classes"]
+    tam_img = context.run_config["tam_img"]
+    tam_batch = context.run_config["tam_batch"]
+    tam_ruido = context.run_config["tam_ruido"]
+    #channels = 1
 
 
     # Torne os logs do TensorFlow menos detalhados
@@ -93,7 +113,16 @@ def server_fn(context: Context) -> ServerAppComponents:
     parameters = ndarrays_to_parameters(ndarrays)
 
     # Define a estratégia usando a estratégia personalizada
-    strategy = FedAvg_Save(initial_parameters=parameters, dataset=dataset, num_clientes=num_clientes)
+    strategy = FedAvg_Save(
+                            initial_parameters=parameters,
+                            dataset=dataset,
+                            num_clientes=num_clientes,
+                            tam_img=tam_img,
+                            tam_batch=tam_batch,
+                            tam_ruido=tam_ruido,
+                            classes=classes
+                           )
+    
     config = ServerConfig(num_rounds=num_rounds)
 
     return ServerAppComponents(strategy=strategy, config=config)
