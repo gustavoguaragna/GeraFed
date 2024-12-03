@@ -6,11 +6,12 @@ build-backend = "hatchling.build"
 name = "GeraFed"
 version = "1.0.0"
 description = "Data Augmentation para Dados Heterogêneos em Aprendizado Federado"
-license = ""
+license = "Apache-2.0"
 dependencies = [
     "flwr[simulation]>=1.12.0",
     "flwr-datasets[vision]>=0.3.0",
-    "tensorflow==2.17.1",
+    "torch==2.2.1",
+    "torchvision==0.17.1",
 ]
 
 [tool.hatch.build.targets.wheel]
