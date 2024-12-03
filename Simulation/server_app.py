@@ -88,6 +88,7 @@ def server_fn(context: Context) -> ServerAppComponents:
 
     # Torne os logs do TensorFlow menos detalhados
     os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+    #os.environ[TF_FORCE_GPU_ALLOW_GROWTH]="1"
 
 
     # Configure logging to display client-side information
