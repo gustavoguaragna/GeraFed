@@ -1,20 +1,22 @@
 """GeraFed: um framework para balancear dados heterogêneos em aprendizado federado."""
 
 import torch
-from Simulation.task import Net, get_weights, load_data, set_weights, test, train
+from Simulation.task import Generator, Discriminator, get_weights, load_data, set_weights, test, train
 
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import Context
 
 
 class FedVaeClient(NumPyClient):
-    def __init__(self, trainloader, testloader, local_epochs, learning_rate, dataset):
-        self.net = Net(dataset=dataset)
+    def __init__(self, trainloader, testloader, local_epochs, learning_rate, dataset, img_size, latent_dim):
+        self.gen = Generator(dataset=dataset, img_size=img_size, latent_dim=latent_dim)
+        self.disc = Discriminator(dataset=dataset, img_size=img_size, latent_dim=latent_dim)
         self.trainloader = trainloader
         self.testloader = testloader
         self.local_epochs = local_epochs
         self.lr = learning_rate
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        # cudnn.benchmark = True
         self.dataset = dataset
 
     def fit(self, parameters, config):
@@ -46,11 +48,14 @@ def client_fn(context: Context):
 
     # Read the run_config to fetch hyperparameters relevant to this run
     dataset = context.run_config["dataset"]  # Novo parâmetro
-    trainloader, testloader = load_data(partition_id, num_partitions, dataset=dataset)
+    img_size = context.run_config["tam_img"]
+    batch_size = context.run_config["tam_batch"]
+    trainloader, testloader = load_data(partition_id, num_partitions, dataset=dataset, img_size=img_size, batch_size=batch_size)
     local_epochs = context.run_config["local-epochs"]
     learning_rate = context.run_config["learning-rate"]
+    noise_dim = context.run_config["tam_ruido"]
 
-    return FedVaeClient(trainloader, testloader, local_epochs, learning_rate, dataset).to_client()
+    return FedVaeClient(trainloader, testloader, local_epochs, learning_rate, dataset, img_size=img_size, latent_dim=noise_dim).to_client()
 
 
 app = ClientApp(client_fn=client_fn)

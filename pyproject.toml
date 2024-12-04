@@ -30,7 +30,6 @@ num_clientes = 2
 tam_ruido = 10
 tam_batch = 64
 tam_img = 64
-classes = 10
 epocas_alvo = 2
 epocas_gen = 2
 num_dadossint = 10

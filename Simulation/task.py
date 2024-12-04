@@ -8,15 +8,17 @@ from flwr_datasets import FederatedDataset
 from flwr_datasets.partitioner import IidPartitioner
 from torch import nn
 from torch.utils.data import DataLoader
-from torchvision.transforms import Compose, Normalize, ToTensor
+from torchvision.transforms import Compose, Normalize, ToTensor, Resize
+import numpy as np
 
 
 # Define the Generator model
 class Generator(nn.Module):
-    def __init__(self, classes, channels, img_size, latent_dim):
+    def __init__(self, dataset, img_size, latent_dim):
         super(Generator, self).__init__()
-        self.classes = classes
-        self.channels = channels
+        if dataset == "mnist":
+            self.classes = 10
+            self.channels = 1
         self.img_size = img_size
         self.latent_dim = latent_dim
         self.img_shape = (self.channels, self.img_size, self.img_size)
@@ -47,10 +49,11 @@ class Generator(nn.Module):
 
 # Define the Discriminator model
 class Discriminator(nn.Module):
-    def __init__(self, classes, channels, img_size, latent_dim):
+    def __init__(self, dataset, img_size, latent_dim):
         super(Discriminator, self).__init__()
-        self.classes = classes
-        self.channels = channels
+        if dataset == "mnist":
+            self.classes = 10
+            self.channels = 1
         self.img_size = img_size
         self.latent_dim = latent_dim
         self.img_shape = (self.channels, self.img_size, self.img_size)
@@ -86,7 +89,7 @@ class Discriminator(nn.Module):
 fds = None  # Cache FederatedDataset
 
 
-def load_data(partition_id, num_partitions, dataset="mnist"):
+def load_data(partition_id, num_partitions, dataset="mnist", img_size=64, batch_size=32):
     """Load partition dataset (MNIST or CIFAR10)."""
     # Only initialize FederatedDataset once
     global fds
@@ -109,11 +112,11 @@ def load_data(partition_id, num_partitions, dataset="mnist"):
     partition_train_test = partition.train_test_split(test_size=0.2, seed=42)
     if dataset == "mnist":
         pytorch_transforms = Compose(
-            [ToTensor(), Normalize((0.5,), (0.5,))]  # MNIST has 1 channel
+            [Resize(img_size), ToTensor(), Normalize((0.5,), (0.5,))]  # MNIST has 1 channel
         )
     elif dataset == "cifar10":
         pytorch_transforms = Compose(
-            [ToTensor(), Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]  # CIFAR-10 has 3 channels
+            [Resize(img_size), ToTensor(), Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]  # CIFAR-10 has 3 channels
         )
 
     def apply_transforms(batch, dataset=dataset):
@@ -126,8 +129,8 @@ def load_data(partition_id, num_partitions, dataset="mnist"):
         return batch
 
     partition_train_test = partition_train_test.with_transform(apply_transforms)
-    trainloader = DataLoader(partition_train_test["train"], batch_size=32, shuffle=True)
-    testloader = DataLoader(partition_train_test["test"], batch_size=32)
+    trainloader = DataLoader(partition_train_test["train"], batch_size=batch_size, shuffle=True)
+    testloader = DataLoader(partition_train_test["test"], batch_size=batch_size)
     return trainloader, testloader
 
 
@@ -138,7 +141,7 @@ def train(net, trainloader, epochs, learning_rate, device, dataset="mnist"):
     elif dataset == "cifar10":
       imagem = "img"
     net.to(device)  # move model to GPU if available
-    optimizer = torch.optim.SGD(net.parameters(), lr=learning_rate, momentum=0.9)
+    optimizer = torch.optim.Adam(net.parameters(), lr=learning_rate, betas=(0.5, 0.999))
     for _ in range(epochs):
         for batch in trainloader:
             images = batch[imagem]
