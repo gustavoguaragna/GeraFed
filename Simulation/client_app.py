@@ -1,16 +1,15 @@
 """GeraFed: um framework para balancear dados heterogêneos em aprendizado federado."""
 
 import torch
-from Simulation.task import Generator, Discriminator, get_weights, load_data, set_weights, test, train
+from Simulation.task import GAN, get_weights, load_data, set_weights, test, train
 
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import Context
 
 
-class FedVaeClient(NumPyClient):
+class CGANClient(NumPyClient):
     def __init__(self, trainloader, testloader, local_epochs, learning_rate, dataset, img_size, latent_dim):
-        self.gen = Generator(dataset=dataset, img_size=img_size, latent_dim=latent_dim)
-        self.disc = Discriminator(dataset=dataset, img_size=img_size, latent_dim=latent_dim)
+        self.net = GAN(dataset=dataset, img_size=img_size, latent_dim=latent_dim)
         self.trainloader = trainloader
         self.testloader = testloader
         self.local_epochs = local_epochs
@@ -55,7 +54,7 @@ def client_fn(context: Context):
     learning_rate = context.run_config["learning-rate"]
     noise_dim = context.run_config["tam_ruido"]
 
-    return FedVaeClient(trainloader, testloader, local_epochs, learning_rate, dataset, img_size=img_size, latent_dim=noise_dim).to_client()
+    return CGANClient(trainloader, testloader, local_epochs, learning_rate, dataset, img_size=img_size, latent_dim=noise_dim).to_client()
 
 
 app = ClientApp(client_fn=client_fn)
