@@ -52,8 +52,8 @@ def client_fn(context: Context):
     img_size = context.run_config["tam_img"]
     batch_size = context.run_config["tam_batch"]
     trainloader, testloader = load_data(partition_id, num_partitions, dataset=dataset, img_size=img_size, batch_size=batch_size)
-    local_epochs = context.run_config["local-epochs"]
-    learning_rate = context.run_config["learning-rate"]
+    local_epochs = context.run_config["epocas_gen"]
+    learning_rate = context.run_config["learn_rate_gen"]
     noise_dim = context.run_config["tam_ruido"]
 
     return CGANClient(trainloader, testloader, local_epochs, learning_rate, dataset, img_size=img_size, latent_dim=noise_dim).to_client()
