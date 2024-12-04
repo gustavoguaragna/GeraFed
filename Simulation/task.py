@@ -14,7 +14,7 @@ import numpy as np
 
 # Define the GAN model
 class CGAN(nn.Module):
-    def __init__(self, dataset, img_size, latent_dim):
+    def __init__(self, dataset, img_size, latent_dim, batch_size):
         super(CGAN, self).__init__()
         if dataset == "mnist":
             self.classes = 10
@@ -59,22 +59,109 @@ class CGAN(nn.Module):
             layers.append(nn.LeakyReLU(0.2, inplace=True))
         return layers
 
-    def forward_gen(self, noise, labels):
-        z = torch.cat((self.label_embedding(labels), noise), -1)
-        x = self.model(z)
-        x = x.view(x.size(0), *self.img_shape) #Em
-        return x
-
-    def forward_disc(self, image, labels):
-        x = torch.cat((image.view(image.size(0), -1), self.label_embedding(labels)), -1)
-        return self.model(x)
+    def forward(self, input, labels):
+        if input.dim() == 2:
+            z = torch.cat((self.label_embedding(labels), input), -1)
+            x = self.generator(z)
+            x = x.view(x.size(0), *self.img_shape) #Em
+            return x 
+        elif input.dim() == 4:
+            x = torch.cat((input.view(input.size(0), -1), self.label_embedding(labels)), -1)
+            return self.discriminator(x)
 
     def loss(self, output, label):
         return self.adv_loss(output, label)
     
 
-fds = None  # Cache FederatedDataset
+def train(net, trainloader, epochs, learning_rate, device, dataset="mnist", latent_dim=100):
+    """Train the network on the training set."""
+    if dataset == "mnist":
+      imagem = "image"
+    elif dataset == "cifar10":
+      imagem = "img"
+    
+    net.to(device)  # move model to GPU if available
+    optim_G = torch.optim.Adam(net.generator.parameters(), lr=learning_rate, betas=(0.5, 0.999))
+    optim_D = torch.optim.Adam(net.discriminator.parameters(), lr=learning_rate, betas=(0.5, 0.999))
 
+    
+    for _ in range(epochs):
+        for batch in trainloader:
+            images, labels = batch[imagem].to(device), batch["label"].to_device
+            batch_size = images.size(0)
+            real_ident = torch.full((batch_size, 1), 1., device=device)
+            fake_ident = torch.full((batch_size, 1), 0., device=device)
+
+            # Train G
+            net.zero_grad()
+            z_noise = torch.randn(batch_size, latent_dim, device=device)
+            x_fake_labels = torch.randint(0, 10, (batch_size,), device=device)
+            x_fake = net(z_noise, x_fake_labels)
+            y_fake_g = net(x_fake, x_fake_labels)
+            g_loss = net.loss(y_fake_g, real_ident)
+            g_loss.backward()
+            optim_G.step()
+
+            # Train D
+            net.zero_grad()
+            y_real = net(images, labels)
+            d_real_loss = net.loss(y_real, real_ident)
+            y_fake_d = net(x_fake.detach(), x_fake_labels)
+            d_fake_loss = net.loss(y_fake_d, fake_ident)
+            d_loss = (d_real_loss + d_fake_loss) / 2
+            d_loss.backward()
+            optim_D.step()
+
+            g_losses.append(g_loss.item())
+            d_losses.append(d_loss.item())
+
+            if batch_idx % log_interval == 0 and batch_idx > 0:
+                print('Epoch {} [{}/{}] loss_D: {:.4f} loss_G: {:.4f}'.format(
+                            epoch, batch_idx, len(dataloader),
+                            d_loss.mean().item(),
+                            g_loss.mean().item()))
+
+                with torch.no_grad():
+                    viz_sample = netG(viz_noise, viz_label)
+                    img_list.append(vutils.make_grid(viz_sample, normalize=True))
+    
+
+
+def test(net, testloader, device, dataset="mnist"):
+    """Validate the network on the entire test set."""
+    if dataset == "mnist":
+      imagem = "image"
+    elif dataset == "cifar10":
+      imagem = "img"
+    total, loss = 0, 0.0
+    with torch.no_grad():
+        for batch in testloader:
+            images = batch[imagem].to(device)
+            recon_images, mu, logvar = net(images)
+            recon_loss = F.mse_loss(recon_images, images)
+            kld_loss = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
+            loss += recon_loss + kld_loss
+            total += len(images)
+    return loss / total
+
+
+def generate(net, image):
+    """Reproduce the input with trained VAE."""
+    with torch.no_grad():
+        return net.forward(image)
+
+
+def get_weights(net):
+    return [val.cpu().numpy() for _, val in net.state_dict().items()]
+
+
+def set_weights(net, parameters):
+    params_dict = zip(net.state_dict().keys(), parameters)
+    state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
+    net.load_state_dict(state_dict, strict=True)
+
+
+fds = None  # Cache FederatedDataset
 
 def load_data(partition_id, num_partitions, dataset="mnist", img_size=64, batch_size=32):
     """Load partition dataset (MNIST or CIFAR10)."""
@@ -119,59 +206,3 @@ def load_data(partition_id, num_partitions, dataset="mnist", img_size=64, batch_
     trainloader = DataLoader(partition_train_test["train"], batch_size=batch_size, shuffle=True)
     testloader = DataLoader(partition_train_test["test"], batch_size=batch_size)
     return trainloader, testloader
-
-
-def train(net, trainloader, epochs, learning_rate, device, dataset="mnist"):
-    """Train the network on the training set."""
-    if dataset == "mnist":
-      imagem = "image"
-    elif dataset == "cifar10":
-      imagem = "img"
-    
-    net.to(device)  # move model to GPU if available
-    optimizer = torch.optim.Adam(net.parameters(), lr=learning_rate, betas=(0.5, 0.999))
-    for _ in range(epochs):
-        for batch in trainloader:
-            images = batch[imagem]
-            images = images.to(device)
-            optimizer.zero_grad()
-            recon_images, mu, logvar = net(images)
-            recon_loss = F.mse_loss(recon_images, images)
-            kld_loss = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
-            loss = recon_loss + 0.05 * kld_loss
-            loss.backward()
-            optimizer.step()
-
-
-def test(net, testloader, device, dataset="mnist"):
-    """Validate the network on the entire test set."""
-    if dataset == "mnist":
-      imagem = "image"
-    elif dataset == "cifar10":
-      imagem = "img"
-    total, loss = 0, 0.0
-    with torch.no_grad():
-        for batch in testloader:
-            images = batch[imagem].to(device)
-            recon_images, mu, logvar = net(images)
-            recon_loss = F.mse_loss(recon_images, images)
-            kld_loss = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
-            loss += recon_loss + kld_loss
-            total += len(images)
-    return loss / total
-
-
-def generate(net, image):
-    """Reproduce the input with trained VAE."""
-    with torch.no_grad():
-        return net.forward(image)
-
-
-def get_weights(net):
-    return [val.cpu().numpy() for _, val in net.state_dict().items()]
-
-
-def set_weights(net, parameters):
-    params_dict = zip(net.state_dict().keys(), parameters)
-    state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
-    net.load_state_dict(state_dict, strict=True)

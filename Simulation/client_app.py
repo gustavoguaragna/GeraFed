@@ -1,7 +1,7 @@
 """GeraFed: um framework para balancear dados heterogêneos em aprendizado federado."""
 
 import torch
-from Simulation.task import GAN, get_weights, load_data, set_weights, test, train
+from Simulation.task import CGAN, get_weights, load_data, set_weights, test, train
 
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import Context
@@ -9,7 +9,8 @@ from flwr.common import Context
 
 class CGANClient(NumPyClient):
     def __init__(self, trainloader, testloader, local_epochs, learning_rate, dataset, img_size, latent_dim):
-        self.net = GAN(dataset=dataset, img_size=img_size, latent_dim=latent_dim)
+        self.latent_dim = latent_dim
+        self.net = CGAN(dataset=dataset, img_size=img_size, latent_dim=self.latent_dim)
         self.trainloader = trainloader
         self.testloader = testloader
         self.local_epochs = local_epochs
@@ -27,7 +28,8 @@ class CGANClient(NumPyClient):
             epochs=self.local_epochs,
             learning_rate=self.lr,
             device=self.device,
-            dataset=self.dataset
+            dataset=self.dataset,
+            latent_dim=self.latent_dim
         )
         return get_weights(self.net), len(self.trainloader), {}
 
