@@ -84,9 +84,12 @@ def train(net, trainloader, epochs, learning_rate, device, dataset="mnist", late
     optim_G = torch.optim.Adam(net.generator.parameters(), lr=learning_rate, betas=(0.5, 0.999))
     optim_D = torch.optim.Adam(net.discriminator.parameters(), lr=learning_rate, betas=(0.5, 0.999))
 
-    
-    for _ in range(epochs):
-        for batch in trainloader:
+    g_losses = []
+    d_losses = []
+
+
+    for epoch in range(epochs):
+        for batch_idx, batch in enumerate(trainloader):
             images, labels = batch[imagem].to(device), batch["label"].to_device
             batch_size = images.size(0)
             real_ident = torch.full((batch_size, 1), 1., device=device)
@@ -115,15 +118,11 @@ def train(net, trainloader, epochs, learning_rate, device, dataset="mnist", late
             g_losses.append(g_loss.item())
             d_losses.append(d_loss.item())
 
-            if batch_idx % log_interval == 0 and batch_idx > 0:
-                print('Epoch {} [{}/{}] loss_D: {:.4f} loss_G: {:.4f}'.format(
-                            epoch, batch_idx, len(dataloader),
+            if batch_idx % 100 == 0 and batch_idx > 0:
+                print('Epoch {} [{}/{}] loss_D_treino: {:.4f} loss_G_treino: {:.4f}'.format(
+                            epoch, batch_idx, len(trainloader),
                             d_loss.mean().item(),
                             g_loss.mean().item()))
-
-                with torch.no_grad():
-                    viz_sample = netG(viz_noise, viz_label)
-                    img_list.append(vutils.make_grid(viz_sample, normalize=True))
     
 
 
@@ -133,22 +132,38 @@ def test(net, testloader, device, dataset="mnist"):
       imagem = "image"
     elif dataset == "cifar10":
       imagem = "img"
-    total, loss = 0, 0.0
+    g_losses = []
+    d_losses = []
     with torch.no_grad():
-        for batch in testloader:
-            images = batch[imagem].to(device)
-            recon_images, mu, logvar = net(images)
-            recon_loss = F.mse_loss(recon_images, images)
-            kld_loss = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
-            loss += recon_loss + kld_loss
-            total += len(images)
-    return loss / total
+        for batch_idx, batch in enumerate(testloader):
+            images, labels = batch[imagem].to(device), batch["label"].to_device
+            batch_size = images.size(0)
+            real_ident = torch.full((batch_size, 1), 1., device=device)
+            fake_ident = torch.full((batch_size, 1), 0., device=device)
+            
+            #Gen loss
+            z_noise = torch.randn(batch_size, latent_dim, device=device)
+            x_fake_labels = torch.randint(0, 10, (batch_size,), device=device)
+            x_fake = net(z_noise, x_fake_labels)
+            y_fake_g = net(x_fake, x_fake_labels)
+            g_loss = net.loss(y_fake_g, real_ident)
 
+            #Disc loss
+            y_real = net(images, labels)
+            d_real_loss = net.loss(y_real, real_ident)
+            y_fake_d = net(x_fake.detach(), x_fake_labels)
+            d_fake_loss = net.loss(y_fake_d, fake_ident)
+            d_loss = (d_real_loss + d_fake_loss) / 2
 
-def generate(net, image):
-    """Reproduce the input with trained VAE."""
-    with torch.no_grad():
-        return net.forward(image)
+            g_losses.append(g_loss.item())
+            d_losses.append(d_loss.item())
+
+            if batch_idx % 100 == 0 and batch_idx > 0:
+                print('[{}/{}] loss_D_teste: {:.4f} loss_G_teste: {:.4f}'.format(
+                            batch_idx, len(testloader),
+                            d_loss.mean().item(),
+                            g_loss.mean().item()))
+    return np.mean(g_losses), np.mean(d_losses)
 
 
 def get_weights(net):

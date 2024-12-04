@@ -36,8 +36,8 @@ class CGANClient(NumPyClient):
     def evaluate(self, parameters, config):
         """Evaluate the model on the data this client has."""
         set_weights(self.net, parameters)
-        loss = test(self.net, self.testloader, self.device, dataset=self.dataset)
-        return float(loss), len(self.testloader), {}
+        g_loss, d_loss = test(self.net, self.testloader, self.device, dataset=self.dataset)
+        return g_loss, len(self.testloader), {}
 
 
 def client_fn(context: Context):
