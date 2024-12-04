@@ -90,7 +90,7 @@ def train(net, trainloader, epochs, learning_rate, device, dataset="mnist", late
 
     for epoch in range(epochs):
         for batch_idx, batch in enumerate(trainloader):
-            images, labels = batch[imagem].to(device), batch["label"].to_device
+            images, labels = batch[imagem].to(device), batch["label"].to(device)
             batch_size = images.size(0)
             real_ident = torch.full((batch_size, 1), 1., device=device)
             fake_ident = torch.full((batch_size, 1), 0., device=device)
