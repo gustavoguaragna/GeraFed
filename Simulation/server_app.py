@@ -1,6 +1,6 @@
 """GeraFed: um framework para balancear dados heterogêneos em aprendizado federado."""
 
-from Simulation.task import Net, get_weights, set_weights
+from Simulation.task import CGAN, get_weights, set_weights
 from flwr.common import Context, ndarrays_to_parameters, parameters_to_ndarrays
 from flwr.server import ServerApp, ServerAppComponents, ServerConfig
 from flwr.server.strategy import FedAvg
@@ -35,7 +35,7 @@ class FedAvg_Save(FedAvg):
         # Converte os parâmetros para ndarrays
         ndarrays = parameters_to_ndarrays(parameters)
         # Cria uma instância do modelo
-        model = Net(dataset=self.dataset)
+        model = CGAN(dataset=self.dataset)
         # Define os pesos do modelo
         set_weights(model, ndarrays)
         # Salva o modelo no disco com o nome específico do dataset
@@ -63,13 +63,13 @@ def server_fn(context: Context) -> ServerAppComponents:
 
     if os.path.exists(initial_model_path):
         # Carrega o modelo existente
-        model = Net(dataset=dataset)
+        model = CGAN(dataset=dataset)
         model.load_state_dict(torch.load(initial_model_path))
         ndarrays = get_weights(model)
         print(f"Modelo carregado a partir de {initial_model_path}")
     else:
         # Inicializa o modelo a partir do início
-        ndarrays = get_weights(Net(dataset=dataset))
+        ndarrays = get_weights(CGAN(dataset=dataset))
         print(f"Inicializando modelo do zero para dataset {dataset}")
 
     parameters = ndarrays_to_parameters(ndarrays)

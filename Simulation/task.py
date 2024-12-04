@@ -14,7 +14,7 @@ import numpy as np
 
 # Define the GAN model
 class CGAN(nn.Module):
-    def __init__(self, dataset, img_size, latent_dim, batch_size):
+    def __init__(self, dataset, img_size=64, latent_dim=100, batch_size=64):
         super(CGAN, self).__init__()
         if dataset == "mnist":
             self.classes = 10
