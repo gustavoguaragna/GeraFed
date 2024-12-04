@@ -126,7 +126,7 @@ def train(net, trainloader, epochs, learning_rate, device, dataset="mnist", late
     
 
 
-def test(net, testloader, device, dataset="mnist"):
+def test(net, testloader, device, dataset="mnist", latent_dim=100):
     """Validate the network on the entire test set."""
     if dataset == "mnist":
       imagem = "image"
@@ -136,7 +136,7 @@ def test(net, testloader, device, dataset="mnist"):
     d_losses = []
     with torch.no_grad():
         for batch_idx, batch in enumerate(testloader):
-            images, labels = batch[imagem].to(device), batch["label"].to_device
+            images, labels = batch[imagem].to(device), batch["label"].to(device)
             batch_size = images.size(0)
             real_ident = torch.full((batch_size, 1), 1., device=device)
             fake_ident = torch.full((batch_size, 1), 0., device=device)
