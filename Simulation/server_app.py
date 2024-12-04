@@ -55,7 +55,7 @@ def server_fn(context: Context) -> ServerAppComponents:
     """Construct components for ServerApp."""
 
     # Lê a configuração
-    num_rounds = context.run_config["num-server-rounds"]
+    num_rounds = context.run_config["num_rodadas"]
     dataset = context.run_config["dataset"]  # Novo parâmetro
 
     # Define o caminho do checkpoint inicial (opcional)
