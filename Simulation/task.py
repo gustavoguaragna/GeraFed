@@ -27,20 +27,20 @@ class CGAN(nn.Module):
 
 
         self.generator = nn.Sequential(
-            *self._create_layer(self.latent_dim + self.classes, 128, False),
-            *self._create_layer(128, 256),
-            *self._create_layer(256, 512),
-            *self._create_layer(512, 1024),
+            *self._create_layer_gen(self.latent_dim + self.classes, 128, False),
+            *self._create_layer_gen(128, 256),
+            *self._create_layer_gen(256, 512),
+            *self._create_layer_gen(512, 1024),
             nn.Linear(1024, int(np.prod(self.img_shape))),
             nn.Tanh()
         )
 
         self.discriminator = nn.Sequential(
-            *self._create_layer(self.classes + int(np.prod(self.img_shape)), 1024, False, True),
-            *self._create_layer(1024, 512, True, True),
-            *self._create_layer(512, 256, True, True),
-            *self._create_layer(256, 128, False, False),
-            *self._create_layer(128, 1, False, False),
+            *self._create_layer_disc(self.classes + int(np.prod(self.img_shape)), 1024, False, True),
+            *self._create_layer_disc(1024, 512, True, True),
+            *self._create_layer_disc(512, 256, True, True),
+            *self._create_layer_disc(256, 128, False, False),
+            *self._create_layer_disc(128, 1, False, False),
             nn.Sigmoid()
         )
 
