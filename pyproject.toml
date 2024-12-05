@@ -27,6 +27,7 @@ clientapp = "Simulation.client_app:app"
 [tool.flwr.app.config]
 num_rodadas = 5
 num_clientes = 2
+fraction_fit_alvo = 1.0
 tam_ruido = 100
 tam_batch = 64
 tam_img = 64
@@ -38,6 +39,7 @@ learn_rate_gen = 0.001
 modelo_alvo = "mlp"
 modelo_gen = "gan"
 dataset = "mnist"
+
 
 [tool.flwr.federations]
 default = "local-simulation"
