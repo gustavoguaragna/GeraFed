@@ -54,7 +54,7 @@ def load_data(partition_id: int, num_partitions: int):
 
     def apply_transforms(batch):
         """Apply transforms to the partition from FederatedDataset."""
-        batch["img"] = [pytorch_transforms(img) for img in batch["img"]]
+        batch["image"] = [pytorch_transforms(img) for img in batch["image"]]
         return batch
 
     partition_train_test = partition_train_test.with_transform(apply_transforms)
@@ -72,7 +72,7 @@ def train(net, trainloader, epochs, device):
     running_loss = 0.0
     for _ in range(epochs):
         for batch in trainloader:
-            images = batch["img"]
+            images = batch["image"]
             labels = batch["label"]
             optimizer.zero_grad()
             loss = criterion(net(images.to(device)), labels.to(device))
@@ -91,7 +91,7 @@ def test(net, testloader, device):
     correct, loss = 0, 0.0
     with torch.no_grad():
         for batch in testloader:
-            images = batch["img"].to(device)
+            images = batch["image"].to(device)
             labels = batch["label"].to(device)
             outputs = net(images)
             loss += criterion(outputs, labels).item()
