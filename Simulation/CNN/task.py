@@ -34,66 +34,6 @@ class Net(nn.Module):
 
 fds = None  # Cache FederatedDataset
 
-# Define the GAN model
-class CGAN(nn.Module):
-    def __init__(self, dataset, img_size=64, latent_dim=100, batch_size=64):
-        super(CGAN, self).__init__()
-        if dataset == "mnist":
-            self.classes = 10
-            self.channels = 1
-        self.img_size = img_size
-        self.latent_dim = latent_dim
-        self.img_shape = (self.channels, self.img_size, self.img_size)
-        self.label_embedding = nn.Embedding(self.classes, self.classes)
-        self.adv_loss = torch.nn.BCELoss()
-
-
-        self.generator = nn.Sequential(
-            *self._create_layer_gen(self.latent_dim + self.classes, 128, False),
-            *self._create_layer_gen(128, 256),
-            *self._create_layer_gen(256, 512),
-            *self._create_layer_gen(512, 1024),
-            nn.Linear(1024, int(np.prod(self.img_shape))),
-            nn.Tanh()
-        )
-
-        self.discriminator = nn.Sequential(
-            *self._create_layer_disc(self.classes + int(np.prod(self.img_shape)), 1024, False, True),
-            *self._create_layer_disc(1024, 512, True, True),
-            *self._create_layer_disc(512, 256, True, True),
-            *self._create_layer_disc(256, 128, False, False),
-            *self._create_layer_disc(128, 1, False, False),
-            nn.Sigmoid()
-        )
-
-    def _create_layer_gen(self, size_in, size_out, normalize=True):
-        layers = [nn.Linear(size_in, size_out)]
-        if normalize:
-            layers.append(nn.BatchNorm1d(size_out))
-        layers.append(nn.LeakyReLU(0.2, inplace=True))
-        return layers
-    
-    def _create_layer_disc(self, size_in, size_out, drop_out=True, act_func=True):
-        layers = [nn.Linear(size_in, size_out)]
-        if drop_out:
-            layers.append(nn.Dropout(0.4))
-        if act_func:
-            layers.append(nn.LeakyReLU(0.2, inplace=True))
-        return layers
-
-    def forward(self, input, labels):
-        if input.dim() == 2:
-            z = torch.cat((self.label_embedding(labels), input), -1)
-            x = self.generator(z)
-            x = x.view(x.size(0), *self.img_shape) #Em
-            return x 
-        elif input.dim() == 4:
-            x = torch.cat((input.view(input.size(0), -1), self.label_embedding(labels)), -1)
-            return self.discriminator(x)
-
-    def loss(self, output, label):
-        return self.adv_loss(output, label)
-
 
 def load_data(partition_id: int, num_partitions: int):
     """Load partition MNIST data."""
