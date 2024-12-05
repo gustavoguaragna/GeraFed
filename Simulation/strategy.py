@@ -18,7 +18,7 @@ from flwr.server.client_manager import ClientManager
 from flwr.server.client_proxy import ClientProxy
 
 from flwr.server.strategy.aggregate import aggregate, aggregate_inplace, weighted_loss_avg
-
+import random
 
 
 WARNING_MIN_AVAILABLE_CLIENTS_TOO_LOW = """
@@ -114,6 +114,8 @@ class GeraFed(Strategy):
         self.accept_failures = accept_failures
         self.initial_parameters_alvo = initial_parameters_alvo
         self.initial_parameters_gen = initial_parameters_gen
+        self.parameters_alvo = initial_parameters_alvo
+        self.parameters_gen = initial_parameters_gen
         self.fit_metrics_aggregation_fn = fit_metrics_aggregation_fn
         self.evaluate_metrics_aggregation_fn = evaluate_metrics_aggregation_fn
         self.inplace = inplace
@@ -177,18 +179,35 @@ class GeraFed(Strategy):
         if self.on_fit_config_fn is not None:
             # Custom fit config function provided
             config = self.on_fit_config_fn(server_round)
-        fit_ins = FitIns(parameters, config)
+        #fit_ins = FitIns(parameters, config)
 
         # Sample clients
         sample_size, min_num_clients = self.num_fit_clients(
             client_manager.num_available()
         )
-        clients = client_manager.sample(
+        clients = list(client_manager.sample(
             num_clients=sample_size, min_num_clients=min_num_clients
-        )
+        ))
+
+        random.shuffle(clients)
+        metade = len(clients) // 2
+        conjunto_alvo = clients[:metade]
+        conjunto_gen = clients[metade:]
+
+        fit_instructions = []
+        config_alvo = {"modelo": "alvo"}
+        config_gen = {"modelo": "gen"}
+
+        for c in conjunto_alvo:
+            fit_ins_alvo = FitIns(parameters=self.parameters_alvo, config=config_alvo)
+            fit_instructions.append((c, fit_ins_alvo))
+        
+        for c in conjunto_gen:
+            fit_ins_gen = FitIns(parameters=self.parameters_gen, config=config_gen)
+            fit_instructions.append((c, fit_ins_gen))
 
         # Return client/config pairs
-        return [(client, fit_ins) for client in clients]
+        return fit_instructions
 
 
 
