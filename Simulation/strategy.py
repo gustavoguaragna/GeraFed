@@ -1,4 +1,4 @@
-from .strategy import Strategy
+from flwr.server.strategy import Strategy
 from logging import WARNING
 from typing import Callable, Optional, Union
 from flwr.common import (

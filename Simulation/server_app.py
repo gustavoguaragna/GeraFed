@@ -3,7 +3,7 @@
 from flwr.common import Context, ndarrays_to_parameters
 from flwr.server import ServerApp, ServerAppComponents, ServerConfig
 from Simulation.task import Net, CGAN, get_weights
-from strategy import GeraFed
+from Simulation.strategy import GeraFed
 
 
 def server_fn(context: Context):
