@@ -11,11 +11,12 @@ def server_fn(context: Context):
     num_rounds = context.run_config["num_rodadas"]
     fraction_fit_alvo = context.run_config["fraction_fit_alvo"]
     fraction_fit_gen = context.run_config["fraction_fit_gen"]
+    dataset = context.run_config["dataset"]
 
     # Initialize model parameters
     ndarrays_alvo = get_weights(Net())
     parameters_alvo = ndarrays_to_parameters(ndarrays_alvo)
-    ndarrays_gen = get_weights(CGAN())
+    ndarrays_gen = get_weights(CGAN(dataset=dataset))
     parameters_gen = ndarrays_to_parameters(ndarrays_gen)
 
     # Define strategy

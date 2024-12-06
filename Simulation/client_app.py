@@ -56,7 +56,8 @@ class FlowerClient(NumPyClient):
 
 def client_fn(context: Context):
     # Load model and data
-    net_gen = CGAN()
+    dataset = context.run_config["dataset"]
+    net_gen = CGAN(dataset=dataset)
     net_alvo = Net()
     partition_id = context.node_config["partition-id"]
     num_partitions = context.node_config["num-partitions"]
