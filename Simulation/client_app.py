@@ -49,8 +49,8 @@ class FlowerClient(NumPyClient):
             )
 
     def evaluate(self, parameters, config):
-        set_weights(self.net, parameters)
-        loss, accuracy = test(self.net, self.valloader, self.device)
+        set_weights(self.net_alvo, parameters)
+        loss, accuracy = test(self.net_alvo, self.valloader, self.device)
         return loss, len(self.valloader.dataset), {"accuracy": accuracy}
 
 
