@@ -253,10 +253,14 @@ class GeraFed(Strategy):
         # Do not aggregate if there are failures and failures are not accepted
         if not self.accept_failures and failures:
             return None, {}
+        
+        results_alvo = [res for res in results if res[1].metrics["model"] == "alvo"]
+        results_gen = [res for res in results if res[1].metrics["model"] == "gen"]
 
         if self.inplace:
             # Does in-place weighted average of results
-            aggregated_ndarrays = aggregate_inplace(results)
+            aggregated_ndarrays_alvo = aggregate_inplace(results_alvo)
+            aggregated_ndarrays_gen = aggregate_inplace(results_gen)
         else:
             # Convert results
             weights_results = [
@@ -265,17 +269,21 @@ class GeraFed(Strategy):
             ]
             aggregated_ndarrays = aggregate(weights_results)
 
-        parameters_aggregated = ndarrays_to_parameters(aggregated_ndarrays)
+        parameters_aggregated_alvo = ndarrays_to_parameters(aggregated_ndarrays_alvo)
+        parameters_aggregated_gen = ndarrays_to_parameters(aggregated_ndarrays_gen)
+
+        self.parameters_alvo = parameters_aggregated_alvo
+        self.parameters_gen = parameters_aggregated_gen
 
         # Aggregate custom metrics if aggregation fn was provided
         metrics_aggregated = {}
         if self.fit_metrics_aggregation_fn:
-            fit_metrics = [(res.num_examples, res.metrics) for _, res in results]
+            fit_metrics = [(res.num_examples, res.metrics) for _, res in results_alvo]
             metrics_aggregated = self.fit_metrics_aggregation_fn(fit_metrics)
         elif server_round == 1:  # Only log this warning once
             log(WARNING, "No fit_metrics_aggregation_fn provided")
 
-        return parameters_aggregated, metrics_aggregated
+        return parameters_aggregated_alvo, metrics_aggregated
 
 
 
