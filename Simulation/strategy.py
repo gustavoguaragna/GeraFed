@@ -113,7 +113,6 @@ class GeraFed(Strategy):
         self.on_evaluate_config_fn = on_evaluate_config_fn
         self.accept_failures = accept_failures
         self.initial_parameters_alvo = initial_parameters_alvo
-        self.initial_parameters_gen = initial_parameters_gen
         self.parameters_alvo = initial_parameters_alvo
         self.parameters_gen = initial_parameters_gen
         self.fit_metrics_aggregation_fn = fit_metrics_aggregation_fn
@@ -147,8 +146,8 @@ class GeraFed(Strategy):
         self, client_manager: ClientManager
     ) -> Optional[Parameters]:
         """Initialize global model parameters."""
-        initial_parameters = self.initial_parameters
-        self.initial_parameters = None  # Don't keep initial parameters in memory
+        initial_parameters = self.initial_parameters_alvo
+        self.initial_parameters_alvo = None  # Don't keep initial parameters in memory
         return initial_parameters
 
 
