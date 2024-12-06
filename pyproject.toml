@@ -28,6 +28,7 @@ clientapp = "Simulation.client_app:app"
 num_rodadas = 5
 num_clientes = 2
 fraction_fit_alvo = 1.0
+fraction_fit_gen = 1.0
 tam_ruido = 100
 tam_batch = 64
 tam_img = 64

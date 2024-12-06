@@ -2,25 +2,29 @@
 
 from flwr.common import Context, ndarrays_to_parameters
 from flwr.server import ServerApp, ServerAppComponents, ServerConfig
-from Simulation.task import Net, get_weights
+from Simulation.task import Net, CGAN, get_weights
 from strategy import GeraFed
 
 
 def server_fn(context: Context):
     # Read from config
     num_rounds = context.run_config["num_rodadas"]
-    fraction_fit = context.run_config["fraction_fit_alvo"]
+    fraction_fit_alvo = context.run_config["fraction_fit_alvo"]
+    fraction_fit_gen = context.run_config["fraction_fit_gen"]
 
     # Initialize model parameters
-    ndarrays = get_weights(Net())
-    parameters = ndarrays_to_parameters(ndarrays)
+    ndarrays_alvo = get_weights(Net())
+    parameters_alvo = ndarrays_to_parameters(ndarrays_alvo)
+    ndarrays_gen = get_weights(CGAN())
+    parameters_gen = ndarrays_to_parameters(ndarrays_gen)
 
     # Define strategy
     strategy = GeraFed(
-        fraction_fit=fraction_fit,
-        fraction_evaluate=1.0,
-        min_available_clients=2,
-        initial_parameters=parameters,
+        fraction_fit_alvo=fraction_fit_alvo,
+        fraction_fit_gen=fraction_fit_gen,
+        fraction_evaluate_alvo=1.0,
+        initial_parameters_alvo=parameters_alvo,
+        initial_parameters_gen=parameters_gen
     )
     config = ServerConfig(num_rounds=num_rounds)
 

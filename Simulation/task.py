@@ -124,7 +124,7 @@ def load_data(partition_id: int, num_partitions: int):
     return trainloader, testloader
 
 
-def train(net, trainloader, epochs, device):
+def train_alvo(net, trainloader, epochs, device):
     """Train the model on the training set."""
     net.to(device)  # move model to GPU if available
     criterion = torch.nn.CrossEntropyLoss().to(device)
@@ -143,6 +143,57 @@ def train(net, trainloader, epochs, device):
 
     avg_trainloss = running_loss / len(trainloader)
     return avg_trainloss
+
+def train_gen(net, trainloader, epochs, learning_rate, device, dataset="mnist", latent_dim=100):
+    """Train the network on the training set."""
+    if dataset == "mnist":
+      imagem = "image"
+    elif dataset == "cifar10":
+      imagem = "img"
+    
+    net.to(device)  # move model to GPU if available
+    optim_G = torch.optim.Adam(net.generator.parameters(), lr=learning_rate, betas=(0.5, 0.999))
+    optim_D = torch.optim.Adam(net.discriminator.parameters(), lr=learning_rate, betas=(0.5, 0.999))
+
+    g_losses = []
+    d_losses = []
+
+
+    for epoch in range(epochs):
+        for batch_idx, batch in enumerate(trainloader):
+            images, labels = batch[imagem].to(device), batch["label"].to(device)
+            batch_size = images.size(0)
+            real_ident = torch.full((batch_size, 1), 1., device=device)
+            fake_ident = torch.full((batch_size, 1), 0., device=device)
+
+            # Train G
+            net.zero_grad()
+            z_noise = torch.randn(batch_size, latent_dim, device=device)
+            x_fake_labels = torch.randint(0, 10, (batch_size,), device=device)
+            x_fake = net(z_noise, x_fake_labels)
+            y_fake_g = net(x_fake, x_fake_labels)
+            g_loss = net.loss(y_fake_g, real_ident)
+            g_loss.backward()
+            optim_G.step()
+
+            # Train D
+            net.zero_grad()
+            y_real = net(images, labels)
+            d_real_loss = net.loss(y_real, real_ident)
+            y_fake_d = net(x_fake.detach(), x_fake_labels)
+            d_fake_loss = net.loss(y_fake_d, fake_ident)
+            d_loss = (d_real_loss + d_fake_loss) / 2
+            d_loss.backward()
+            optim_D.step()
+
+            g_losses.append(g_loss.item())
+            d_losses.append(d_loss.item())
+
+            if batch_idx % 100 == 0 and batch_idx > 0:
+                print('Epoch {} [{}/{}] loss_D_treino: {:.4f} loss_G_treino: {:.4f}'.format(
+                            epoch, batch_idx, len(trainloader),
+                            d_loss.mean().item(),
+                            g_loss.mean().item()))
 
 
 def test(net, testloader, device):

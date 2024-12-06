@@ -4,7 +4,7 @@ import torch
 
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import Context
-from Simulation.task import Net, CGAN, get_weights, load_data, set_weights, test, train
+from Simulation.task import Net, CGAN, get_weights, load_data, set_weights, test, train_alvo, train_gen
 
 
 # Define Flower Client and client_fn
@@ -21,18 +21,32 @@ class FlowerClient(NumPyClient):
         self.net_gen.to(self.device)
 
     def fit(self, parameters, config):
-        set_weights(self.net, parameters)
-        train_loss = train(
-            self.net,
-            self.trainloader,
-            self.local_epochs,
-            self.device,
-        )
-        return (
-            get_weights(self.net),
-            len(self.trainloader.dataset),
-            {"train_loss": train_loss},
-        )
+        if config["model"] == "alvo":
+            set_weights(self.net_alvo, parameters)
+            train_loss = train_alvo(
+                self.net_alvo,
+                self.trainloader,
+                self.local_epochs_alvo,
+                self.device,
+            )
+            return (
+                get_weights(self.net_alvo),
+                len(self.trainloader.dataset),
+                {"train_loss": train_loss, "modelo": "alvo"},
+            )
+        elif config["model"] == "gen":
+            set_weights(self.net_gen, parameters)
+            train_loss = train_gen(
+                self.net_gen,
+                self.trainloader,
+                self.local_epochs_gen,
+                self.device,
+            )
+            return (
+                get_weights(self.net_gen),
+                len(self.trainloader.dataset),
+                {"train_loss": train_loss, "modelo": "gen"},
+            )
 
     def evaluate(self, parameters, config):
         set_weights(self.net, parameters)
@@ -58,4 +72,3 @@ def client_fn(context: Context):
 app = ClientApp(
     client_fn,
 )
-

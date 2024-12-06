@@ -137,7 +137,7 @@ class GeraFed(Strategy):
 
     def num_evaluation_clients(self, num_available_clients: int) -> tuple[int, int]:
         """Use a fraction of available clients for evaluation."""
-        num_clients = int(num_available_clients * self.fraction_evaluate)
+        num_clients = int(num_available_clients * self.fraction_evaluate_alvo)
         return max(num_clients, self.min_evaluate_clients), self.min_available_clients
 
 
@@ -217,7 +217,7 @@ class GeraFed(Strategy):
     ) -> list[tuple[ClientProxy, EvaluateIns]]:
         """Configure the next round of evaluation."""
         # Do not configure federated evaluation if fraction eval is 0.
-        if self.fraction_evaluate == 0.0:
+        if self.fraction_evaluate_alvo == 0.0:
             return []
 
         # Parameters and config
