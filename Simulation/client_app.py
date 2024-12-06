@@ -63,7 +63,7 @@ def client_fn(context: Context):
     num_partitions = context.node_config["num-partitions"]
     trainloader, valloader = load_data(partition_id, num_partitions)
     local_epochs_alvo = context.run_config["epocas_alvo"]
-    local_epochs_gen = context.run_congig["epocas_gen"]
+    local_epochs_gen = context.run_config["epocas_gen"]
 
     # Return Client instance
     return FlowerClient(net_gen, net_alvo, trainloader, valloader, local_epochs_alvo, local_epochs_gen).to_client()
