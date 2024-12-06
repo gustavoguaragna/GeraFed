@@ -21,7 +21,7 @@ class FlowerClient(NumPyClient):
         self.net_gen.to(self.device)
 
     def fit(self, parameters, config):
-        if config["model"] == "alvo":
+        if config["modelo"] == "alvo":
             set_weights(self.net_alvo, parameters)
             train_loss = train_alvo(
                 self.net_alvo,
@@ -34,7 +34,7 @@ class FlowerClient(NumPyClient):
                 len(self.trainloader.dataset),
                 {"train_loss": train_loss, "modelo": "alvo"},
             )
-        elif config["model"] == "gen":
+        elif config["modelo"] == "gen":
             set_weights(self.net_gen, parameters)
             train_loss = train_gen(
                 self.net_gen,

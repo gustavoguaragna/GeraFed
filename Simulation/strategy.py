@@ -253,8 +253,8 @@ class GeraFed(Strategy):
         if not self.accept_failures and failures:
             return None, {}
         
-        results_alvo = [res for res in results if res[1].metrics["model"] == "alvo"]
-        results_gen = [res for res in results if res[1].metrics["model"] == "gen"]
+        results_alvo = [res for res in results if res[1].metrics["modelo"] == "alvo"]
+        results_gen = [res for res in results if res[1].metrics["modelo"] == "gen"]
 
         if self.inplace:
             # Does in-place weighted average of results
