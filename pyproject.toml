@@ -25,8 +25,8 @@ serverapp = "Simulation.server_app:app"
 clientapp = "Simulation.client_app:app"
 
 [tool.flwr.app.config]
-num_rodadas = 5
-num_clientes = 2
+num_rodadas = 3
+num_clientes = 4
 fraction_fit_alvo = 1.0
 fraction_fit_gen = 1.0
 tam_ruido = 100
@@ -46,4 +46,4 @@ dataset = "mnist"
 default = "local-simulation"
 
 [tool.flwr.federations.local-simulation]
-options.num-supernodes = 2
+options.num-supernodes = 4
