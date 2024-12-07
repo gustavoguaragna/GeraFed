@@ -66,7 +66,7 @@ def client_fn(context: Context):
     local_epochs_gen = context.run_config["epocas_gen"]
 
     # Return Client instance
-    return FlowerClient(net_gen, net_alvo, trainloader, valloader, local_epochs_alvo, local_epochs_gen).to_client()
+    return FlowerClient(net_alvo=net_alvo, net_gen=net_gen, trainloader=trainloader, valloader=valloader, local_epochs_alvo=local_epochs_alvo, local_epochs_gen=local_epochs_gen).to_client()
 
 
 # Flower ClientApp
