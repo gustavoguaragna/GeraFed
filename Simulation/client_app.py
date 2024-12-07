@@ -9,7 +9,7 @@ from Simulation.task import Net, CGAN, get_weights, load_data, set_weights, test
 
 # Define Flower Client and client_fn
 class FlowerClient(NumPyClient):
-    def __init__(self, net_alvo, net_gen, trainloader, valloader, local_epochs_alvo, local_epochs_gen):
+    def __init__(self, net_alvo, net_gen, trainloader, valloader, local_epochs_alvo, local_epochs_gen, dataset, lr, latent_dim):
         self.net_alvo = net_alvo
         self.net_gen = net_gen
         self.trainloader = trainloader
@@ -19,6 +19,9 @@ class FlowerClient(NumPyClient):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.net_alvo.to(self.device)
         self.net_gen.to(self.device)
+        self.dataset = dataset
+        self.lr = lr
+        self.latent_dim = latent_dim
 
     def fit(self, parameters, config):
         if config["modelo"] == "alvo":
@@ -37,10 +40,13 @@ class FlowerClient(NumPyClient):
         elif config["modelo"] == "gen":
             set_weights(self.net_gen, parameters)
             train_loss = train_gen(
-                self.net_gen,
-                self.trainloader,
-                self.local_epochs_gen,
-                self.device,
+                net=self.net_gen,
+                trainloader=self.trainloader,
+                epochs=self.local_epochs_gen,
+                learning_rate=self.lr,
+                device=self.device,
+                dataset=self.dataset,
+                latent_dim=self.latent_dim
             )
             return (
                 get_weights(self.net_gen),
@@ -64,9 +70,19 @@ def client_fn(context: Context):
     trainloader, valloader = load_data(partition_id, num_partitions)
     local_epochs_alvo = context.run_config["epocas_alvo"]
     local_epochs_gen = context.run_config["epocas_gen"]
+    lr_gen = context.run_config["learn_rate_gen"]
+    latent_dim = context.run_config["tam_ruido"]
 
     # Return Client instance
-    return FlowerClient(net_alvo=net_alvo, net_gen=net_gen, trainloader=trainloader, valloader=valloader, local_epochs_alvo=local_epochs_alvo, local_epochs_gen=local_epochs_gen).to_client()
+    return FlowerClient(net_alvo=net_alvo, 
+                        net_gen=net_gen, 
+                        trainloader=trainloader, 
+                        valloader=valloader, 
+                        local_epochs_alvo=local_epochs_alvo, 
+                        local_epochs_gen=local_epochs_gen,
+                        dataset=dataset,
+                        lr=lr_gen,
+                        latent_dim=latent_dim).to_client()
 
 
 # Flower ClientApp
