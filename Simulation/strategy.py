@@ -20,6 +20,9 @@ from flwr.server.client_proxy import ClientProxy
 from flwr.server.strategy.aggregate import aggregate, aggregate_inplace, weighted_loss_avg
 import random
 
+from Simulation.task import Net, CGAN, set_weights
+import torch
+
 
 WARNING_MIN_AVAILABLE_CLIENTS_TOO_LOW = """
     Setting `min_available_clients` lower than `min_fit_clients` or
@@ -282,6 +285,29 @@ class GeraFed(Strategy):
         elif server_round == 1:  # Only log this warning once
             log(WARNING, "No fit_metrics_aggregation_fn provided")
 
+        if parameters_aggregated_alvo is not None:
+            # Salva o modelo após a agregação
+            ndarrays = parameters_to_ndarrays(parameters_aggregated_alvo)
+            # Cria uma instância do modelo
+            model = Net()
+            # Define os pesos do modelo
+            set_weights(model, ndarrays)
+            # Salva o modelo no disco com o nome específico do dataset
+            model_path = f"modelo_alvo_round_{server_round}_mnist.pt"
+            torch.save(model.state_dict(), model_path)
+            print(f"Modelo salvo em {model_path}")
+
+        if parameters_aggregated_gen is not None:
+            ndarrays = parameters_to_ndarrays(parameters_aggregated_gen)
+            # Cria uma instância do modelo
+            model = CGAN()
+            # Define os pesos do modelo
+            set_weights(model, ndarrays)
+            # Salva o modelo no disco com o nome específico do dataset
+            model_path = f"modelo_gen_round_{server_round}_mnist.pt"
+            torch.save(model.state_dict(), model_path)
+            print(f"Modelo salvo em {model_path}")
+
         return parameters_aggregated_alvo, metrics_aggregated
 
 
@@ -308,8 +334,23 @@ class GeraFed(Strategy):
             ]
         )
 
+        accuracies = [
+            evaluate_res.metrics["accuracy"] * evaluate_res.num_examples
+            for _, evaluate_res in results
+        ]
+        examples = [evaluate_res.num_examples for _, evaluate_res in results]
+        accuracy_aggregated = (
+            sum(accuracies) / sum(examples) if sum(examples) != 0 else 0
+        )
+
+        loss_file = f"losses.txt"
+        with open(loss_file, "a") as f:
+            f.write(f"Rodada {server_round}, Perda: {loss_aggregated}, Acuracia: {accuracy_aggregated}\n")
+        print(f"Perda da rodada {server_round} salva em {loss_file}")
+
+
         # Aggregate custom metrics if aggregation fn was provided
-        metrics_aggregated = {}
+        metrics_aggregated = {"loss": loss_aggregated, "accuracy": accuracy_aggregated}
         if self.evaluate_metrics_aggregation_fn:
             eval_metrics = [(res.num_examples, res.metrics) for _, res in results]
             metrics_aggregated = self.evaluate_metrics_aggregation_fn(eval_metrics)

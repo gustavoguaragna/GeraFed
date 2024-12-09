@@ -37,7 +37,7 @@ fds = None  # Cache FederatedDataset
 
 # Define the GAN model
 class CGAN(nn.Module):
-    def __init__(self, dataset, img_size=28, latent_dim=100, batch_size=64):
+    def __init__(self, dataset="mnist", img_size=28, latent_dim=100, batch_size=64):
         super(CGAN, self).__init__()
         if dataset == "mnist":
             self.classes = 10
