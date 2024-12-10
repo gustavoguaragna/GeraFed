@@ -8,9 +8,10 @@ import torch
 import os  # Importar para verificar a existência de arquivos
 
 class FedAvg_Save(FedAvg):
-    def __init__(self, dataset, **kwargs):
+    def __init__(self, dataset, img_size, **kwargs):
         super().__init__(**kwargs)
         self.dataset = dataset
+        self.img_size = img_size
 
     def aggregate_fit(self, server_round, results, failures):
         # Agrega os resultados da rodada
@@ -35,7 +36,7 @@ class FedAvg_Save(FedAvg):
         # Converte os parâmetros para ndarrays
         ndarrays = parameters_to_ndarrays(parameters)
         # Cria uma instância do modelo
-        model = CGAN(dataset=self.dataset)
+        model = CGAN(dataset=self.dataset, img_size=self.img_size)
         # Define os pesos do modelo
         set_weights(model, ndarrays)
         # Salva o modelo no disco com o nome específico do dataset
@@ -56,26 +57,27 @@ def server_fn(context: Context) -> ServerAppComponents:
 
     # Lê a configuração
     num_rounds = context.run_config["num_rodadas"]
-    dataset = context.run_config["dataset"]  # Novo parâmetro
+    dataset = context.run_config["dataset"]
+    img_size = context.run_config["tam_img"]  # Novo parâmetro
 
     # Define o caminho do checkpoint inicial (opcional)
     initial_model_path = f"model_round_0_{dataset}.pt"  # Ajuste conforme necessário
 
     if os.path.exists(initial_model_path):
         # Carrega o modelo existente
-        model = CGAN(dataset=dataset)
+        model = CGAN(dataset=dataset, img_size=img_size)
         model.load_state_dict(torch.load(initial_model_path))
         ndarrays = get_weights(model)
         print(f"Modelo carregado a partir de {initial_model_path}")
     else:
         # Inicializa o modelo a partir do início
-        ndarrays = get_weights(CGAN(dataset=dataset))
+        ndarrays = get_weights(CGAN(dataset=dataset, img_size=img_size))
         print(f"Inicializando modelo do zero para dataset {dataset}")
 
     parameters = ndarrays_to_parameters(ndarrays)
 
     # Define a estratégia usando a estratégia personalizada
-    strategy = FedAvg_Save(initial_parameters=parameters, dataset=dataset)
+    strategy = FedAvg_Save(initial_parameters=parameters, dataset=dataset, img_size=img_size)
     config = ServerConfig(num_rounds=num_rounds)
 
     return ServerAppComponents(strategy=strategy, config=config)
