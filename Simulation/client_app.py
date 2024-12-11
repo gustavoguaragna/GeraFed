@@ -43,7 +43,7 @@ class FlowerClient(NumPyClient):
                 net=self.net_alvo,
                 trainloader=self.trainloader,
                 epochs=self.local_epochs_alvo,
-                learning_rate=self.lr_alvo,
+                lr=self.lr_alvo,
                 device=self.device,
             )
             return (
