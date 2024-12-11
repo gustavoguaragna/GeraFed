@@ -40,7 +40,7 @@ learn_rate_gen = 0.001
 modelo_alvo = "mlp"
 modelo_gen = "gan"
 dataset = "mnist"
-niid = False
+niid = false
 alpha_dir = 0.5
 
 
