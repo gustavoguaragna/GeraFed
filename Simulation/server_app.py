@@ -25,7 +25,7 @@ def server_fn(context: Context):
     fraction_fit_alvo = context.run_config["fraction_fit_alvo"]
     fraction_fit_gen = context.run_config["fraction_fit_gen"]
     dataset = context.run_config["dataset"]
-    img_size = context.run_cofig["tam_img"]
+    img_size = context.run_config["tam_img"]
     latent_dim = context.run_config["tam_ruido"]
 
     # Initialize model parameters
