@@ -6,6 +6,18 @@ from flwr.server import ServerApp, ServerAppComponents, ServerConfig
 from flwr.server.strategy import FedAvg
 import torch
 import os  # Importar para verificar a existência de arquivos
+import random
+import numpy as np
+
+SEED = 42
+random.seed(SEED)
+np.random.seed(SEED)
+torch.manual_seed(SEED)
+if torch.cuda.is_available():
+    torch.cuda.manual_seed_all(SEED)
+    # Para garantir determinismo total em operações com CUDA
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 class FedAvg_Save(FedAvg):
     def __init__(self, dataset, img_size, **kwargs):

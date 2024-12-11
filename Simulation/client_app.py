@@ -6,6 +6,18 @@ from flwr.client import ClientApp, NumPyClient
 from flwr.common import Context
 from Simulation.task import Net, CGAN, get_weights, load_data, set_weights, test, train_alvo, train_gen
 
+import random
+import numpy as np
+
+SEED = 42
+random.seed(SEED)
+np.random.seed(SEED)
+torch.manual_seed(SEED)
+if torch.cuda.is_available():
+    torch.cuda.manual_seed_all(SEED)
+    # Para garantir determinismo total em operações com CUDA
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 # Define Flower Client and client_fn
 class FlowerClient(NumPyClient):

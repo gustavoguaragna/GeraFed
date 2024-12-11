@@ -4,6 +4,19 @@ from flwr.common import Context, ndarrays_to_parameters
 from flwr.server import ServerApp, ServerAppComponents, ServerConfig
 from Simulation.task import Net, CGAN, get_weights
 from Simulation.strategy import GeraFed
+import random
+import numpy as np
+import torch
+
+SEED = 42
+random.seed(SEED)
+np.random.seed(SEED)
+torch.manual_seed(SEED)
+if torch.cuda.is_available():
+    torch.cuda.manual_seed_all(SEED)
+    # Para garantir determinismo total em operações com CUDA
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 
 def server_fn(context: Context):
