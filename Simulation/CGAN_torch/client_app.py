@@ -1,7 +1,7 @@
 """GeraFed: um framework para balancear dados heterogêneos em aprendizado federado."""
 
 import torch
-from Simulation.task import CGAN, get_weights, load_data, set_weights, test, train
+from Simulation.CGAN_torch.task import CGAN, get_weights, load_data, set_weights, test, train
 
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import Context

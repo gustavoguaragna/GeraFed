@@ -1,6 +1,6 @@
 """GeraFed: um framework para balancear dados heterogêneos em aprendizado federado."""
 
-from Simulation.task import CGAN, get_weights, set_weights
+from Simulation.CGAN_torch.task import CGAN, get_weights, set_weights
 from flwr.common import Context, ndarrays_to_parameters, parameters_to_ndarrays
 from flwr.server import ServerApp, ServerAppComponents, ServerConfig
 from flwr.server.strategy import FedAvg
