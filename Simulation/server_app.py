@@ -25,11 +25,15 @@ def server_fn(context: Context):
     fraction_fit_alvo = context.run_config["fraction_fit_alvo"]
     fraction_fit_gen = context.run_config["fraction_fit_gen"]
     dataset = context.run_config["dataset"]
+    img_size = context.run_cofig["tam_img"]
+    latent_dim = context.run_config["tam_ruido"]
 
     # Initialize model parameters
     ndarrays_alvo = get_weights(Net())
     parameters_alvo = ndarrays_to_parameters(ndarrays_alvo)
-    ndarrays_gen = get_weights(CGAN(dataset=dataset))
+    ndarrays_gen = get_weights(CGAN(dataset=dataset,
+                                    img_size=img_size,
+                                    latent_dim=latent_dim))
     parameters_gen = ndarrays_to_parameters(ndarrays_gen)
 
     # Define strategy

@@ -21,7 +21,7 @@ if torch.cuda.is_available():
 
 # Define Flower Client and client_fn
 class FlowerClient(NumPyClient):
-    def __init__(self, net_alvo, net_gen, trainloader, valloader, local_epochs_alvo, local_epochs_gen, dataset, lr, latent_dim):
+    def __init__(self, net_alvo, net_gen, trainloader, valloader, local_epochs_alvo, local_epochs_gen, dataset, lr_alvo, lr_gen, latent_dim):
         self.net_alvo = net_alvo
         self.net_gen = net_gen
         self.trainloader = trainloader
@@ -32,17 +32,19 @@ class FlowerClient(NumPyClient):
         self.net_alvo.to(self.device)
         self.net_gen.to(self.device)
         self.dataset = dataset
-        self.lr = lr
+        self.lr_alvo = lr_alvo
+        self.lr_gen = lr_gen
         self.latent_dim = latent_dim
 
     def fit(self, parameters, config):
         if config["modelo"] == "alvo":
             set_weights(self.net_alvo, parameters)
             train_loss = train_alvo(
-                self.net_alvo,
-                self.trainloader,
-                self.local_epochs_alvo,
-                self.device,
+                net=self.net_alvo,
+                trainloader=self.trainloader,
+                epochs=self.local_epochs_alvo,
+                learning_rate=self.lr_alvo,
+                device=self.device,
             )
             return (
                 get_weights(self.net_alvo),
@@ -55,7 +57,7 @@ class FlowerClient(NumPyClient):
                 net=self.net_gen,
                 trainloader=self.trainloader,
                 epochs=self.local_epochs_gen,
-                learning_rate=self.lr,
+                lr=self.lr_gen,
                 device=self.device,
                 dataset=self.dataset,
                 latent_dim=self.latent_dim
@@ -83,14 +85,17 @@ def client_fn(context: Context):
     num_partitions = context.node_config["num-partitions"]
     niid = context.run_config["niid"]
     alpha_dir = context.run_config["alpha_dir"]
+    batch_size = context.run_config["tam_batch"]
     trainloader, valloader = load_data(partition_id=partition_id,
                                        num_partitions=num_partitions,
                                        niid=niid,
-                                       alpha_dir=alpha_dir
+                                       alpha_dir=alpha_dir,
+                                       batch_size=batch_size
                                       )
     local_epochs_alvo = context.run_config["epocas_alvo"]
     local_epochs_gen = context.run_config["epocas_gen"]
     lr_gen = context.run_config["learn_rate_gen"]
+    lr_alvo = context.run_config["learn_rate_alvo"]
     latent_dim = context.run_config["tam_ruido"]
 
     # Return Client instance
@@ -101,7 +106,8 @@ def client_fn(context: Context):
                         local_epochs_alvo=local_epochs_alvo, 
                         local_epochs_gen=local_epochs_gen,
                         dataset=dataset,
-                        lr=lr_gen,
+                        lr_alvo=lr_alvo,
+                        lr_gen=lr_gen,
                         latent_dim=latent_dim).to_client()
 
 

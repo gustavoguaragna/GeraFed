@@ -49,7 +49,7 @@ fds = None  # Cache FederatedDataset
 
 # Define the GAN model
 class CGAN(nn.Module):
-    def __init__(self, dataset="mnist", img_size=28, latent_dim=100, batch_size=64):
+    def __init__(self, dataset="mnist", img_size=28, latent_dim=100):
         super(CGAN, self).__init__()
         if dataset == "mnist":
             self.classes = 10
@@ -108,7 +108,7 @@ class CGAN(nn.Module):
         return self.adv_loss(output, label)
 
 
-def load_data(partition_id: int, num_partitions: int, niid: bool, alpha_dir: float):
+def load_data(partition_id: int, num_partitions: int, niid: bool, alpha_dir: float, batch_size: int):
     """Load partition MNIST data."""
     # Only initialize `FederatedDataset` once
     global fds
@@ -137,16 +137,16 @@ def load_data(partition_id: int, num_partitions: int, niid: bool, alpha_dir: flo
         return batch
 
     partition_train_test = partition_train_test.with_transform(apply_transforms)
-    trainloader = DataLoader(partition_train_test["train"], batch_size=32, shuffle=True)
-    testloader = DataLoader(partition_train_test["test"], batch_size=32)
+    trainloader = DataLoader(partition_train_test["train"], batch_size=batch_size, shuffle=True)
+    testloader = DataLoader(partition_train_test["test"], batch_size=batch_size)
     return trainloader, testloader
 
 
-def train_alvo(net, trainloader, epochs, device):
+def train_alvo(net, trainloader, epochs, lr, device):
     """Train the model on the training set."""
     net.to(device)  # move model to GPU if available
     criterion = torch.nn.CrossEntropyLoss().to(device)
-    optimizer = torch.optim.Adam(net.parameters(), lr=0.01)
+    optimizer = torch.optim.Adam(net.parameters(), lr=lr)
     net.train()
     running_loss = 0.0
     for _ in range(epochs):
@@ -162,7 +162,7 @@ def train_alvo(net, trainloader, epochs, device):
     avg_trainloss = running_loss / len(trainloader)
     return avg_trainloss
 
-def train_gen(net, trainloader, epochs, learning_rate, device, dataset="mnist", latent_dim=100):
+def train_gen(net, trainloader, epochs, lr, device, dataset="mnist", latent_dim=100):
     """Train the network on the training set."""
     if dataset == "mnist":
       imagem = "image"
@@ -170,8 +170,8 @@ def train_gen(net, trainloader, epochs, learning_rate, device, dataset="mnist", 
       imagem = "img"
     
     net.to(device)  # move model to GPU if available
-    optim_G = torch.optim.Adam(net.generator.parameters(), lr=learning_rate, betas=(0.5, 0.999))
-    optim_D = torch.optim.Adam(net.discriminator.parameters(), lr=learning_rate, betas=(0.5, 0.999))
+    optim_G = torch.optim.Adam(net.generator.parameters(), lr=lr, betas=(0.5, 0.999))
+    optim_D = torch.optim.Adam(net.discriminator.parameters(), lr=lr, betas=(0.5, 0.999))
 
     g_losses = []
     d_losses = []
