@@ -69,7 +69,13 @@ def client_fn(context: Context):
     net_alvo = Net()
     partition_id = context.node_config["partition-id"]
     num_partitions = context.node_config["num-partitions"]
-    trainloader, valloader = load_data(partition_id, num_partitions)
+    niid = context.run_config["niid"]
+    alpha_dir = context.run_config["alpha_dir"]
+    trainloader, valloader = load_data(partition_id=partition_id,
+                                       num_partitions=num_partitions,
+                                       niid=niid,
+                                       alpha_dir=alpha_dir
+                                      )
     local_epochs_alvo = context.run_config["epocas_alvo"]
     local_epochs_gen = context.run_config["epocas_gen"]
     lr_gen = context.run_config["learn_rate_gen"]

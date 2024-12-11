@@ -40,6 +40,8 @@ learn_rate_gen = 0.001
 modelo_alvo = "mlp"
 modelo_gen = "gan"
 dataset = "mnist"
+niid = False
+alpha_dir = 0.5
 
 
 [tool.flwr.federations]

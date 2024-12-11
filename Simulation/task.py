@@ -96,15 +96,18 @@ class CGAN(nn.Module):
         return self.adv_loss(output, label)
 
 
-def load_data(partition_id: int, num_partitions: int):
+def load_data(partition_id: int, num_partitions: int, niid: bool, alpha_dir: float):
     """Load partition MNIST data."""
     # Only initialize `FederatedDataset` once
     global fds
     if fds is None:
         #partitioner = IidPartitioner(num_partitions=num_partitions)
-        partitioner = DirichletPartitioner(num_partitions=num_partitions, partition_by="label",
-                                alpha=0.5, min_partition_size=0,
-                                self_balancing=False)
+        if niid:
+            partitioner = DirichletPartitioner(num_partitions=num_partitions, partition_by="label",
+                                    alpha=alpha_dir, min_partition_size=0,
+                                    self_balancing=False)
+        else:
+             partitioner = IidPartitioner(num_partitions=num_partitions)
         fds = FederatedDataset(
             dataset="mnist",
             partitioners={"train": partitioner},
