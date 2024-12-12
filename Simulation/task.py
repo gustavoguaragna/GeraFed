@@ -79,6 +79,8 @@ class CGAN(nn.Module):
             nn.Sigmoid()
         )
 
+        #self._initialize_weights()
+
     def _create_layer_gen(self, size_in, size_out, normalize=True):
         layers = [nn.Linear(size_in, size_out)]
         if normalize:
@@ -93,6 +95,14 @@ class CGAN(nn.Module):
         if act_func:
             layers.append(nn.LeakyReLU(0.2, inplace=True))
         return layers
+
+    def _initialize_weights(self):
+        # Itera sobre todos os módulos da rede geradora
+        for m in self.generator:
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_normal_(m.weight)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0.0)
 
     def forward(self, input, labels):
         if input.dim() == 2:
