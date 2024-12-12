@@ -42,7 +42,10 @@ def server_fn(context: Context):
         fraction_fit_gen=fraction_fit_gen,
         fraction_evaluate_alvo=1.0,
         initial_parameters_alvo=parameters_alvo,
-        initial_parameters_gen=parameters_gen
+        initial_parameters_gen=parameters_gen,
+        dataset=dataset,
+        img_size=img_size,
+        latent_dim=latent_dim
     )
     config = ServerConfig(num_rounds=num_rounds)
 

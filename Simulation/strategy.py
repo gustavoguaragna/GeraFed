@@ -95,6 +95,9 @@ class GeraFed(Strategy):
         fit_metrics_aggregation_fn: Optional[MetricsAggregationFn] = None,
         evaluate_metrics_aggregation_fn: Optional[MetricsAggregationFn] = None,
         inplace: bool = True,
+        dataset: str = "mnist",
+        img_size: int = 28,
+        latent_dim: int = 100
     ) -> None:
         super().__init__()
 
@@ -121,6 +124,9 @@ class GeraFed(Strategy):
         self.fit_metrics_aggregation_fn = fit_metrics_aggregation_fn
         self.evaluate_metrics_aggregation_fn = evaluate_metrics_aggregation_fn
         self.inplace = inplace
+        self.dataset = dataset
+        self.img_size = img_size
+        self.latent_dim = latent_dim
 
     def __repr__(self) -> str:
         """Compute a string representation of the strategy."""
@@ -300,7 +306,9 @@ class GeraFed(Strategy):
         if parameters_aggregated_gen is not None:
             ndarrays = parameters_to_ndarrays(parameters_aggregated_gen)
             # Cria uma instância do modelo
-            model = CGAN()
+            model = CGAN(dataset=self.dataset,
+                         img_size=self.img_size,
+                         latent_dim=self.latent_dim)
             # Define os pesos do modelo
             set_weights(model, ndarrays)
             # Salva o modelo no disco com o nome específico do dataset
