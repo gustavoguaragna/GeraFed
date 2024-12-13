@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from flwr_datasets import FederatedDataset
 from flwr_datasets.partitioner import IidPartitioner, DirichletPartitioner
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, TensorDataset
 from torchvision.transforms import Compose, Normalize, ToTensor
 import numpy as np
 
@@ -44,6 +44,8 @@ class Net(nn.Module):
         x = F.relu(self.fc2(x))
         return self.fc3(x)
 
+
+fds = None  # Cache FederatedDataset
 
 # Define the GAN model
 class CGAN(nn.Module):
@@ -115,57 +117,113 @@ class CGAN(nn.Module):
     def loss(self, output, label):
         return self.adv_loss(output, label)
 
-fds = None  # Cache FederatedDataset
 
-def load_data(partition_id: int, 
-              num_partitions: int, 
-              niid: bool, 
-              alpha_dir: float, 
-              batch_size: int):
-    """Load partition MNIST data."""
-    # Only initialize `FederatedDataset` once
+# def load_data(partition_id: int, num_partitions: int, niid: bool, alpha_dir: float, batch_size: int):
+#     """Load partition MNIST data."""
+#     # Only initialize `FederatedDataset` once
+#     global fds
+#     if fds is None:
+#         #partitioner = IidPartitioner(num_partitions=num_partitions)
+#         if niid:
+#             partitioner = DirichletPartitioner(num_partitions=num_partitions, partition_by="label",
+#                                     alpha=alpha_dir, min_partition_size=0,
+#                                     self_balancing=False)
+#         else:
+#              partitioner = IidPartitioner(num_partitions=num_partitions)
+#         fds = FederatedDataset(
+#             dataset="mnist",
+#             partitioners={"train": partitioner},
+#         )
+#     partition = fds.load_partition(partition_id)
+#     # Divide data on each node: 80% train, 20% test
+#     partition_train_test = partition.train_test_split(test_size=0.2, seed=42)
+#     pytorch_transforms = Compose(
+#         [ToTensor(), Normalize((0.5,), (0.5,))]
+#     )
+
+#     def apply_transforms(batch):
+#         """Apply transforms to the partition from FederatedDataset."""
+#         batch["image"] = [pytorch_transforms(img) for img in batch["image"]]
+#         return batch
+
+#     partition_train_test = partition_train_test.with_transform(apply_transforms)
+#     trainloader = DataLoader(partition_train_test["train"], batch_size=batch_size, shuffle=True)
+#     testloader = DataLoader(partition_train_test["test"], batch_size=batch_size)
+#     return trainloader, testloader
+
+def generate_images(cgan, examples_per_class):
+    device = next(cgan.parameters()).device
+    latent_dim = cgan.latent_dim
+    classes = cgan.classes
+    
+    # Cria um vetor de rótulos balanceado
+    labels = torch.tensor([i for i in range(classes) for _ in range(examples_per_class)], device=device)
+    # Número total de imagens geradas
+    num_samples = examples_per_class * classes
+    # Gera vetores latentes aleatórios
+    z = torch.randn(num_samples, latent_dim, device=device)
+
+    with torch.no_grad():
+        cgan.eval()
+        gen_imgs = cgan(z, labels)  # [N, C, H, W]
+
+    # Retorna como lista para aplicar transforms depois
+    # Convertendo para CPU para aplicar transforms com PIL, se necessário
+    gen_imgs_list = [img.cpu() for img in gen_imgs]
+    gen_labels_list = labels.cpu().tolist()
+    return gen_imgs_list, gen_labels_list
+
+
+def load_data(partition_id: int, num_partitions: int, niid: bool, alpha_dir: float, batch_size: int, 
+              cgan=None, examples_per_class=0):
+    """Load partition MNIST data and optionally include balanced CGAN-generated data in the training set."""
     global fds
     if fds is None:
-        #partitioner = IidPartitioner(num_partitions=num_partitions)
         if niid:
-            partitioner = DirichletPartitioner(num_partitions=num_partitions, 
-                                               partition_by="label",
-                                               alpha=alpha_dir, 
-                                               min_partition_size=0,
-                                               self_balancing=False
-                                               )
+            partitioner = DirichletPartitioner(num_partitions=num_partitions, partition_by="label",
+                                               alpha=alpha_dir, min_partition_size=0,
+                                               self_balancing=False)
         else:
-             partitioner = IidPartitioner(num_partitions=num_partitions)
-
-        partitioner_test = IidPartitioner(num_partitions=1)
-
+            partitioner = IidPartitioner(num_partitions=num_partitions)
         fds = FederatedDataset(
             dataset="mnist",
-            partitioners={"train": partitioner,
-                          "teste": partitioner_test},
+            partitioners={"train": partitioner},
         )
     partition = fds.load_partition(partition_id)
-    # Divide data on each node: 80% train, 20% test
-    #partition_train_test = partition.train_test_split(test_size=0.2, seed=42)
-    train_partition = partition["train"]
-    test_partition = partition["test"]
-
+    # Divide data em 80% treino e 20% teste
+    partition_train_test = partition.train_test_split(test_size=0.2, seed=42)
     pytorch_transforms = Compose(
         [ToTensor(), Normalize((0.5,), (0.5,))]
     )
 
     def apply_transforms(batch):
-        """Apply transforms to the partition from FederatedDataset."""
         batch["image"] = [pytorch_transforms(img) for img in batch["image"]]
         return batch
 
-    #partition_train_test = partition_train_test.with_transform(apply_transforms)
-    train_partition = train_partition.with_transform(apply_transforms)
-    test_partition = test_partition.with_transform(apply_transforms)
+    partition_train_test = partition_train_test.with_transform(apply_transforms)
 
-    trainloader = DataLoader(train_partition["train"], batch_size=batch_size, shuffle=True)
-    testloader = DataLoader(test_partition["test"], batch_size=batch_size)
+    # Obtem datasets de treino e teste
+    #train_dataset = partition_train_test["train"]
+    test_dataset = partition_train_test["test"]
+
+    # Se examples_per_class > 0, geramos dados sintéticos balanceados pela CGAN
+    if cgan is not None and examples_per_class > 0:
+        print("CGAN")
+        generated_images, generated_labels = generate_images(cgan, examples_per_class)
+        
+        # Aplica mesma transformação
+        #gen_imgs_transformed = [pytorch_transforms(img) for img in generated_images]
+        
+        # Cria o dataset com dados gerados
+        gen_dataset = TensorDataset(torch.stack(generated_images), torch.tensor(generated_labels))
+        
+
+    trainloader = DataLoader(gen_dataset, batch_size=batch_size, shuffle=True)
+    testloader = DataLoader(test_dataset, batch_size=batch_size)
+
     return trainloader, testloader
+
+
 
 
 def train_alvo(net, trainloader, epochs, lr, device):
@@ -177,8 +235,7 @@ def train_alvo(net, trainloader, epochs, lr, device):
     running_loss = 0.0
     for _ in range(epochs):
         for batch in trainloader:
-            images = batch["image"]
-            labels = batch["label"]
+            images, labels = batch
             optimizer.zero_grad()
             loss = criterion(net(images.to(device)), labels.to(device))
             loss.backward()
@@ -205,7 +262,7 @@ def train_gen(net, trainloader, epochs, lr, device, dataset="mnist", latent_dim=
 
     for epoch in range(epochs):
         for batch_idx, batch in enumerate(trainloader):
-            images, labels = batch[imagem].to(device), batch["label"].to(device)
+            images, labels = batch
             batch_size = images.size(0)
             real_ident = torch.full((batch_size, 1), 1., device=device)
             fake_ident = torch.full((batch_size, 1), 0., device=device)

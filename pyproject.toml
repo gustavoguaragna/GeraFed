@@ -25,7 +25,7 @@ serverapp = "Simulation.server_app:app"
 clientapp = "Simulation.client_app:app"
 
 [tool.flwr.app.config]
-num_rodadas = 10
+num_rodadas = 20
 num_clientes = 10
 fraction_fit_alvo = 1.0
 fraction_fit_gen = 1.0
@@ -41,7 +41,7 @@ modelo_alvo = "mlp"
 modelo_gen = "gan"
 dataset = "mnist"
 niid = false
-alpha_dir = 0.5
+alpha_dir = 0.1
 
 
 [tool.flwr.federations]
