@@ -10,7 +10,8 @@ from flwr_datasets.partitioner import IidPartitioner, DirichletPartitioner
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose, Normalize, ToTensor
 import numpy as np
-
+from torchvision.transforms.functional import to_pil_image
+from datasets import Dataset, Features, ClassLabel, Image
 import random
 
 SEED = 42
@@ -115,56 +116,143 @@ class CGAN(nn.Module):
     def loss(self, output, label):
         return self.adv_loss(output, label)
 
+def generate_images(cgan, examples_per_class):
+    device = next(cgan.parameters()).device
+    latent_dim = cgan.latent_dim
+    classes = cgan.classes
+    
+    # Cria um vetor de rótulos balanceado
+    labels = torch.tensor([i for i in range(classes) for _ in range(examples_per_class)], device=device)
+    # Número total de imagens geradas
+    num_samples = examples_per_class * classes
+    # Gera vetores latentes aleatórios
+    z = torch.randn(num_samples, latent_dim, device=device)
+
+    with torch.no_grad():
+        cgan.eval()
+        gen_imgs = cgan(z, labels)  # [N, C, H, W]
+
+    # Retorna como lista para aplicar transforms depois
+    # Convertendo para CPU para aplicar transforms com PIL, se necessário
+    gen_imgs_list = [img.cpu() for img in gen_imgs]
+    gen_labels_list = labels.cpu().tolist()
+
+    #converte para PIL
+    gen_imgs_pil = [to_pil_image((img * 0.5 + 0.5).clamp(0,1)) for img in gen_imgs_list]
+
+    #Monta dataset como do FederatedDataset
+    features = Features({
+    "image": Image(),
+    "label": ClassLabel(names=[str(i) for i in range(classes)])
+    })
+
+    # Cria um dicionário com os dados
+    gen_dict = {"image": gen_imgs_pil, "label": gen_labels_list}
+
+    # Cria o dataset Hugging Face
+    gen_dataset_hf = Dataset.from_dict(gen_dict, features=features)
+    return gen_dataset_hf
+
+def split_balanced(gen_dataset_hf, num_clientes):
+    # Identificar as classes
+    class_label = gen_dataset_hf.features["label"]
+    num_classes = class_label.num_classes
+    
+    # Cria um mapeamento classe -> índices
+    class_to_indices = {c: [] for c in range(num_classes)}
+    for i in range(len(gen_dataset_hf)):
+        lbl = gen_dataset_hf[i]["label"]
+        class_to_indices[lbl].append(i)
+    
+    # Verifica quantos exemplos por classe temos
+    examples_per_class = len(class_to_indices[0])
+    # Garantir que o número de exemplos por classe seja divisível por num_clientes 
+    # (ou lidar com o resto de alguma forma)
+    if examples_per_class % num_clientes != 0:
+        raise ValueError("O número de exemplos por classe não é divisível igualmente pelo número de clientes.")
+        
+    # Número de exemplos por classe por cliente
+    examples_per_class_per_client = examples_per_class // num_clientes
+
+    # Agora, distribui igualmente os índices para cada cliente
+    client_indices = [[] for _ in range(num_clientes)]
+    for c in range(num_classes):
+        # Índices dessa classe
+        idxs = class_to_indices[c]
+        # Divide em partes iguais
+        for i in range(num_clientes):
+            start = i * examples_per_class_per_client
+            end = (i+1) * examples_per_class_per_client
+            client_indices[i].extend(idxs[start:end])
+    
+    # Agora criamos um DatasetDict com um subset para cada cliente
+    # Cada cliente terá a mesma quantidade total de exemplos (classes * examples_per_class_per_client)
+    client_datasets = {}
+    for i in range(num_clientes):
+        # Ordena os índices do cliente (opcional, mas pode manter a ordem)
+        client_indices[i].sort()
+        # Seleciona os exemplos
+        client_subset = gen_dataset_hf.select(client_indices[i])
+        client_datasets[i] = client_subset
+    
+    return client_datasets
+
+
 fds = None  # Cache FederatedDataset
 
 def load_data(partition_id: int, 
               num_partitions: int, 
               niid: bool, 
               alpha_dir: float, 
-              batch_size: int):
-    """Load partition MNIST data."""
-    # Only initialize `FederatedDataset` once
+              batch_size: int, 
+              cgan=None, 
+              examples_per_class=0):
+    
+    """Carrega MNIST com splits de treino e teste separados. Se examples_per_class > 0, inclui dados gerados."""
+   
     global fds
-    if fds is None:
-        #partitioner = IidPartitioner(num_partitions=num_partitions)
-        if niid:
-            partitioner = DirichletPartitioner(num_partitions=num_partitions, 
-                                               partition_by="label",
-                                               alpha=alpha_dir, 
-                                               min_partition_size=0,
-                                               self_balancing=False
-                                               )
-        else:
-             partitioner = IidPartitioner(num_partitions=num_partitions)
 
-        partitioner_test = IidPartitioner(num_partitions=1)
+    if fds is None:
+        if niid:
+            partitioner = DirichletPartitioner(
+                num_partitions=num_partitions,
+                partition_by="label",
+                alpha=alpha_dir,
+                min_partition_size=0,
+                self_balancing=False
+            )
+        else:
+            partitioner = IidPartitioner(num_partitions=num_partitions)
 
         fds = FederatedDataset(
             dataset="mnist",
-            partitioners={"train": partitioner,
-                          "teste": partitioner_test},
+            partitioners={"train": partitioner}
         )
-    partition = fds.load_partition(partition_id)
-    # Divide data on each node: 80% train, 20% test
-    #partition_train_test = partition.train_test_split(test_size=0.2, seed=42)
-    train_partition = partition["train"]
-    test_partition = partition["test"]
 
-    pytorch_transforms = Compose(
-        [ToTensor(), Normalize((0.5,), (0.5,))]
-    )
+    # Carrega a partição de treino e teste separadamente
+    test_partition = fds.load_split("test")
+    if cgan is not None and examples_per_class > 0:
+        generated_images = generate_images(cgan, examples_per_class)
+        gen_img_part = split_balanced(gen_dataset_hf=generated_images, num_clientes=num_partitions)
+        train_partition = gen_img_part[partition_id]
+    else:
+        train_partition = fds.load_partition(partition_id, split="train")
+    
+    pytorch_transforms = Compose([
+        ToTensor(),
+        Normalize((0.5,), (0.5,))
+    ])
 
     def apply_transforms(batch):
-        """Apply transforms to the partition from FederatedDataset."""
         batch["image"] = [pytorch_transforms(img) for img in batch["image"]]
         return batch
 
-    #partition_train_test = partition_train_test.with_transform(apply_transforms)
     train_partition = train_partition.with_transform(apply_transforms)
     test_partition = test_partition.with_transform(apply_transforms)
+    
+    trainloader = DataLoader(train_partition, batch_size=batch_size, shuffle=True)
+    testloader = DataLoader(test_partition, batch_size=batch_size)
 
-    trainloader = DataLoader(train_partition["train"], batch_size=batch_size, shuffle=True)
-    testloader = DataLoader(test_partition["test"], batch_size=batch_size)
     return trainloader, testloader
 
 
