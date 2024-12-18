@@ -199,6 +199,7 @@ def split_balanced(gen_dataset_hf, num_clientes):
 
 
 fds = None  # Cache FederatedDataset
+gen_img_part = None # Cache GeneratedDataset
 
 def load_data(partition_id: int, 
               num_partitions: int, 
@@ -213,6 +214,7 @@ def load_data(partition_id: int,
     global fds
 
     if fds is None:
+        print("ENTROU FDS NONE")
         if niid:
             partitioner = DirichletPartitioner(
                 num_partitions=num_partitions,
@@ -231,9 +233,14 @@ def load_data(partition_id: int,
 
     # Carrega a partição de treino e teste separadamente
     test_partition = fds.load_split("test")
+
+    global gen_img_part
+
     if cgan is not None and examples_per_class > 0:
-        generated_images = generate_images(cgan, examples_per_class)
-        gen_img_part = split_balanced(gen_dataset_hf=generated_images, num_clientes=num_partitions)
+        if gen_img_part is None:
+            print("ENTRA GEN_IMG_PART NONE")
+            generated_images = generate_images(cgan, examples_per_class)
+            gen_img_part = split_balanced(gen_dataset_hf=generated_images, num_clientes=num_partitions)
         train_partition = gen_img_part[partition_id]
     else:
         train_partition = fds.load_partition(partition_id, split="train")
