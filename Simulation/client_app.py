@@ -21,7 +21,8 @@ if torch.cuda.is_available():
 
 # Define Flower Client and client_fn
 class FlowerClient(NumPyClient):
-    def __init__(self, net_alvo, net_gen, trainloader, valloader, local_epochs_alvo, local_epochs_gen, dataset, lr_alvo, lr_gen, latent_dim, context: Context):
+    def __init__(self, cid, net_alvo, net_gen, trainloader, valloader, local_epochs_alvo, local_epochs_gen, dataset, lr_alvo, lr_gen, latent_dim, context: Context):
+        self.cid=cid
         self.net_alvo = net_alvo
         self.net_gen = net_gen
         self.trainloader = trainloader
@@ -106,6 +107,9 @@ class FlowerClient(NumPyClient):
             # Add to a context
             self.client_state.parameters_records["net_parameters"] = p_record
 
+            model_path = f"modelo_gen_round_{config['round']}_client_{self.cid}.pt"
+            torch.save(self.net_gen.state_dict(), model_path)
+
             return (
                 get_weights_gen(self.net_gen),
                 len(self.trainloader.dataset),
@@ -143,7 +147,8 @@ def client_fn(context: Context):
     latent_dim = context.run_config["tam_ruido"]
 
     # Return Client instance
-    return FlowerClient(net_alvo=net_alvo, 
+    return FlowerClient(cid=partition_id,
+                        net_alvo=net_alvo, 
                         net_gen=net_gen, 
                         trainloader=trainloader, 
                         valloader=valloader, 
