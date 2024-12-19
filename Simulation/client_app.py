@@ -3,7 +3,7 @@
 import torch
 
 from flwr.client import ClientApp, NumPyClient
-from flwr.common import Context
+from flwr.common import Context, ParametersRecord, array_from_numpy
 from Simulation.task import Net, CGAN, get_weights, load_data, set_weights, test, train_alvo, train_gen
 
 import random
@@ -21,7 +21,7 @@ if torch.cuda.is_available():
 
 # Define Flower Client and client_fn
 class FlowerClient(NumPyClient):
-    def __init__(self, net_alvo, net_gen, trainloader, valloader, local_epochs_alvo, local_epochs_gen, dataset, lr_alvo, lr_gen, latent_dim):
+    def __init__(self, net_alvo, net_gen, trainloader, valloader, local_epochs_alvo, local_epochs_gen, dataset, lr_alvo, lr_gen, latent_dim, context: Context):
         self.net_alvo = net_alvo
         self.net_gen = net_gen
         self.trainloader = trainloader
@@ -35,6 +35,10 @@ class FlowerClient(NumPyClient):
         self.lr_alvo = lr_alvo
         self.lr_gen = lr_gen
         self.latent_dim = latent_dim
+        self.client_state = (
+            context.state
+        ) 
+
 
     def fit(self, parameters, config):
         if config["modelo"] == "alvo":
@@ -62,6 +66,10 @@ class FlowerClient(NumPyClient):
                 dataset=self.dataset,
                 latent_dim=self.latent_dim
             )
+            p_record = ParametersRecord()
+            for k, v in self.net_gen.state_dict().items():
+                p_record[k] = array_from_numpy(v.detach().cpu().numpy())
+            self.client_state.parameters_records["net_parameters"] = p_record
             return (
                 get_weights(self.net_gen),
                 len(self.trainloader.dataset),
@@ -108,10 +116,11 @@ def client_fn(context: Context):
                         dataset=dataset,
                         lr_alvo=lr_alvo,
                         lr_gen=lr_gen,
-                        latent_dim=latent_dim).to_client()
+                        latent_dim=latent_dim,
+                        context=context).to_client()
 
 
 # Flower ClientApp
 app = ClientApp(
-    client_fn,
+    client_fn=client_fn
 )
