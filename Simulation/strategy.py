@@ -303,18 +303,18 @@ class GeraFed(Strategy):
             torch.save(model.state_dict(), model_path)
             print(f"Modelo salvo em {model_path}")
 
-        if parameters_aggregated_gen is not None:
-            ndarrays = parameters_to_ndarrays(parameters_aggregated_gen)
-            # Cria uma instância do modelo
-            model = CGAN(dataset=self.dataset,
-                         img_size=self.img_size,
-                         latent_dim=self.latent_dim)
-            # Define os pesos do modelo
-            set_weights(model, ndarrays)
-            # Salva o modelo no disco com o nome específico do dataset
-            model_path = f"modelo_gen_round_{server_round}_mnist.pt"
-            torch.save(model.state_dict(), model_path)
-            print(f"Modelo salvo em {model_path}")
+        # if parameters_aggregated_gen is not None:
+        #     ndarrays = parameters_to_ndarrays(parameters_aggregated_gen)
+        #     # Cria uma instância do modelo
+        #     model = CGAN(dataset=self.dataset,
+        #                  img_size=self.img_size,
+        #                  latent_dim=self.latent_dim)
+        #     # Define os pesos do modelo
+        #     set_weights(model, ndarrays)
+        #     # Salva o modelo no disco com o nome específico do dataset
+        #     model_path = f"modelo_gen_round_{server_round}_mnist.pt"
+        #     torch.save(model.state_dict(), model_path)
+        #     print(f"Modelo salvo em {model_path}")
 
         return parameters_aggregated_alvo, metrics_aggregated
 

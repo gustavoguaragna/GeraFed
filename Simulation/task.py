@@ -356,6 +356,9 @@ def test(net, testloader, device):
 def get_weights(net):
     return [val.cpu().numpy() for _, val in net.state_dict().items()]
 
+def get_weights_gen(net):
+    return [val.cpu().numpy() for key, val in net.state_dict().items() if 'discriminator' in key or 'label' in key]
+
 
 def set_weights(net, parameters):
     params_dict = zip(net.state_dict().keys(), parameters)

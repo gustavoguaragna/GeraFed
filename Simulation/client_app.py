@@ -1,10 +1,10 @@
 """GeraFed: um framework para balancear dados heterogêneos em aprendizado federado."""
 
 import torch
-
+from collections import OrderedDict
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import Context, ParametersRecord, array_from_numpy
-from Simulation.task import Net, CGAN, get_weights, load_data, set_weights, test, train_alvo, train_gen
+from Simulation.task import Net, CGAN, get_weights, get_weights_gen, load_data, set_weights, test, train_alvo, train_gen
 
 import random
 import numpy as np
@@ -56,11 +56,15 @@ class FlowerClient(NumPyClient):
                 {"train_loss": train_loss, "modelo": "alvo"},
             )
         elif config["modelo"] == "gen":
-            set_weights(self.net_gen, parameters)
+            # Supondo que net seja o modelo e parameters seja a lista de parâmetros fornecida
+            state_keys = [k for k in self.net_gen.state_dict().keys() if 'generator' not in k]
+        
+            # Criando o OrderedDict com as chaves filtradas e os parâmetros fornecidos
+            disc_dict = OrderedDict({k: torch.tensor(v) for k, v in zip(state_keys, parameters)})
 
             state_dict = {}
             # Extract record from context
-            if self.client_state.parameters_records["net_parameters"]:
+            if "net_parameters" in self.client_state.parameters_records:
                 print("MAIS DE SEGUNDO ROUND")
                 p_record = self.client_state.parameters_records["net_parameters"]
 
@@ -76,9 +80,9 @@ class FlowerClient(NumPyClient):
 
                 for name, param in self.net_gen.state_dict().items():
                     if 'generator' in name:
-                        new_state_dict[name] = model_.state_dict[name]
+                        new_state_dict[name] = model_.state_dict()[name]
                     elif 'discriminator' in name or 'label' in name:
-                        new_state_dict[name] = self.net_gen[name]
+                        new_state_dict[name] = disc_dict[name]
                     else:
                         new_state_dict[name] = param
 
@@ -103,7 +107,7 @@ class FlowerClient(NumPyClient):
             self.client_state.parameters_records["net_parameters"] = p_record
 
             return (
-                get_weights(self.net_gen),
+                get_weights_gen(self.net_gen),
                 len(self.trainloader.dataset),
                 {"train_loss": train_loss, "modelo": "gen"},
             )
