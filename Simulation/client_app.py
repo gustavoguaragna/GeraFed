@@ -60,27 +60,29 @@ class FlowerClient(NumPyClient):
 
             state_dict = {}
             # Extract record from context
-            p_record = self.client_state.parameters_records["net_parameters"]
+            if self.client_state.parameters_records["net_parameters"]:
+                print("MAIS DE SEGUNDO ROUND")
+                p_record = self.client_state.parameters_records["net_parameters"]
 
-            # Deserialize arrays
-            for k, v in p_record.items():
-                state_dict[k] = torch.from_numpy(v.numpy())
+                # Deserialize arrays
+                for k, v in p_record.items():
+                    state_dict[k] = torch.from_numpy(v.numpy())
 
-            # Apply state dict to a new model instance
-            model_ = CGAN()
-            model_.load_state_dict(state_dict)
+                # Apply state dict to a new model instance
+                model_ = CGAN()
+                model_.load_state_dict(state_dict)
 
-            new_state_dict = {}
+                new_state_dict = {}
 
-            for name, param in self.net_gen.state_dict().items():
-                if 'generator' in name:
-                    new_state_dict[name] = model_.state_dict[name]
-                elif 'discriminator' in name or 'label' in name:
-                    new_state_dict[name] = self.net_gen[name]
-                else:
-                    new_state_dict[name] = param
+                for name, param in self.net_gen.state_dict().items():
+                    if 'generator' in name:
+                        new_state_dict[name] = model_.state_dict[name]
+                    elif 'discriminator' in name or 'label' in name:
+                        new_state_dict[name] = self.net_gen[name]
+                    else:
+                        new_state_dict[name] = param
 
-            self.net_gen.load_state_dict(new_state_dict)
+                self.net_gen.load_state_dict(new_state_dict)
 
             train_loss = train_gen(
                 net=self.net_gen,
