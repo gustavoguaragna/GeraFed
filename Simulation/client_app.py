@@ -21,7 +21,20 @@ if torch.cuda.is_available():
 
 # Define Flower Client and client_fn
 class FlowerClient(NumPyClient):
-    def __init__(self, cid, net_alvo, net_gen, trainloader, valloader, local_epochs_alvo, local_epochs_gen, dataset, lr_alvo, lr_gen, latent_dim, context: Context):
+    def __init__(self,
+                cid: int, 
+                net_alvo,
+                net_gen, 
+                trainloader, 
+                valloader,
+                local_epochs_alvo: int, 
+                local_epochs_gen: int, 
+                dataset: str, 
+                lr_alvo: float, 
+                lr_gen: float, 
+                latent_dim: int, 
+                context: Context,
+                agg: str):
         self.cid=cid
         self.net_alvo = net_alvo
         self.net_gen = net_gen
@@ -39,6 +52,7 @@ class FlowerClient(NumPyClient):
         self.client_state = (
             context.state
         ) 
+        self.agg = agg
 
 
     def fit(self, parameters, config):
@@ -57,39 +71,9 @@ class FlowerClient(NumPyClient):
                 {"train_loss": train_loss, "modelo": "alvo"},
             )
         elif config["modelo"] == "gen":
-            # Supondo que net seja o modelo e parameters seja a lista de parâmetros fornecida
-            state_keys = [k for k in self.net_gen.state_dict().keys() if 'generator' not in k]
-        
-            # Criando o OrderedDict com as chaves filtradas e os parâmetros fornecidos
-            disc_dict = OrderedDict({k: torch.tensor(v) for k, v in zip(state_keys, parameters)})
-
-            state_dict = {}
-            # Extract record from context
-            if "net_parameters" in self.client_state.parameters_records:
-                print("MAIS DE SEGUNDO ROUND")
-                p_record = self.client_state.parameters_records["net_parameters"]
-
-                # Deserialize arrays
-                for k, v in p_record.items():
-                    state_dict[k] = torch.from_numpy(v.numpy())
-
-                # Apply state dict to a new model instance
-                model_ = CGAN()
-                model_.load_state_dict(state_dict)
-
-                new_state_dict = {}
-
-                for name, param in self.net_gen.state_dict().items():
-                    if 'generator' in name:
-                        new_state_dict[name] = model_.state_dict()[name]
-                    elif 'discriminator' in name or 'label' in name:
-                        new_state_dict[name] = disc_dict[name]
-                    else:
-                        new_state_dict[name] = param
-
-                self.net_gen.load_state_dict(new_state_dict)
-
-            train_loss = train_gen(
+            if self.agg == "full":
+                set_weights(self.net_gen, parameters)
+                train_loss = train_gen(
                 net=self.net_gen,
                 trainloader=self.trainloader,
                 epochs=self.local_epochs_gen,
@@ -98,17 +82,65 @@ class FlowerClient(NumPyClient):
                 dataset=self.dataset,
                 latent_dim=self.latent_dim
             )
+                return (
+                get_weights(self.net_alvo),
+                len(self.trainloader.dataset),
+                {"train_loss": train_loss, "modelo": "alvo"},
+            )
 
-            # Save all elements of the state_dict into a single RecordSet
-            p_record = ParametersRecord()
-            for k, v in self.net_gen.state_dict().items():
-                # Convert to NumPy, then to Array. Add to record
-                p_record[k] = array_from_numpy(v.detach().cpu().numpy())
-            # Add to a context
-            self.client_state.parameters_records["net_parameters"] = p_record
+            elif self.agg == "disc":
+                # Supondo que net seja o modelo e parameters seja a lista de parâmetros fornecida
+                state_keys = [k for k in self.net_gen.state_dict().keys() if 'generator' not in k]
+            
+                # Criando o OrderedDict com as chaves filtradas e os parâmetros fornecidos
+                disc_dict = OrderedDict({k: torch.tensor(v) for k, v in zip(state_keys, parameters)})
 
-            model_path = f"modelo_gen_round_{config['round']}_client_{self.cid}.pt"
-            torch.save(self.net_gen.state_dict(), model_path)
+                state_dict = {}
+                # Extract record from context
+                if "net_parameters" in self.client_state.parameters_records:
+                    print("MAIS DE SEGUNDO ROUND")
+                    p_record = self.client_state.parameters_records["net_parameters"]
+
+                    # Deserialize arrays
+                    for k, v in p_record.items():
+                        state_dict[k] = torch.from_numpy(v.numpy())
+
+                    # Apply state dict to a new model instance
+                    model_ = CGAN()
+                    model_.load_state_dict(state_dict)
+
+                    new_state_dict = {}
+
+                    for name, param in self.net_gen.state_dict().items():
+                        if 'generator' in name:
+                            new_state_dict[name] = model_.state_dict()[name]
+                        elif 'discriminator' in name or 'label' in name:
+                            new_state_dict[name] = disc_dict[name]
+                        else:
+                            new_state_dict[name] = param
+
+                    self.net_gen.load_state_dict(new_state_dict)
+
+                    train_loss = train_gen(
+                        net=self.net_gen,
+                        trainloader=self.trainloader,
+                        epochs=self.local_epochs_gen,
+                        lr=self.lr_gen,
+                        device=self.device,
+                        dataset=self.dataset,
+                        latent_dim=self.latent_dim
+                    )
+
+                    # Save all elements of the state_dict into a single RecordSet
+                    p_record = ParametersRecord()
+                    for k, v in self.net_gen.state_dict().items():
+                        # Convert to NumPy, then to Array. Add to record
+                        p_record[k] = array_from_numpy(v.detach().cpu().numpy())
+                    # Add to a context
+                    self.client_state.parameters_records["net_parameters"] = p_record
+
+                    model_path = f"modelo_gen_round_{config['round']}_client_{self.cid}.pt"
+                    torch.save(self.net_gen.state_dict(), model_path)
 
             return (
                 get_weights_gen(self.net_gen),
@@ -145,6 +177,7 @@ def client_fn(context: Context):
     lr_gen = context.run_config["learn_rate_gen"]
     lr_alvo = context.run_config["learn_rate_alvo"]
     latent_dim = context.run_config["tam_ruido"]
+    agg = context.run_config["agg"]
 
     # Return Client instance
     return FlowerClient(cid=partition_id,
@@ -158,7 +191,8 @@ def client_fn(context: Context):
                         lr_alvo=lr_alvo,
                         lr_gen=lr_gen,
                         latent_dim=latent_dim,
-                        context=context).to_client()
+                        context=context,
+                        agg=agg).to_client()
 
 
 # Flower ClientApp
