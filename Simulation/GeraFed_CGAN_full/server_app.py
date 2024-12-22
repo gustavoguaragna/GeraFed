@@ -27,6 +27,7 @@ def server_fn(context: Context):
     dataset = context.run_config["dataset"]
     img_size = context.run_config["tam_img"]
     latent_dim = context.run_config["tam_ruido"]
+    agg = context.run_config["agg"]
 
     # Initialize model parameters
     ndarrays_alvo = get_weights(Net())
@@ -45,7 +46,8 @@ def server_fn(context: Context):
         initial_parameters_gen=parameters_gen,
         dataset=dataset,
         img_size=img_size,
-        latent_dim=latent_dim
+        latent_dim=latent_dim,
+        agg=agg
     )
     config = ServerConfig(num_rounds=num_rounds)
 

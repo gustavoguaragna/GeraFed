@@ -99,7 +99,8 @@ class GeraFed(Strategy):
         inplace: bool = True,
         dataset: str = "mnist",
         img_size: int = 28,
-        latent_dim: int = 100
+        latent_dim: int = 100,
+        client_counter: Counter
     ) -> None:
         super().__init__()
 
@@ -129,6 +130,7 @@ class GeraFed(Strategy):
         self.dataset = dataset
         self.img_size = img_size
         self.latent_dim = latent_dim
+        self.client_counter = client_counter
 
     def __repr__(self) -> str:
         """Compute a string representation of the strategy."""
@@ -198,14 +200,14 @@ class GeraFed(Strategy):
         clients = list(client_manager.sample(
             num_clients=sample_size, min_num_clients=min_num_clients
         ))
-
-        client_counter = Counter()
-        sorted_clients = sorted(clients, key=lambda c: client_counter[c])
+    
+        sorted_clients = sorted(clients, key=lambda c: self.client_counter[c])
         metade = len(clients) // 2
         conjunto_gen = sorted_clients[:metade]
         conjunto_alvo = sorted_clients[metade:]
 
-        client_counter.update(conjunto_gen)
+        self.client_counter.update(conjunto_gen)
+        print(self.client_counter)
 
         fit_instructions = []
         config_alvo = {"modelo": "alvo"}

@@ -7,6 +7,7 @@ from Simulation.strategy import GeraFed
 import random
 import numpy as np
 import torch
+from collections import Counter
 
 SEED = 42
 random.seed(SEED)
@@ -36,6 +37,8 @@ def server_fn(context: Context):
                                     latent_dim=latent_dim))
     parameters_gen = ndarrays_to_parameters(ndarrays_gen)
 
+    client_counter = Counter()
+
     # Define strategy
     strategy = GeraFed(
         fraction_fit_alvo=fraction_fit_alvo,
@@ -45,7 +48,8 @@ def server_fn(context: Context):
         initial_parameters_gen=parameters_gen,
         dataset=dataset,
         img_size=img_size,
-        latent_dim=latent_dim
+        latent_dim=latent_dim,
+        client_counter=client_counter
     )
     config = ServerConfig(num_rounds=num_rounds)
 
