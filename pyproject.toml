@@ -42,6 +42,7 @@ modelo_gen = "gan"
 dataset = "mnist"
 niid = false
 alpha_dir = 0.1
+agg_method = "full" # 'disc'
 
 
 [tool.flwr.federations]

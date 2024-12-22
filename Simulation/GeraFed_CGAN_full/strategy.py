@@ -17,8 +17,6 @@ from flwr.common.logger import log
 from flwr.server.client_manager import ClientManager
 from flwr.server.client_proxy import ClientProxy
 
-from collections import Counter
-
 from flwr.server.strategy.aggregate import aggregate, aggregate_inplace, weighted_loss_avg
 import random
 
@@ -199,13 +197,10 @@ class GeraFed(Strategy):
             num_clients=sample_size, min_num_clients=min_num_clients
         ))
 
-        client_counter = Counter()
-        sorted_clients = sorted(clients, key=lambda c: client_counter[c])
+        random.shuffle(clients)
         metade = len(clients) // 2
-        conjunto_gen = sorted_clients[:metade]
-        conjunto_alvo = sorted_clients[metade:]
-
-        client_counter.update(conjunto_gen)
+        conjunto_alvo = clients[:metade]
+        conjunto_gen = clients[metade:]
 
         fit_instructions = []
         config_alvo = {"modelo": "alvo"}
