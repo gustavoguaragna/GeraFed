@@ -98,7 +98,6 @@ class FlowerClient(NumPyClient):
                 state_dict = {}
                 # Extract record from context
                 if "net_parameters" in self.client_state.parameters_records:
-                    print("MAIS DE SEGUNDO ROUND")
                     p_record = self.client_state.parameters_records["net_parameters"]
 
                     # Deserialize arrays
@@ -121,32 +120,30 @@ class FlowerClient(NumPyClient):
 
                     self.net_gen.load_state_dict(new_state_dict)
 
-                    train_loss = train_gen(
-                        net=self.net_gen,
-                        trainloader=self.trainloader,
-                        epochs=self.local_epochs_gen,
-                        lr=self.lr_gen,
-                        device=self.device,
-                        dataset=self.dataset,
-                        latent_dim=self.latent_dim
-                    )
+                train_loss = train_gen(
+                    net=self.net_gen,
+                    trainloader=self.trainloader,
+                    epochs=self.local_epochs_gen,
+                    lr=self.lr_gen,
+                    device=self.device,
+                    dataset=self.dataset,
+                    latent_dim=self.latent_dim
+                )
+                # Save all elements of the state_dict into a single RecordSet
+                p_record = ParametersRecord()
+                for k, v in self.net_gen.state_dict().items():
+                    # Convert to NumPy, then to Array. Add to record
+                    p_record[k] = array_from_numpy(v.detach().cpu().numpy())
+                # Add to a context
+                self.client_state.parameters_records["net_parameters"] = p_record
 
-                    # Save all elements of the state_dict into a single RecordSet
-                    p_record = ParametersRecord()
-                    for k, v in self.net_gen.state_dict().items():
-                        # Convert to NumPy, then to Array. Add to record
-                        p_record[k] = array_from_numpy(v.detach().cpu().numpy())
-                    # Add to a context
-                    self.client_state.parameters_records["net_parameters"] = p_record
-
-                    model_path = f"modelo_gen_round_{config['round']}_client_{self.cid}.pt"
-                    torch.save(self.net_gen.state_dict(), model_path)
-
-            return (
-                get_weights_gen(self.net_gen),
-                len(self.trainloader.dataset),
-                {"train_loss": train_loss, "modelo": "gen"},
-            )
+                model_path = f"modelo_gen_round_{config['round']}_client_{self.cid}.pt"
+                torch.save(self.net_gen.state_dict(), model_path)
+                return (
+                    get_weights_gen(self.net_gen),
+                    len(self.trainloader.dataset),
+                    {"train_loss": train_loss, "modelo": "gen"},
+                )
 
     def evaluate(self, parameters, config):
         set_weights(self.net_alvo, parameters)

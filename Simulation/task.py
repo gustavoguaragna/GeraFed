@@ -214,7 +214,6 @@ def load_data(partition_id: int,
     global fds
 
     if fds is None:
-        print("ENTROU FDS NONE")
         if niid:
             partitioner = DirichletPartitioner(
                 num_partitions=num_partitions,

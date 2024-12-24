@@ -132,6 +132,7 @@ class GeraFed(Strategy):
         self.img_size = img_size
         self.latent_dim = latent_dim
         self.client_counter = client_counter
+        self.agg = agg
 
     def __repr__(self) -> str:
         """Compute a string representation of the strategy."""
@@ -208,7 +209,6 @@ class GeraFed(Strategy):
         conjunto_alvo = sorted_clients[metade:]
 
         self.client_counter.update(conjunto_gen)
-        print(self.client_counter)
 
         fit_instructions = []
         config_alvo = {"modelo": "alvo"}
