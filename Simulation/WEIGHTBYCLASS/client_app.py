@@ -4,7 +4,7 @@ import torch
 
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import Context
-from Simulation.WEIGHTBYCLASS.task import Net, get_weights, load_data, set_weights, test, train
+from Simulation.WEIGHTBYCLASS.task import Net, load_data, set_weights, test, train
 
 
 # Define Flower Client and client_fn
@@ -61,4 +61,3 @@ def client_fn(context: Context):
 app = ClientApp(
     client_fn,
 )
-

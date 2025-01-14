@@ -7,6 +7,7 @@ from flwr.common import (
     FitIns,
     FitRes,
     MetricsAggregationFn,
+    NDArray,
     NDArrays,
     Parameters,
     Scalar,
@@ -16,12 +17,11 @@ from flwr.common import (
 from flwr.common.logger import log
 from flwr.server.client_manager import ClientManager
 from flwr.server.client_proxy import ClientProxy
-import numpy as np
 # from collections import Counter
-
-from flwr.server.strategy.aggregate import aggregate, aggregate_inplace, weighted_loss_avg
+from flwr.server.strategy.aggregate import aggregate, weighted_loss_avg
+import numpy as np
 # import random
-
+from functools import partial, reduce
 #from Simulation.task import Net, set_weights
 # import torch
 
@@ -193,8 +193,7 @@ class GeraFed(Strategy):
         )
         clients = list(client_manager.sample(
             num_clients=sample_size, min_num_clients=min_num_clients
-        ))
-    
+        )) 
 
         fit_instructions = []
         config = {}
@@ -237,7 +236,6 @@ class GeraFed(Strategy):
 
 
 
-
     def aggregate_fit(
         self,
         server_round: int,
@@ -245,6 +243,47 @@ class GeraFed(Strategy):
         failures: list[Union[tuple[ClientProxy, FitRes], BaseException]],
     ) -> tuple[Optional[Parameters], dict[str, Scalar]]:
         """Aggregate fit results using weighted average."""
+
+        def aggregate_inplace(results: list[tuple[ClientProxy, FitRes]]) -> NDArrays:
+            """Compute in-place weighted average where each parameter is weighted by its normalized absolute proportion and the number of examples from each client."""
+            # Converter os parâmetros de cada cliente para ndarrays
+            all_params = [parameters_to_ndarrays(fit_res.parameters) for _, fit_res in results]
+            
+            # Calcular a soma total do valor absoluto de cada parâmetro entre os clientes
+            total_sums = [
+                sum(np.abs(layer_params)) for layer_params in zip(*all_params)
+            ]
+
+            # Calcular o total de exemplos
+            num_examples_total = sum(fit_res.num_examples for _, fit_res in results)
+
+            def _try_inplace(
+                x: NDArray, y: Union[NDArray, np.float64], np_binary_op: np.ufunc
+            ) -> NDArray:
+                return (
+                    np_binary_op(x, y, out=x)
+                    if np.can_cast(y, x.dtype, casting="same_kind")
+                    else np_binary_op(x, np.array(y, x.dtype), out=x)
+                )
+
+            # Inicializar os parâmetros agregados com zeros
+            params = [np.zeros_like(layer) for layer in all_params[0]]
+
+            # Agregar ponderando pela proporção normalizada do valor absoluto de cada parâmetro e pelo número de exemplos
+            for i, (_, fit_res) in enumerate(results):
+                client_params = parameters_to_ndarrays(fit_res.parameters)
+                example_weight = fit_res.num_examples / num_examples_total  # Ponderação pelo número de exemplos
+                for j, (param, total_sum) in enumerate(zip(client_params, total_sums)):
+                    # Evitar divisão por zero
+                    proportion = np.abs(param) / total_sum if np.all(total_sum != 0) else np.zeros_like(param)
+                    # Normalizar a proporção com softmax para suavizar a influência
+                    # Somar ponderadamente com normalização
+                    weighted_param = param * example_weight  # Combina ambas as ponderações com suavização
+                    params[j] = _try_inplace(params[j], weighted_param, np.add)
+
+            return params
+
+
         if not results:
             return None, {}
         # Do not aggregate if there are failures and failures are not accepted
@@ -263,11 +302,12 @@ class GeraFed(Strategy):
                 for _, fit_res in results
             ]
             aggregated_ndarrays = aggregate(weights_results)
+
         
         param_ndarray = parameters_to_ndarrays(self.parameters)
         #print(f'SELF.PARAM: {param_ndarray[9][0]} GRAD ACU: {aggregated_ndarrays[9][0]}')
     
-        aggregated_ndarrays = [w - 0.01*g for w, g in zip(param_ndarray, aggregated_ndarrays)]
+        aggregated_ndarrays = [w - 0.001*g for w, g in zip(param_ndarray, aggregated_ndarrays)]
         #print(f'PESO ATUALIZADO: {aggregated_ndarrays[9][0]}')
 
         parameters_aggregated = ndarrays_to_parameters(aggregated_ndarrays)
