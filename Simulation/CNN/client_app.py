@@ -42,7 +42,15 @@ def client_fn(context: Context):
     net = Net()
     partition_id = context.node_config["partition-id"]
     num_partitions = context.node_config["num-partitions"]
-    trainloader, valloader = load_data(partition_id, num_partitions)
+    niid = context.run_config["niid"]
+    alpha_dir = context.run_config["alpha_dir"]
+    batch_size = context.run_config["tam_batch"]
+    trainloader, valloader = load_data(partition_id=partition_id,
+                                       num_partitions=num_partitions,
+                                       niid=niid,
+                                       alpha_dir=alpha_dir,
+                                       batch_size=batch_size
+                                      )
     local_epochs = context.run_config["epocas_alvo"]
 
     # Return Client instance

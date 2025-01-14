@@ -21,12 +21,12 @@ packages = ["."]
 publisher = "gustavoguaragna"
 
 [tool.flwr.app.components]
-serverapp = "Simulation.server_app:app"
-clientapp = "Simulation.client_app:app"
+serverapp = "Simulation.WEIGHTBYCLASS.server_app:app"
+clientapp = "Simulation.WEIGHTBYCLASS.client_app:app"
 
 [tool.flwr.app.config]
-num_rodadas = 20
-num_clientes = 4
+num_rodadas = 10
+num_clientes = 10
 fraction_fit_alvo = 1.0
 fraction_fit_gen = 1.0
 tam_ruido = 100
