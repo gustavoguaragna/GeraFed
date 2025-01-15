@@ -51,7 +51,7 @@ def server_fn(context: Context):
         img_size=img_size,
         latent_dim=latent_dim,
         client_counter=client_counter,
-        agg=agg
+        agg=agg,
     )
     config = ServerConfig(num_rounds=num_rounds)
 

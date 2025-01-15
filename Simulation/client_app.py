@@ -82,10 +82,15 @@ class FlowerClient(NumPyClient):
                 dataset=self.dataset,
                 latent_dim=self.latent_dim
             )
+                modelo = get_weights(self.net_gen)
+                print(f'MODELO full: {modelo}')
+                print(f'NUMERO DE CAMADAS: {len(modelo)}')
+                for i, param in enumerate(modelo):
+                    print(f'CAMADA {i}: {param.shape}')
                 return (
-                get_weights(self.net_alvo),
+                get_weights(self.net_gen),
                 len(self.trainloader.dataset),
-                {"train_loss": train_loss, "modelo": "alvo"},
+                {"train_loss": train_loss, "modelo": "gen"},
             )
 
             elif self.agg == "disc":
@@ -139,6 +144,10 @@ class FlowerClient(NumPyClient):
 
                 model_path = f"modelo_gen_round_{config['round']}_client_{self.cid}.pt"
                 torch.save(self.net_gen.state_dict(), model_path)
+                modelo = get_weights_gen(self.net_gen)
+                print(f'NUMERO DE CAMADAS: {len(modelo)}')
+                for i, param in enumerate(modelo):
+                    print(f'CAMADA {i}: {param.shape}')
                 return (
                     get_weights_gen(self.net_gen),
                     len(self.trainloader.dataset),
@@ -146,8 +155,11 @@ class FlowerClient(NumPyClient):
                 )
 
     def evaluate(self, parameters, config):
+        print("ENTROU EVALUATE")
         set_weights(self.net_alvo, parameters)
+        print("PASSOU SET WEIGHTS")
         loss, accuracy = test(self.net_alvo, self.valloader, self.device)
+        print("SAINDO EVALUATE")
         return loss, len(self.valloader.dataset), {"accuracy": accuracy}
 
 

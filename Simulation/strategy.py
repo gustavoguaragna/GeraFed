@@ -25,7 +25,6 @@ import random
 from Simulation.task import Net, CGAN, set_weights
 import torch
 
-
 WARNING_MIN_AVAILABLE_CLIENTS_TOO_LOW = """
     Setting `min_available_clients` lower than `min_fit_clients` or
     `min_evaluate_clients` can cause the server to fail when there are too few clients
@@ -189,6 +188,7 @@ class GeraFed(Strategy):
         self, server_round: int, parameters: Parameters, client_manager: ClientManager
     ) -> list[tuple[ClientProxy, FitIns]]:
         """Configure the next round of training."""
+        print("ENTROU CONFUGURE FIT")
         config = {}
         if self.on_fit_config_fn is not None:
             # Custom fit config function provided
@@ -222,6 +222,7 @@ class GeraFed(Strategy):
             fit_ins_gen = FitIns(parameters=self.parameters_gen, config=config_gen)
             fit_instructions.append((c, fit_ins_gen))
 
+        print("SAIU CONFIGURE FIT")
         # Return client/config pairs
         return fit_instructions
 
@@ -231,6 +232,7 @@ class GeraFed(Strategy):
     def configure_evaluate(
         self, server_round: int, parameters: Parameters, client_manager: ClientManager
     ) -> list[tuple[ClientProxy, EvaluateIns]]:
+        print("ENTROU CONFIGURE EVALUATE")
         """Configure the next round of evaluation."""
         # Do not configure federated evaluation if fraction eval is 0.
         if self.fraction_evaluate_alvo == 0.0:
@@ -252,6 +254,7 @@ class GeraFed(Strategy):
         )
 
         # Return client/config pairs
+        print("SAIU CONFIGURE EVALUATE")
         return [(client, evaluate_ins) for client in clients]
 
 
@@ -264,6 +267,7 @@ class GeraFed(Strategy):
         failures: list[Union[tuple[ClientProxy, FitRes], BaseException]],
     ) -> tuple[Optional[Parameters], dict[str, Scalar]]:
         """Aggregate fit results using weighted average."""
+        print("ENTROU AGGREGATE FIT")
         if not results:
             return None, {}
         # Do not aggregate if there are failures and failures are not accepted
@@ -323,7 +327,7 @@ class GeraFed(Strategy):
             model_path = f"modelo_gen_round_{server_round}_mnist.pt"
             torch.save(model.state_dict(), model_path)
             print(f"Modelo salvo em {model_path}")
-
+        print("SAIU AGGREGATE FIT")
         return parameters_aggregated_alvo, metrics_aggregated
 
 
@@ -336,6 +340,7 @@ class GeraFed(Strategy):
         failures: list[Union[tuple[ClientProxy, EvaluateRes], BaseException]],
     ) -> tuple[Optional[float], dict[str, Scalar]]:
         """Aggregate evaluation losses using weighted average."""
+        print("ENTROU AGGREGATE EVALUATE")
         if not results:
             return None, {}
         # Do not aggregate if there are failures and failures are not accepted
@@ -372,6 +377,6 @@ class GeraFed(Strategy):
             metrics_aggregated = self.evaluate_metrics_aggregation_fn(eval_metrics)
         elif server_round == 1:  # Only log this warning once
             log(WARNING, "No evaluate_metrics_aggregation_fn provided")
-
+        print("SAIU AGGREGATE FIT")
         return loss_aggregated, metrics_aggregated
 
