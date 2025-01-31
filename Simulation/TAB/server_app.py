@@ -4,10 +4,11 @@ from typing import Dict
 
 from flwr.common import Context, Parameters
 from flwr.server import ServerApp, ServerAppComponents, ServerConfig
+from Simulation.TAB.strategy import FedXgbBagging_Save
 from flwr.server.strategy import FedXgbBagging
 
 
-def evaluate_metrics_aggregation(eval_metrics):
+def evaluate_metrics_aggregation(eval_metrics, server_round):
     """Return an aggregated metric (AUC) for evaluation."""
     total_num = sum([num for num, _ in eval_metrics])
     auc_aggregated = (
@@ -20,6 +21,10 @@ def evaluate_metrics_aggregation(eval_metrics):
         sum([metrics["F1_score"] * num for num, metrics in eval_metrics]) / total_num
     )
     metrics_aggregated = {"AUC": auc_aggregated, "Accuracy": acc_aggregated, "F1_score": f1_aggregated}
+    
+    loss_file = f"losses_tab.txt"
+    with open(loss_file, "a") as f:
+            f.write(f"Rodada {server_round}, F1_score: {f1_aggregated}, AUC: {auc_aggregated}, Acuracia: {acc_aggregated}\n")
     return metrics_aggregated
 
 
@@ -41,7 +46,7 @@ def server_fn(context: Context):
     parameters = Parameters(tensor_type="", tensors=[])
 
     # Define strategy
-    strategy = FedXgbBagging(
+    strategy = FedXgbBagging_Save(
         fraction_fit=fraction_fit,
         fraction_evaluate=fraction_evaluate,
         evaluate_metrics_aggregation_fn=evaluate_metrics_aggregation,
