@@ -125,8 +125,10 @@ def client_fn(context: Context):
     # Load model and data
     partition_id = context.node_config["partition-id"]
     num_partitions = context.node_config["num-partitions"]
+    niid = context.run_config["niid"]
+    alpha_dir = context.run_config["alpha_dir"]
     train_dmatrix, valid_dmatrix, num_train, num_val = load_data(
-        partition_id, num_partitions
+        partition_id=partition_id, num_clients=num_partitions, niid=niid, alpha_dir=alpha_dir
     )
 
     cfg = replace_keys(unflatten_dict(context.run_config))

@@ -5,7 +5,7 @@ from logging import INFO
 import xgboost as xgb
 from flwr.common import log
 from flwr_datasets import FederatedDataset
-from flwr_datasets.partitioner import IidPartitioner
+from flwr_datasets.partitioner import IidPartitioner, DirichletPartitioner
 from sklearn.preprocessing import LabelEncoder
 
 
@@ -31,12 +31,25 @@ def transform_dataset_to_dmatrix(data):
 fds = None  # Cache FederatedDataset
 
 
-def load_data(partition_id: int, num_clients: int):
+def load_data(partition_id: int, 
+              num_clients: int,
+              niid: bool = False,
+              alpha_dir: float = 1.0):
     """Load partition HIGGS data."""
     # Only initialize `FederatedDataset` once
     global fds
     if fds is None:
-        partitioner = IidPartitioner(num_partitions=num_clients)
+        if niid:
+            partitioner = DirichletPartitioner(
+                num_partitions=num_clients,
+                partition_by="income",
+                alpha=alpha_dir,
+                min_partition_size=30,
+                self_balancing=False
+                )
+        else:
+            partitioner = IidPartitioner(num_partitions=num_clients)
+
         fds = FederatedDataset(
             dataset="scikit-learn/adult-census-income",
             partitioners={"train": partitioner},
