@@ -12,6 +12,7 @@ dependencies = [
     "flwr-datasets[vision]>=0.3.0",
     "torch==2.2.1",
     "torchvision==0.17.1",
+    "numpy<2.0"
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -21,11 +22,11 @@ packages = ["."]
 publisher = "gustavoguaragna"
 
 [tool.flwr.app.components]
-serverapp = "Simulation.server_app:app"
-clientapp = "Simulation.client_app:app"
+serverapp = "Simulation.TAB.server_app:app"
+clientapp = "Simulation.TAB.client_app:app"
 
 [tool.flwr.app.config]
-num_rodadas = 20
+num_rodadas = 3
 num_clientes = 2
 fraction_fit_alvo = 1.0
 fraction_fit_gen = 1.0
@@ -33,7 +34,7 @@ tam_ruido = 100
 tam_batch = 64
 tam_img = 28
 epocas_alvo = 2
-epocas_gen = 5
+epocas_gen = 2
 num_dadosssyn = 10
 learn_rate_alvo = 0.001
 learn_rate_gen = 0.0001
@@ -43,7 +44,14 @@ dataset = "mnist"
 niid = false
 alpha_dir = 0.1
 agg = "full" # 'disc', 'full'
-
+xgb_params.objective = "binary:logistic"
+xgb_params.eta = 0.1 # Learning rate
+xgb_params.max-depth = 8
+xgb_params.eval-metric = "auc"
+xgb_params.nthread = 16
+xgb_params.num-parallel-tree = 1
+xgb_params.subsample = 1
+xgb_params.tree-method = "hist"
 
 [tool.flwr.federations]
 default = "local-simulation"
