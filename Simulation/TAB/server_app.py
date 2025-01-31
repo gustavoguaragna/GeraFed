@@ -13,7 +13,13 @@ def evaluate_metrics_aggregation(eval_metrics):
     auc_aggregated = (
         sum([metrics["AUC"] * num for num, metrics in eval_metrics]) / total_num
     )
-    metrics_aggregated = {"AUC": auc_aggregated}
+    acc_aggregated = (
+        sum([metrics["Accuracy"] * num for num, metrics in eval_metrics]) / total_num
+    )
+    f1_aggregated = (
+        sum([metrics["F1_score"] * num for num, metrics in eval_metrics]) / total_num
+    )
+    metrics_aggregated = {"AUC": auc_aggregated, "Accuracy": acc_aggregated, "F1_score": f1_aggregated}
     return metrics_aggregated
 
 

@@ -18,6 +18,7 @@ from flwr.common import (
 )
 
 from Simulation.TAB.task import load_data, replace_keys
+from sklearn.metrics import accuracy_score, f1_score
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -99,6 +100,15 @@ class FlowerClient(Client):
             iteration=bst.num_boosted_rounds() - 1,
         )
         auc = round(float(eval_results.split("\t")[1].split(":")[1]), 4)
+        acc = accuracy_score(
+            self.valid_dmatrix.get_label(),
+            bst.predict(self.valid_dmatrix) > 0.5,
+        )
+        f1 = f1_score(
+            self.valid_dmatrix.get_label(),
+            bst.predict(self.valid_dmatrix) > 0.5,
+            average="macro"
+        )
 
         return EvaluateRes(
             status=Status(
@@ -107,7 +117,7 @@ class FlowerClient(Client):
             ),
             loss=0.0,
             num_examples=self.num_val,
-            metrics={"AUC": auc},
+            metrics={"AUC": auc, "Accuracy": acc, "F1_score": f1},
         )
 
 
