@@ -100,6 +100,7 @@ class FlowerClient(Client):
             iteration=bst.num_boosted_rounds() - 1,
         )
         auc = round(float(eval_results.split("\t")[1].split(":")[1]), 4)
+        print(f"AUC: {auc}")
         acc = accuracy_score(
             self.valid_dmatrix.get_label(),
             bst.predict(self.valid_dmatrix) > 0.5,

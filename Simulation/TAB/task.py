@@ -6,7 +6,8 @@ import xgboost as xgb
 from flwr.common import log
 from flwr_datasets import FederatedDataset
 from flwr_datasets.partitioner import IidPartitioner, DirichletPartitioner
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, OrdinalEncoder
+import pandas as pd
 
 
 def train_test_split(partition, test_fraction, seed):
@@ -67,13 +68,20 @@ def load_data(partition_id: int,
     log(INFO, "Reformatting data...")
     train_data_df = train_data.to_pandas()
     valid_data_df = valid_data.to_pandas()
-    categorical_columns = train_data_df.select_dtypes(include=["object"]).columns
-    
+    print(f"Class distribution: {valid_data_df['income'].value_counts()}")
+    combined_data_df = pd.concat([train_data_df, valid_data_df])
+    categorical_cols = combined_data_df.select_dtypes(include=["object"]).columns
+    #categorical_columns = train_data_df.select_dtypes(include=["object"]).columns
+
+    ordinal_encoder = OrdinalEncoder()
+    combined_data_df[categorical_cols] = ordinal_encoder.fit_transform(combined_data_df[categorical_cols])
+    train_data_df[categorical_cols] = ordinal_encoder.transform(train_data_df[categorical_cols])
+    valid_data_df[categorical_cols] = ordinal_encoder.transform(valid_data_df[categorical_cols])
     # Label encoding for categorical columns
-    for col in categorical_columns:
-        le = LabelEncoder()
-        train_data_df[col] = le.fit_transform(train_data_df[col])
-        valid_data_df[col] = le.transform(valid_data_df[col])
+    # for col in categorical_columns:
+    #     le = LabelEncoder()
+    #     train_data_df[col] = le.fit_transform(train_data_df[col])
+    #     valid_data_df[col] = le.transform(valid_data_df[col])
 
     train_dmatrix = transform_dataset_to_dmatrix(train_data_df)
     valid_dmatrix = transform_dataset_to_dmatrix(valid_data_df)
