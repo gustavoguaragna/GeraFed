@@ -68,8 +68,9 @@ def load_data(partition_id: int,
     log(INFO, "Reformatting data...")
     train_data_df = train_data.to_pandas()
     valid_data_df = valid_data.to_pandas()
-    print(f"Class distribution: {valid_data_df['income'].value_counts()}")
+    
     combined_data_df = pd.concat([train_data_df, valid_data_df])
+    print(f"Class distribution: {combined_data_df['income'].value_counts()}")
     categorical_cols = combined_data_df.select_dtypes(include=["object"]).columns
     #categorical_columns = train_data_df.select_dtypes(include=["object"]).columns
 

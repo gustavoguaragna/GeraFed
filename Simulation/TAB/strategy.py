@@ -71,6 +71,11 @@ class FedXgbBagging_Save(FedAvg):
             for bst in update:
                 global_model = aggregate(global_model, bst)
 
+        #Salvar modelo global
+        if server_round == 1 or server_round == 10:
+            with open(f"global_model_round{server_round}.json", "w") as f:
+                f.write(global_model.decode("utf-8"))
+
         self.global_model = global_model
 
         return (
