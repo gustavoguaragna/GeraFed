@@ -8,11 +8,13 @@ version = "1.0.0"
 description = "Data Augmentation para Dados Heterogêneos em Aprendizado Federado"
 license = "Apache-2.0"
 dependencies = [
-    "flwr[simulation]>=1.12.0",
-    "flwr-datasets[vision]>=0.3.0",
-    "torch==2.2.1",
-    "torchvision==0.17.1",
-    "numpy<2.0"
+    "flwr[simulation]",
+    "flwr-datasets",
+    "torch",
+    "torchvision",
+    "numpy<2.0",
+    "xgboost",
+    "scikit-learn"
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -22,8 +24,8 @@ packages = ["."]
 publisher = "gustavoguaragna"
 
 [tool.flwr.app.components]
-serverapp = "Simulation.server_app:app"
-clientapp = "Simulation.client_app:app"
+serverapp = "Simulation.TAB.server_app:app"
+clientapp = "Simulation.TAB.client_app:app"
 
 [tool.flwr.app.config]
 num_rodadas = 3
