@@ -108,7 +108,7 @@ def train(net, trainloader, epochs, device):
                 grads_acu[i] += param.grad
             running_loss += loss.item()
     gradients = [grad.cpu().numpy() for grad in grads_acu]
-    avg_trainloss = running_loss / len(trainloader)
+    avg_trainloss = running_loss / (len(trainloader) * epochs)
     # print(f'PARAM INIT TREINO: {params_init[9][0]}')
     # for i, param in enumerate(net.parameters()):
     #     if i == 9:

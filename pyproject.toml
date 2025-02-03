@@ -22,11 +22,11 @@ packages = ["."]
 publisher = "gustavoguaragna"
 
 [tool.flwr.app.components]
-serverapp = "Simulation.TAB.server_app:app"
-clientapp = "Simulation.TAB.client_app:app"
+serverapp = "Simulation.server_app:app"
+clientapp = "Simulation.client_app:app"
 
 [tool.flwr.app.config]
-num_rodadas = 10
+num_rodadas = 3
 fraction_fit_alvo = 1.0
 fraction_fit_gen = 1.0
 tam_ruido = 100

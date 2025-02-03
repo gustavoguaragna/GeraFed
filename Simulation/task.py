@@ -279,7 +279,7 @@ def train_alvo(net, trainloader, epochs, lr, device):
             optimizer.step()
             running_loss += loss.item()
 
-    avg_trainloss = running_loss / len(trainloader)
+    avg_trainloss = running_loss / (len(trainloader) * epochs)
     return avg_trainloss
 
 def train_gen(net, trainloader, epochs, lr, device, dataset="mnist", latent_dim=100):
