@@ -85,7 +85,6 @@ class FedXgbBagging_Save(FedAvg):
 
 
 
-
     def aggregate_evaluate(
         self,
         server_round: int,

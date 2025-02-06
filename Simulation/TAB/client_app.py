@@ -17,7 +17,7 @@ from flwr.common import (
     Status,
 )
 
-from Simulation.TAB.task import load_data, replace_keys
+from Simulation.TAB.task import load_data, replace_keys, test_global
 from sklearn.metrics import accuracy_score, f1_score
 
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -33,6 +33,8 @@ class FlowerClient(Client):
         num_val,
         num_local_round,
         params,
+        num_rounds,
+        ordinal_encoder
     ):
         self.train_dmatrix = train_dmatrix
         self.valid_dmatrix = valid_dmatrix
@@ -40,6 +42,8 @@ class FlowerClient(Client):
         self.num_val = num_val
         self.num_local_round = num_local_round
         self.params = params
+        self.num_rounds = num_rounds
+        self.ordinal_encoder = ordinal_encoder
 
     def _local_boost(self, bst_input):
         # Update trees based on local training data.
@@ -110,7 +114,18 @@ class FlowerClient(Client):
             bst.predict(self.valid_dmatrix) > 0.5,
             average="macro"
         )
-
+        if ins.config["global_round"] == self.num_rounds:
+            f1_g, acc_g, auc_g = test_global(model=bst, encoder=self.ordinal_encoder)
+            metrics = {"F1_score": f1,
+                     "F1_global": f1_g,
+                     "AUC": auc, 
+                     "AUC_global": auc_g,
+                     "Accuracy": acc,
+                     "Acc_global": acc_g,}
+        else:  
+            metrics = {"F1_score": f1,
+                     "AUC": auc, 
+                     "Accuracy": acc,}
         return EvaluateRes(
             status=Status(
                 code=Code.OK,
@@ -118,7 +133,7 @@ class FlowerClient(Client):
             ),
             loss=0.0,
             num_examples=self.num_val,
-            metrics={"AUC": auc, "Accuracy": acc, "F1_score": f1},
+            metrics=metrics,
         )
 
 
@@ -128,22 +143,25 @@ def client_fn(context: Context):
     num_partitions = context.node_config["num-partitions"]
     niid = context.run_config["niid"]
     alpha_dir = context.run_config["alpha_dir"]
-    train_dmatrix, valid_dmatrix, num_train, num_val = load_data(
+    train_dmatrix, valid_dmatrix, num_train, num_val, ordinal_encoder = load_data(
         partition_id=partition_id, num_clients=num_partitions, niid=niid, alpha_dir=alpha_dir
     )
 
     cfg = replace_keys(unflatten_dict(context.run_config))
     num_local_round = cfg["epocas_alvo"]
+    num_rounds = context.run_config["num_rodadas"]
 
     # Return Client instance
     return FlowerClient(
-        train_dmatrix,
-        valid_dmatrix,
-        num_train,
-        num_val,
-        num_local_round,
-        cfg["xgb_params"],
-    )
+        train_dmatrix=train_dmatrix,
+        valid_dmatrix=valid_dmatrix,
+        num_train=num_train,
+        num_val=num_val,
+        num_local_round=num_local_round,
+        params=cfg["xgb_params"],
+        num_rounds=num_rounds,
+        ordinal_encoder=ordinal_encoder
+    )   
 
 
 # Flower ClientApp

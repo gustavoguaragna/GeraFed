@@ -10,11 +10,10 @@ license = "Apache-2.0"
 dependencies = [
     "flwr[simulation]",
     "flwr-datasets",
-    "torch",
     "torchvision",
     "numpy<2.0",
     "xgboost",
-    "scikit-learn"
+    "ctgan"
 ]
 
 [tool.hatch.build.targets.wheel]

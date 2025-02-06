@@ -40,8 +40,3 @@ Rodada 17, Perda: 0.5711605915218402, Acuracia: 0.8106
 Rodada 18, Perda: 0.8115906088974824, Acuracia: 0.7552
 Rodada 19, Perda: 1.0819277996849863, Acuracia: 0.7153000000000002
 Rodada 20, Perda: 1.2636098387135062, Acuracia: 0.713
-Rodada 1, Perda: 3.3424580142756173, Acuracia: 0.4731
-Rodada 2, Perda: 0.6954803990710313, Acuracia: 0.7409
-Rodada 1, Perda: 2.347192644313642, Acuracia: 0.4152
-Rodada 1, Perda: 2.008487789494217, Acuracia: 0.3804
-Rodada 1, Perda: 1.696924192130945, Acuracia: 0.5446

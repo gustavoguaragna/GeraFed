@@ -8,6 +8,8 @@ from flwr_datasets import FederatedDataset
 from flwr_datasets.partitioner import IidPartitioner, DirichletPartitioner
 from sklearn.preprocessing import LabelEncoder, OrdinalEncoder
 import pandas as pd
+import numpy as np
+from sklearn.metrics import f1_score, accuracy_score, roc_auc_score
 
 
 def train_test_split(partition, test_fraction, seed):
@@ -87,7 +89,7 @@ def load_data(partition_id: int,
     train_dmatrix = transform_dataset_to_dmatrix(train_data_df)
     valid_dmatrix = transform_dataset_to_dmatrix(valid_data_df)
 
-    return train_dmatrix, valid_dmatrix, num_train, num_val
+    return train_dmatrix, valid_dmatrix, num_train, num_val, ordinal_encoder
 
 
 def replace_keys(input_dict, match="-", target="_"):
@@ -100,3 +102,38 @@ def replace_keys(input_dict, match="-", target="_"):
         else:
             new_dict[new_key] = value
     return new_dict
+
+def test_global(model, encoder):
+    """Evaluate model in global test_data"""
+
+    test_url = "https://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.test"
+
+    # Column names for the dataset
+    columns = [
+        "age", "workclass", "fnlwgt", "education", "education.num",
+        "marital.status", "occupation", "relationship", "race", "sex",
+        "capital.gain", "capital.loss", "hours.per.week", "native.country", "income"
+    ]
+
+    test_data_g = pd.read_csv(test_url, header=None, names=columns, skipinitialspace=True, skiprows=1)
+    test_data_g["income"] = test_data_g["income"].str.strip(".")
+
+    categorical_cols = test_data_g.select_dtypes(include=["object"]).columns
+    
+    # encode no teste global
+    test_data_g[categorical_cols] = encoder.transform(test_data_g[categorical_cols])
+
+    # dmatrix para teste global
+    X_test_g = test_data_g.drop(columns=["income"]).values
+    y_test_g = test_data_g["income"].values
+    test_dmatrix_g = xgb.DMatrix(data=X_test_g, label=y_test_g)
+
+    y_pred_g = model.predict(test_dmatrix_g)
+    y_pred_g_binary = np.where(y_pred_g > 0.5, 1, 0)
+    y_test_g = test_dmatrix_g.get_label()
+
+    f1 = f1_score(y_test_g, y_pred_g_binary, average='macro')
+    acc = accuracy_score(y_test_g, y_pred_g_binary)
+    auc = roc_auc_score(y_test_g, y_pred_g)
+    
+    return f1, acc, auc
