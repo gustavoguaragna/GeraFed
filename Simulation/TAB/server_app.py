@@ -7,7 +7,7 @@ from flwr.server import ServerApp, ServerAppComponents, ServerConfig
 from Simulation.TAB.strategy import FedXgbBagging_Save
 
 
-def evaluate_metrics_aggregation(eval_metrics, server_round):
+def evaluate_metrics_aggregation(eval_metrics, server_round, num_rounds):
     """Return an aggregated metric (AUC) for evaluation."""
     total_num = sum([num for num, _ in eval_metrics])
     auc_aggregated = (
@@ -19,24 +19,32 @@ def evaluate_metrics_aggregation(eval_metrics, server_round):
     f1_aggregated = (
         sum([metrics["F1_score"] * num for num, metrics in eval_metrics]) / total_num
     )
+    if server_round == num_rounds:
+        f1_global = (
+            sum([metrics["F1_global"] * num for num, metrics in eval_metrics]) / total_num
+        )
+        acc_global = (
+            sum([metrics["Acc_global"] * num for num, metrics in eval_metrics]) / total_num
+        )
+        auc_global = (
+            sum([metrics["AUC_global"] * num for num, metrics in eval_metrics]) / total_num
+        )
 
-    f1_global = (
-        sum([metrics["F1_global"] * num for num, metrics in eval_metrics]) / total_num
-    )
-    acc_global = (
-        sum([metrics["Acc_global"] * num for num, metrics in eval_metrics]) / total_num
-    )
-    auc_global = (
-        sum([metrics["AUC_global"] * num for num, metrics in eval_metrics]) / total_num
-    )
-
-    metrics_aggregated = {"AUC": auc_aggregated, "AUC_global": acc_global,
-                           "Accuracy": acc_aggregated, "Accuracy_global": acc_global,
-                             "F1_score": f1_aggregated, "F1_global": f1_global}
-    
-    loss_file = f"losses_tab.txt"
-    with open(loss_file, "a") as f:
-            f.write(f"Rodada {server_round}, F1_score: {round(f1_aggregated, 4)}, F1_global: {round(f1_global, 4)}, AUC: {round(auc_aggregated, 4)}, AUC_global: {round(auc_global, 4)}, Acuracia: {round(acc_aggregated, 4)}, Acuracia_global: {round(acc_global, 4)}\n")
+        metrics_aggregated = {"AUC": auc_aggregated, "AUC_global": auc_global,
+                            "Accuracy": acc_aggregated, "Accuracy_global": acc_global,
+                                "F1_score": f1_aggregated, "F1_global": f1_global}
+        
+        loss_file = f"losses_tab.txt"
+        with open(loss_file, "a") as f:
+                f.write(f"Rodada {server_round}, F1_score: {round(f1_aggregated, 4)}, F1_global: {round(f1_global, 4)}, AUC: {round(auc_aggregated, 4)}, AUC_global: {round(auc_global, 4)}, Acuracia: {round(acc_aggregated, 4)}, Acuracia_global: {round(acc_global, 4)}\n")
+    else:
+        metrics_aggregated = {"AUC": auc_aggregated,
+                               "Accuracy": acc_aggregated,
+                               "F1_score": f1_aggregated}
+        loss_file = f"losses_tab.txt"
+        with open(loss_file, "a") as f:
+                f.write(f"Rodada {server_round}, F1_score: {round(f1_aggregated, 4)}, AUC: {round(auc_aggregated, 4)}, Acuracia: {round(acc_aggregated, 4)}\n")
+         
     return metrics_aggregated
 
 
@@ -65,6 +73,7 @@ def server_fn(context: Context):
         on_evaluate_config_fn=config_func,
         on_fit_config_fn=config_func,
         initial_parameters=parameters,
+        num_rounds=num_rounds
     )
     config = ServerConfig(num_rounds=num_rounds)
 

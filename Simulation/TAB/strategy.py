@@ -26,6 +26,7 @@ from flwr.server.client_proxy import ClientProxy
 from flwr.server.strategy.fedavg import FedAvg
 
 
+
 class FedXgbBagging_Save(FedAvg):
     """Configurable FedXgbBagging strategy implementation."""
 
@@ -41,7 +42,8 @@ class FedXgbBagging_Save(FedAvg):
         **kwargs: Any,
     ):
         self.evaluate_function = evaluate_function
-        self.global_model: Optional[bytes] = None
+        self.global_model: Optional[bytes] = None   
+        self.num_rounds = kwargs.pop("num_rounds")
         super().__init__(**kwargs)
 
     def __repr__(self) -> str:
@@ -84,7 +86,6 @@ class FedXgbBagging_Save(FedAvg):
         )
 
 
-
     def aggregate_evaluate(
         self,
         server_round: int,
@@ -102,7 +103,7 @@ class FedXgbBagging_Save(FedAvg):
         metrics_aggregated = {}
         if self.evaluate_metrics_aggregation_fn:
             eval_metrics = [(res.num_examples, res.metrics) for _, res in results]
-            metrics_aggregated = self.evaluate_metrics_aggregation_fn(eval_metrics, server_round)
+            metrics_aggregated = self.evaluate_metrics_aggregation_fn(eval_metrics, server_round, self.num_rounds)
         elif server_round == 1:  # Only log this warning once
             log(WARNING, "No evaluate_metrics_aggregation_fn provided")
 

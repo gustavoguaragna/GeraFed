@@ -76,7 +76,7 @@ def load_data(partition_id: int,
     categorical_cols = combined_data_df.select_dtypes(include=["object"]).columns
     #categorical_columns = train_data_df.select_dtypes(include=["object"]).columns
 
-    ordinal_encoder = OrdinalEncoder()
+    ordinal_encoder = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1)
     combined_data_df[categorical_cols] = ordinal_encoder.fit_transform(combined_data_df[categorical_cols])
     train_data_df[categorical_cols] = ordinal_encoder.transform(train_data_df[categorical_cols])
     valid_data_df[categorical_cols] = ordinal_encoder.transform(valid_data_df[categorical_cols])

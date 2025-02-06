@@ -114,7 +114,7 @@ class FlowerClient(Client):
             bst.predict(self.valid_dmatrix) > 0.5,
             average="macro"
         )
-        if ins.config["global_round"] == self.num_rounds:
+        if int(ins.config["global_round"]) == int(self.num_rounds):
             f1_g, acc_g, auc_g = test_global(model=bst, encoder=self.ordinal_encoder)
             metrics = {"F1_score": f1,
                      "F1_global": f1_g,
