@@ -1,33 +1,84 @@
-IID 4 clients
-Rodada 1, F1_score: 0.7379984374247183, AUC: 0.9065009980039922, Acuracia: 0.8493781667434362
-Rodada 2, F1_score: 0.7634772447891974, AUC: 0.9086262705358513, Acuracia: 0.8562874251497006
-Rodada 3, F1_score: 0.7713856990923749, AUC: 0.9114264087210194, Acuracia: 0.8584369722094273
-Rodada 4, F1_score: 0.7812171035076164, AUC: 0.9125512359895593, Acuracia: 0.8608935974205435
-Rodada 5, F1_score: 0.7803976742984319, AUC: 0.913126209120221, Acuracia: 0.8595117457392907
-Rodada 6, F1_score: 0.7882680322964463, AUC: 0.9142261784124059, Acuracia: 0.8621219100261016
-Rodada 7, F1_score: 0.7933479485419362, AUC: 0.9149261937663136, Acuracia: 0.8647320743129127
-Rodada 8, F1_score: 0.7975457637270806, AUC: 0.9155512359895593, Acuracia: 0.8662674650698603
-Rodada 9, F1_score: 0.8006150838811379, AUC: 0.9158512820512822, Acuracia: 0.8667280822969445
-Rodada 10, F1_score: 0.8003004611305166, AUC: 0.9160262398280362, Acuracia: 0.8662674650698603
-IID 10 clients
-Rodada 1, F1_score: 0.7935383790700861, AUC: 0.9110699999999999, Acuracia: 0.8578220858895705
-Rodada 2, F1_score: 0.7904610212021852, AUC: 0.9154499999999999, Acuracia: 0.8588957055214724
-Rodada 3, F1_score: 0.7922584084844676, AUC: 0.9159299999999999, Acuracia: 0.8585889570552148
-Rodada 4, F1_score: 0.7947139695881915, AUC: 0.9146699999999999, Acuracia: 0.8585889570552148
-Rodada 5, F1_score: 0.7945787730396073, AUC: 0.9155099999999999, Acuracia: 0.8592024539877301
-Rodada 6, F1_score: 0.7936119531229366, AUC: 0.9145800000000002, Acuracia: 0.8570552147239264
-Rodada 7, F1_score: 0.7915353159632691, AUC: 0.9134099999999999, Acuracia: 0.8562883435582822
-Rodada 8, F1_score: 0.790828525316651, AUC: 0.91197, Acuracia: 0.8549079754601226
-Rodada 9, F1_score: 0.7919274409898213, AUC: 0.91115, Acuracia: 0.8561349693251534
-Rodada 10, F1_score: 0.7872800809144498, AUC: 0.9093700000000001, Acuracia: 0.8524539877300613
-NAO IID 0.1 DIR 4 clients
-Rodada 1, F1_score: 0.6968577982411278, AUC: nan, Acuracia: 0.9938593797973595
-Rodada 2, F1_score: 0.6968577982411278, AUC: nan, Acuracia: 0.9938593797973595
-Rodada 3, F1_score: 0.6968577982411278, AUC: nan, Acuracia: 0.9938593797973595
-Rodada 4, F1_score: 0.6968577982411278, AUC: nan, Acuracia: 0.9938593797973595
-Rodada 5, F1_score: 0.6968577982411277, AUC: nan, Acuracia: 0.9938593797973595
-Rodada 6, F1_score: 0.6968577982411278, AUC: nan, Acuracia: 0.9938593797973595
-Rodada 7, F1_score: 0.5821080592562932, AUC: nan, Acuracia: 0.9875652440896531
-Rodada 8, F1_score: 0.5823836201263051, AUC: nan, Acuracia: 0.9886398526251151
-Rodada 9, F1_score: 0.5817518777785271, AUC: nan, Acuracia: 0.986183604544059
-Rodada 10, F1_score: 0.5821080592562933, AUC: nan, Acuracia: 0.9875652440896531
+IID 4 clientes
+Rodada 1, F1_score: 0.7358, AUC: 0.9065, Acuracia: 0.8481
+Rodada 2, F1_score: 0.7606, AUC: 0.9093, Acuracia: 0.8552
+Rodada 3, F1_score: 0.7728, AUC: 0.9117, Acuracia: 0.8583
+Rodada 4, F1_score: 0.779, AUC: 0.9135, Acuracia: 0.8594
+Rodada 5, F1_score: 0.7835, AUC: 0.9143, Acuracia: 0.8607
+Rodada 6, F1_score: 0.7853, AUC: 0.9151, Acuracia: 0.8607
+Rodada 7, F1_score: 0.7937, AUC: 0.916, Acuracia: 0.8644
+Rodada 8, F1_score: 0.7964, AUC: 0.9165, Acuracia: 0.8653
+Rodada 9, F1_score: 0.8018, AUC: 0.917, Acuracia: 0.8672
+Rodada 10, F1_score: 0.8015, AUC: 0.9167, Acuracia: 0.8666
+Rodada 11, F1_score: 0.8019, AUC: 0.9164, Acuracia: 0.8666
+Rodada 12, F1_score: 0.802, AUC: 0.9165, Acuracia: 0.8667
+Rodada 13, F1_score: 0.8014, AUC: 0.9161, Acuracia: 0.8658
+Rodada 14, F1_score: 0.8009, AUC: 0.9162, Acuracia: 0.8657
+Rodada 15, F1_score: 0.8026, AUC: 0.9162, Acuracia: 0.8664
+Rodada 16, F1_score: 0.8046, AUC: 0.9163, Acuracia: 0.8676
+Rodada 17, F1_score: 0.8058, AUC: 0.9161, Acuracia: 0.8686
+Rodada 18, F1_score: 0.805, AUC: 0.9159, Acuracia: 0.8678
+Rodada 19, F1_score: 0.8051, AUC: 0.9155, Acuracia: 0.8673
+Rodada 20, F1_score: 0.8059, F1_global: 0.7987, AUC: 0.9155, AUC_global: 0.9152, Acuracia: 0.868, Acuracia_global: 0.8625
+NIID (a=0.1) 4 clientes
+Rodada 1, F1_score: 0.6969, AUC: nan, Acuracia: 0.9939
+Rodada 2, F1_score: 0.6969, AUC: nan, Acuracia: 0.9939
+Rodada 3, F1_score: 0.6969, AUC: nan, Acuracia: 0.9939
+Rodada 4, F1_score: 0.6969, AUC: nan, Acuracia: 0.9939
+Rodada 5, F1_score: 0.6969, AUC: nan, Acuracia: 0.9939
+Rodada 6, F1_score: 0.6969, AUC: nan, Acuracia: 0.9939
+Rodada 7, F1_score: 0.5821, AUC: nan, Acuracia: 0.9876
+Rodada 8, F1_score: 0.5824, AUC: nan, Acuracia: 0.9886
+Rodada 9, F1_score: 0.5818, AUC: nan, Acuracia: 0.9862
+Rodada 10, F1_score: 0.5821, AUC: nan, Acuracia: 0.9876
+Rodada 11, F1_score: 0.5816, AUC: nan, Acuracia: 0.9857
+Rodada 12, F1_score: 0.5814, AUC: nan, Acuracia: 0.9848
+Rodada 13, F1_score: 0.5848, AUC: nan, Acuracia: 0.9836
+Rodada 14, F1_score: 0.5848, AUC: nan, Acuracia: 0.9836
+Rodada 15, F1_score: 0.5845, AUC: nan, Acuracia: 0.9823
+Rodada 16, F1_score: 0.5842, AUC: nan, Acuracia: 0.9813
+Rodada 17, F1_score: 0.584, AUC: nan, Acuracia: 0.9804
+Rodada 18, F1_score: 0.5843, AUC: nan, Acuracia: 0.9814
+Rodada 19, F1_score: 0.5845, AUC: nan, Acuracia: 0.9823
+Rodada 20, F1_score: 0.5843, F1_global: 0.3654, AUC: nan, AUC_global: 0.7644, Acuracia: 0.9816, Acuracia_global: 0.6441
+IID 10 clientes
+Rodada 1, F1_score: 0.7946, AUC: 0.9108, Acuracia: 0.8587
+Rodada 2, F1_score: 0.7915, AUC: 0.9146, Acuracia: 0.8589
+Rodada 3, F1_score: 0.79, AUC: 0.915, Acuracia: 0.8567
+Rodada 4, F1_score: 0.7901, AUC: 0.914, Acuracia: 0.8561
+Rodada 5, F1_score: 0.7905, AUC: 0.9127, Acuracia: 0.8554
+Rodada 6, F1_score: 0.7909, AUC: 0.913, Acuracia: 0.8549
+Rodada 7, F1_score: 0.7931, AUC: 0.9117, Acuracia: 0.8564
+Rodada 8, F1_score: 0.7937, AUC: 0.9102, Acuracia: 0.8569
+Rodada 9, F1_score: 0.7873, AUC: 0.9093, Acuracia: 0.8518
+Rodada 10, F1_score: 0.791, AUC: 0.9077, Acuracia: 0.8543
+Rodada 11, F1_score: 0.7899, AUC: 0.9063, Acuracia: 0.8534
+Rodada 12, F1_score: 0.7912, AUC: 0.9055, Acuracia: 0.8538
+Rodada 13, F1_score: 0.7875, AUC: 0.9044, Acuracia: 0.8512
+Rodada 14, F1_score: 0.7843, AUC: 0.9026, Acuracia: 0.848
+Rodada 15, F1_score: 0.7844, AUC: 0.9009, Acuracia: 0.8486
+Rodada 16, F1_score: 0.7841, AUC: 0.8998, Acuracia: 0.8475
+Rodada 17, F1_score: 0.7797, AUC: 0.8983, Acuracia: 0.8448
+Rodada 18, F1_score: 0.7785, AUC: 0.8968, Acuracia: 0.8433
+Rodada 19, F1_score: 0.779, AUC: 0.8955, Acuracia: 0.8434
+Rodada 20, F1_score: 0.7757, F1_global: 0.7772, AUC: 0.8941, AUC_global: 0.8967, Acuracia: 0.841, Acuracia_global: 0.848
+NIID (a=0.1) 10 clientes
+Rodada 1, F1_score: 0.8073, AUC: nan, Acuracia: 0.8088
+Rodada 2, F1_score: 0.4492, AUC: nan, Acuracia: 0.7045
+Rodada 3, F1_score: 0.8073, AUC: nan, Acuracia: 0.8088
+Rodada 4, F1_score: 0.8073, AUC: nan, Acuracia: 0.8088
+Rodada 5, F1_score: 0.8073, AUC: nan, Acuracia: 0.8088
+Rodada 6, F1_score: 0.8073, AUC: nan, Acuracia: 0.8088
+Rodada 7, F1_score: 0.8073, AUC: nan, Acuracia: 0.8088
+Rodada 8, F1_score: 0.8073, AUC: nan, Acuracia: 0.8088
+Rodada 9, F1_score: 0.8073, AUC: nan, Acuracia: 0.8088
+Rodada 10, F1_score: 0.8073, AUC: nan, Acuracia: 0.8088
+Rodada 11, F1_score: 0.8073, AUC: nan, Acuracia: 0.8088
+Rodada 12, F1_score: 0.8073, AUC: nan, Acuracia: 0.8088
+Rodada 13, F1_score: 0.8073, AUC: nan, Acuracia: 0.8088
+Rodada 14, F1_score: 0.8073, AUC: nan, Acuracia: 0.8088
+Rodada 15, F1_score: 0.8073, AUC: nan, Acuracia: 0.8088
+Rodada 16, F1_score: 0.8073, AUC: nan, Acuracia: 0.8088
+Rodada 17, F1_score: 0.8073, AUC: nan, Acuracia: 0.8088
+Rodada 18, F1_score: 0.8073, AUC: nan, Acuracia: 0.8088
+Rodada 19, F1_score: 0.8073, AUC: nan, Acuracia: 0.8088
+Rodada 20, F1_score: 0.8073, F1_global: 0.4206, AUC: nan, AUC_global: 0.3314, Acuracia: 0.8088, Acuracia_global: 0.7367

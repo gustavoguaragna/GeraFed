@@ -1,16 +1,24 @@
-"""xgboost_quickstart: A Flower / XGBoost app."""
+"""GeraFed: um framework para balancear dados heterogêneos em aprendizado federado."""
 
-from logging import INFO
+from collections import OrderedDict
 
-import xgboost as xgb
-from flwr.common import log
+import torch
 from flwr_datasets import FederatedDataset
 from flwr_datasets.partitioner import IidPartitioner, DirichletPartitioner
-from sklearn.preprocessing import LabelEncoder, OrdinalEncoder
+from flwr.common import log
+from logging import INFO
 import pandas as pd
-import numpy as np
-from sklearn.metrics import f1_score, accuracy_score, roc_auc_score
+from sklearn.preprocessing import OrdinalEncoder
+import xgboost as xgb
 
+def get_weights(net):
+    return [val.cpu().numpy() for _, val in net.state_dict().items()]
+
+
+def set_weights(net, parameters):
+    params_dict = zip(net.state_dict().keys(), parameters)
+    state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
+    net.load_state_dict(state_dict, strict=True)
 
 def train_test_split(partition, test_fraction, seed):
     """Split the data into train and validation set given split rate."""
@@ -22,7 +30,6 @@ def train_test_split(partition, test_fraction, seed):
 
     return partition_train, partition_test, num_train, num_test
 
-
 def transform_dataset_to_dmatrix(data):
     """Transform dataset to DMatrix format for xgboost."""
     x = data.drop(columns=["income"]).values
@@ -30,15 +37,13 @@ def transform_dataset_to_dmatrix(data):
     new_data = xgb.DMatrix(x, label=y)
     return new_data
 
-
 fds = None  # Cache FederatedDataset
-
 
 def load_data(partition_id: int, 
               num_clients: int,
               niid: bool = False,
               alpha_dir: float = 1.0):
-    """Load partition Adult data."""
+    """Load partition adult data."""
     # Only initialize `FederatedDataset` once
     global fds
     if fds is None:
@@ -90,50 +95,3 @@ def load_data(partition_id: int,
     valid_dmatrix = transform_dataset_to_dmatrix(valid_data_df)
 
     return train_dmatrix, valid_dmatrix, num_train, num_val, ordinal_encoder
-
-
-def replace_keys(input_dict, match="-", target="_"):
-    """Recursively replace match string with target string in dictionary keys."""
-    new_dict = {}
-    for key, value in input_dict.items():
-        new_key = key.replace(match, target)
-        if isinstance(value, dict):
-            new_dict[new_key] = replace_keys(value, match, target)
-        else:
-            new_dict[new_key] = value
-    return new_dict
-
-def test_global(model, encoder):
-    """Evaluate model in global test_data"""
-
-    test_url = "https://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.test"
-
-    # Column names for the dataset
-    columns = [
-        "age", "workclass", "fnlwgt", "education", "education.num",
-        "marital.status", "occupation", "relationship", "race", "sex",
-        "capital.gain", "capital.loss", "hours.per.week", "native.country", "income"
-    ]
-
-    test_data_g = pd.read_csv(test_url, header=None, names=columns, skipinitialspace=True, skiprows=1)
-    test_data_g["income"] = test_data_g["income"].str.strip(".")
-
-    categorical_cols = test_data_g.select_dtypes(include=["object"]).columns
-    
-    # encode no teste global
-    test_data_g[categorical_cols] = encoder.transform(test_data_g[categorical_cols])
-
-    # dmatrix para teste global
-    X_test_g = test_data_g.drop(columns=["income"]).values
-    y_test_g = test_data_g["income"].values
-    test_dmatrix_g = xgb.DMatrix(data=X_test_g, label=y_test_g)
-
-    y_pred_g = model.predict(test_dmatrix_g)
-    y_pred_g_binary = np.where(y_pred_g > 0.5, 1, 0)
-    y_test_g = test_dmatrix_g.get_label()
-
-    f1 = f1_score(y_test_g, y_pred_g_binary, average='macro')
-    acc = accuracy_score(y_test_g, y_pred_g_binary)
-    auc = roc_auc_score(y_test_g, y_pred_g)
-    
-    return f1, acc, auc

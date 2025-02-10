@@ -23,11 +23,11 @@ packages = ["."]
 publisher = "gustavoguaragna"
 
 [tool.flwr.app.components]
-serverapp = "Simulation.TAB.server_app:app"
-clientapp = "Simulation.TAB.client_app:app"
+serverapp = "Simulation.CTGAN.server_app:app"
+clientapp = "Simulation.CTGAN.client_app:app"
 
 [tool.flwr.app.config]
-num_rodadas = 3
+num_rodadas = 10
 fraction_fit_alvo = 1.0
 fraction_fit_gen = 1.0
 tam_ruido = 100
@@ -41,7 +41,7 @@ learn_rate_gen = 0.0001
 modelo_alvo = "mlp"
 modelo_gen = "gan"
 dataset = "mnist"
-niid = true
+niid = false
 alpha_dir = 0.1
 agg = "full" # 'disc', 'full'
 xgb_params.objective = "binary:logistic"
