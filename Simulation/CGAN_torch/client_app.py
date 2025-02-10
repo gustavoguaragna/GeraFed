@@ -1,10 +1,11 @@
 """GeraFed: um framework para balancear dados heterogêneos em aprendizado federado."""
 
 import torch
-from Simulation.CGAN_torch.task import CGAN, get_weights, load_data, set_weights, test, train
-
+from Simulation.CGAN_torch.task import CGAN, get_weights, get_weights_gen, load_data, set_weights, test, train
+from collections import OrderedDict
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import Context
+from flwr.common import Context, ParametersRecord, array_from_numpy
 
 import random
 import numpy as np
@@ -20,7 +21,15 @@ if torch.cuda.is_available():
     torch.backends.cudnn.benchmark = False
 
 class CGANClient(NumPyClient):
-    def __init__(self, trainloader, testloader, local_epochs, learning_rate, dataset, img_size, latent_dim):
+    def __init__(self, 
+                 trainloader,
+                 testloader,
+                 local_epochs, 
+                 learning_rate, 
+                 dataset, 
+                 img_size, 
+                 latent_dim,
+                 agg):
         self.latent_dim = latent_dim
         self.net = CGAN(dataset=dataset, img_size=img_size, latent_dim=self.latent_dim)
         self.trainloader = trainloader
@@ -30,20 +39,95 @@ class CGANClient(NumPyClient):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         # cudnn.benchmark = True
         self.dataset = dataset
+        self.agg = agg
 
     def fit(self, parameters, config):
         """Train the model with data of this client."""
-        set_weights(self.net, parameters)
-        train(
-            self.net,
-            self.trainloader,
-            epochs=self.local_epochs,
-            learning_rate=self.lr,
+        # set_weights(self.net, parameters)
+        # train(
+        #     self.net,
+        #     self.trainloader,
+        #     epochs=self.local_epochs,
+        #     learning_rate=self.lr,
+        #     device=self.device,
+        #     dataset=self.dataset,
+        #     latent_dim=self.latent_dim
+        # )
+        # return get_weights(self.net), len(self.trainloader), {}
+        if self.agg == "full":
+            set_weights(self.net_gen, parameters)
+            train_loss = train(
+            net=self.net_gen,
+            trainloader=self.trainloader,
+            epochs=self.local_epochs_gen,
+            lr=self.lr_gen,
             device=self.device,
             dataset=self.dataset,
             latent_dim=self.latent_dim
         )
-        return get_weights(self.net), len(self.trainloader), {}
+            return (
+            get_weights(self.net_gen),
+            len(self.trainloader.dataset),
+            {"train_loss": train_loss, "modelo": "gen"},
+        )
+
+        elif self.agg == "disc":
+            # Supondo que net seja o modelo e parameters seja a lista de parâmetros fornecida
+            state_keys = [k for k in self.net_gen.state_dict().keys() if 'generator' not in k]
+        
+            # Criando o OrderedDict com as chaves filtradas e os parâmetros fornecidos
+            disc_dict = OrderedDict({k: torch.tensor(v) for k, v in zip(state_keys, parameters)})
+
+            state_dict = {}
+            # Extract record from context
+            if "net_parameters" in self.client_state.parameters_records:
+                p_record = self.client_state.parameters_records["net_parameters"]
+
+                # Deserialize arrays
+                for k, v in p_record.items():
+                    state_dict[k] = torch.from_numpy(v.numpy())
+
+                # Apply state dict to a new model instance
+                model_ = CGAN()
+                model_.load_state_dict(state_dict)
+
+                new_state_dict = {}
+
+                for name, param in self.net_gen.state_dict().items():
+                    if 'generator' in name:
+                        new_state_dict[name] = model_.state_dict()[name]
+                    elif 'discriminator' in name or 'label' in name:
+                        new_state_dict[name] = disc_dict[name]
+                    else:
+                        new_state_dict[name] = param
+
+                self.net_gen.load_state_dict(new_state_dict)
+
+            train_loss = train(
+                net=self.net_gen,
+                trainloader=self.trainloader,
+                epochs=self.local_epochs_gen,
+                lr=self.lr_gen,
+                device=self.device,
+                dataset=self.dataset,
+                latent_dim=self.latent_dim
+            )
+            # Save all elements of the state_dict into a single RecordSet
+            p_record = ParametersRecord()
+            for k, v in self.net_gen.state_dict().items():
+                # Convert to NumPy, then to Array. Add to record
+                p_record[k] = array_from_numpy(v.detach().cpu().numpy())
+            # Add to a context
+            self.client_state.parameters_records["net_parameters"] = p_record
+
+            model_path = f"modelo_gen_round_{config['round']}_client_{self.cid}.pt"
+            torch.save(self.net_gen.state_dict(), model_path)
+            return (
+                get_weights_gen(self.net_gen),
+                len(self.trainloader.dataset),
+                {"train_loss": train_loss, "modelo": "gen"},
+            )
+
 
     def evaluate(self, parameters, config):
         """Evaluate the model on the data this client has."""
@@ -63,12 +147,28 @@ def client_fn(context: Context):
     dataset = context.run_config["dataset"]  # Novo parâmetro
     img_size = context.run_config["tam_img"]
     batch_size = context.run_config["tam_batch"]
-    trainloader, testloader = load_data(partition_id, num_partitions, dataset=dataset, img_size=img_size, batch_size=batch_size)
+    niid = context.run_config["niid"]
+    alpha_dir = context.run_config["alpha_dir"]
+    trainloader, testloader = load_data(partition_id, 
+                                        num_partitions, 
+                                        dataset=dataset, 
+                                        niid=niid,
+                                        alpha_dir=alpha_dir,
+                                        img_size=img_size, 
+                                        batch_size=batch_size)
     local_epochs = context.run_config["epocas_gen"]
     learning_rate = context.run_config["learn_rate_gen"]
     noise_dim = context.run_config["tam_ruido"]
+    agg = context.run_config["agg"]
 
-    return CGANClient(trainloader, testloader, local_epochs, learning_rate, dataset, img_size=img_size, latent_dim=noise_dim).to_client()
+    return CGANClient(trainloader, 
+                      testloader, 
+                      local_epochs, 
+                      learning_rate, 
+                      dataset, 
+                      img_size=img_size, 
+                      latent_dim=noise_dim,
+                      agg=agg).to_client()
 
 
 app = ClientApp(client_fn=client_fn)
