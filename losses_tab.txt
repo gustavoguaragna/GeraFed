@@ -82,3 +82,6 @@ Rodada 17, F1_score: 0.8073, AUC: nan, Acuracia: 0.8088
 Rodada 18, F1_score: 0.8073, AUC: nan, Acuracia: 0.8088
 Rodada 19, F1_score: 0.8073, AUC: nan, Acuracia: 0.8088
 Rodada 20, F1_score: 0.8073, F1_global: 0.4206, AUC: nan, AUC_global: 0.3314, Acuracia: 0.8088, Acuracia_global: 0.7367
+Rodada 1, F1_score: 0.7295, AUC: 0.9061, Acuracia: 0.8458
+Rodada 2, F1_score: 0.7619, AUC: 0.9089, Acuracia: 0.8555
+Rodada 3, F1_score: 0.7716, F1_global: 0.7756, AUC: 0.9111, AUC_global: 0.9116, Acuracia: 0.8577, Acuracia_global: 0.8584

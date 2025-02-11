@@ -25,12 +25,12 @@ if torch.cuda.is_available():
     
 # Define the GAN model
 class CGAN(nn.Module):
-    def __init__(self, dataset, img_size=28, latent_dim=100):
+    def __init__(self, dataset, latent_dim=100):
         super(CGAN, self).__init__()
         if dataset == "mnist":
             self.classes = 10
             self.channels = 1
-        self.img_size = img_size
+            self.img_size = 28
         self.latent_dim = latent_dim
         self.img_shape = (self.channels, self.img_size, self.img_size)
         self.label_embedding = nn.Embedding(self.classes, self.classes)
@@ -84,7 +84,7 @@ class CGAN(nn.Module):
         return self.adv_loss(output, label)
     
 
-def train(net, trainloader, epochs, learning_rate, device, dataset="mnist", latent_dim=100):
+def train(net, trainloader, epochs, lr, device, dataset="mnist", latent_dim=100):
     """Train the network on the training set."""
     if dataset == "mnist":
       imagem = "image"
@@ -92,8 +92,8 @@ def train(net, trainloader, epochs, learning_rate, device, dataset="mnist", late
       imagem = "img"
     
     net.to(device)  # move model to GPU if available
-    optim_G = torch.optim.Adam(net.generator.parameters(), lr=learning_rate, betas=(0.5, 0.999))
-    optim_D = torch.optim.Adam(net.discriminator.parameters(), lr=learning_rate, betas=(0.5, 0.999))
+    optim_G = torch.optim.Adam(net.generator.parameters(), lr=lr, betas=(0.5, 0.999))
+    optim_D = torch.optim.Adam(net.discriminator.parameters(), lr=lr, betas=(0.5, 0.999))
 
     g_losses = []
     d_losses = []

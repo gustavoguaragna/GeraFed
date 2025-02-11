@@ -1,0 +1,4 @@
+Rodada 1, Perda: None
+Rodada 2, Perda: None
+Rodada 3, Perda: None
+Rodada 1, Perda: 0.6513981678683287

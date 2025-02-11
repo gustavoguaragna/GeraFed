@@ -27,11 +27,10 @@ class CGANClient(NumPyClient):
                  local_epochs, 
                  learning_rate, 
                  dataset, 
-                 img_size, 
                  latent_dim,
                  agg):
         self.latent_dim = latent_dim
-        self.net = CGAN(dataset=dataset, img_size=img_size, latent_dim=self.latent_dim)
+        self.net = CGAN(dataset=dataset, latent_dim=self.latent_dim)
         self.trainloader = trainloader
         self.testloader = testloader
         self.local_epochs = local_epochs
@@ -55,25 +54,25 @@ class CGANClient(NumPyClient):
         # )
         # return get_weights(self.net), len(self.trainloader), {}
         if self.agg == "full":
-            set_weights(self.net_gen, parameters)
+            set_weights(self.net, parameters)
             train_loss = train(
-            net=self.net_gen,
+            net=self.net,
             trainloader=self.trainloader,
-            epochs=self.local_epochs_gen,
-            lr=self.lr_gen,
+            epochs=self.local_epochs,
+            lr=self.lr,
             device=self.device,
             dataset=self.dataset,
             latent_dim=self.latent_dim
         )
             return (
-            get_weights(self.net_gen),
+            get_weights(self.net),
             len(self.trainloader.dataset),
             {"train_loss": train_loss, "modelo": "gen"},
         )
 
         elif self.agg == "disc":
             # Supondo que net seja o modelo e parameters seja a lista de parâmetros fornecida
-            state_keys = [k for k in self.net_gen.state_dict().keys() if 'generator' not in k]
+            state_keys = [k for k in self.net.state_dict().keys() if 'generator' not in k]
         
             # Criando o OrderedDict com as chaves filtradas e os parâmetros fornecidos
             disc_dict = OrderedDict({k: torch.tensor(v) for k, v in zip(state_keys, parameters)})
@@ -93,7 +92,7 @@ class CGANClient(NumPyClient):
 
                 new_state_dict = {}
 
-                for name, param in self.net_gen.state_dict().items():
+                for name, param in self.net.state_dict().items():
                     if 'generator' in name:
                         new_state_dict[name] = model_.state_dict()[name]
                     elif 'discriminator' in name or 'label' in name:
@@ -101,29 +100,29 @@ class CGANClient(NumPyClient):
                     else:
                         new_state_dict[name] = param
 
-                self.net_gen.load_state_dict(new_state_dict)
+                self.net.load_state_dict(new_state_dict)
 
             train_loss = train(
-                net=self.net_gen,
+                net=self.net,
                 trainloader=self.trainloader,
-                epochs=self.local_epochs_gen,
-                lr=self.lr_gen,
+                epochs=self.local_epochs,
+                lr=self.lr,
                 device=self.device,
                 dataset=self.dataset,
                 latent_dim=self.latent_dim
             )
             # Save all elements of the state_dict into a single RecordSet
             p_record = ParametersRecord()
-            for k, v in self.net_gen.state_dict().items():
+            for k, v in self.net.state_dict().items():
                 # Convert to NumPy, then to Array. Add to record
                 p_record[k] = array_from_numpy(v.detach().cpu().numpy())
             # Add to a context
             self.client_state.parameters_records["net_parameters"] = p_record
 
             model_path = f"modelo_gen_round_{config['round']}_client_{self.cid}.pt"
-            torch.save(self.net_gen.state_dict(), model_path)
+            torch.save(self.net.state_dict(), model_path)
             return (
-                get_weights_gen(self.net_gen),
+                get_weights_gen(self.net),
                 len(self.trainloader.dataset),
                 {"train_loss": train_loss, "modelo": "gen"},
             )
@@ -131,6 +130,7 @@ class CGANClient(NumPyClient):
 
     def evaluate(self, parameters, config):
         """Evaluate the model on the data this client has."""
+        print("ENTROU EVALUATE NO CLIENTE")
         set_weights(self.net, parameters)
         g_loss, d_loss = test(self.net, self.testloader, self.device, dataset=self.dataset)
         return g_loss, len(self.testloader), {}
@@ -145,7 +145,6 @@ def client_fn(context: Context):
 
     # Read the run_config to fetch hyperparameters relevant to this run
     dataset = context.run_config["dataset"]  # Novo parâmetro
-    img_size = context.run_config["tam_img"]
     batch_size = context.run_config["tam_batch"]
     niid = context.run_config["niid"]
     alpha_dir = context.run_config["alpha_dir"]
@@ -153,8 +152,7 @@ def client_fn(context: Context):
                                         num_partitions, 
                                         dataset=dataset, 
                                         niid=niid,
-                                        alpha_dir=alpha_dir,
-                                        img_size=img_size, 
+                                        alpha_dir=alpha_dir, 
                                         batch_size=batch_size)
     local_epochs = context.run_config["epocas_gen"]
     learning_rate = context.run_config["learn_rate_gen"]
@@ -166,7 +164,6 @@ def client_fn(context: Context):
                       local_epochs, 
                       learning_rate, 
                       dataset, 
-                      img_size=img_size, 
                       latent_dim=noise_dim,
                       agg=agg).to_client()
 

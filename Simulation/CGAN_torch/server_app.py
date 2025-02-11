@@ -20,16 +20,16 @@ if torch.cuda.is_available():
     torch.backends.cudnn.benchmark = False
 
 class FedAvg_Save(FedAvg):
-    def __init__(self, dataset, img_size, **kwargs):
+    def __init__(self, dataset, **kwargs):
+        self.agg = kwargs.pop("agg")
         super().__init__(**kwargs)
         self.dataset = dataset
-        self.img_size = img_size
 
     def aggregate_fit(self, server_round, results, failures):
         # Agrega os resultados da rodada
         aggregated_parameters, aggregated_metrics = super().aggregate_fit(server_round, results, failures)
 
-        if aggregated_parameters is not None:
+        if aggregated_parameters is not None and self.agg == "full":
             # Salva o modelo após a agregação
             self.save_model(aggregated_parameters, server_round)
 
@@ -48,7 +48,7 @@ class FedAvg_Save(FedAvg):
         # Converte os parâmetros para ndarrays
         ndarrays = parameters_to_ndarrays(parameters)
         # Cria uma instância do modelo
-        model = CGAN(dataset=self.dataset, img_size=self.img_size)
+        model = CGAN(dataset=self.dataset)
         # Define os pesos do modelo
         set_weights(model, ndarrays)
         # Salva o modelo no disco com o nome específico do dataset
@@ -70,26 +70,26 @@ def server_fn(context: Context) -> ServerAppComponents:
     # Lê a configuração
     num_rounds = context.run_config["num_rodadas"]
     dataset = context.run_config["dataset"]
-    img_size = context.run_config["tam_img"]  # Novo parâmetro
+    agg = context.run_config["agg"]
 
     # Define o caminho do checkpoint inicial (opcional)
     initial_model_path = f"model_round_0_{dataset}.pt"  # Ajuste conforme necessário
 
     if os.path.exists(initial_model_path):
         # Carrega o modelo existente
-        model = CGAN(dataset=dataset, img_size=img_size)
+        model = CGAN(dataset=dataset)
         model.load_state_dict(torch.load(initial_model_path))
         ndarrays = get_weights(model)
         print(f"Modelo carregado a partir de {initial_model_path}")
     else:
         # Inicializa o modelo a partir do início
-        ndarrays = get_weights(CGAN(dataset=dataset, img_size=img_size))
+        ndarrays = get_weights(CGAN(dataset=dataset))
         print(f"Inicializando modelo do zero para dataset {dataset}")
 
     parameters = ndarrays_to_parameters(ndarrays)
 
     # Define a estratégia usando a estratégia personalizada
-    strategy = FedAvg_Save(initial_parameters=parameters, dataset=dataset, img_size=img_size)
+    strategy = FedAvg_Save(initial_parameters=parameters, dataset=dataset, agg=agg)
     config = ServerConfig(num_rounds=num_rounds)
 
     return ServerAppComponents(strategy=strategy, config=config)
