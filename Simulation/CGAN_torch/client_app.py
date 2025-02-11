@@ -50,8 +50,9 @@ class CGANClient(NumPyClient):
         if self.agg == "full":
             set_weights(self.net, parameters)
             # Gera imagens do modelo agregado do round anterior
-            figura = generate_images(net=self.net)
-            figura.savefig(f"mnist_CGAN_r{config['server_round']-1}_{self.local_epochs}e_{self.batch_size}_100z_10c_{self.lr}lr_niid_01dir_cliente{self.cid}.png")
+            if self.cid == 0:
+                figura = generate_images(net=self.net)
+                figura.savefig(f"mnist_CGAN_r{config['server_round']-1}_{self.local_epochs}e_{self.batch_size}_100z_10c_{self.lr}lr_niid_01dir.png")
             train_loss = train(
             net=self.net,
             trainloader=self.trainloader,
@@ -61,6 +62,8 @@ class CGANClient(NumPyClient):
             dataset=self.dataset,
             latent_dim=self.latent_dim
         )
+            figura = generate_images(net=self.net)
+            figura.savefig(f"mnist_CGAN_r{config['server_round']}_{self.local_epochs}e_{self.batch_size}_100z_10c_{self.lr}lr_niid_01dir_cliente{self.cid}.png")
             return (
             get_weights(self.net),
             len(self.trainloader.dataset),
@@ -98,9 +101,9 @@ class CGANClient(NumPyClient):
                         new_state_dict[name] = param
 
                 self.net.load_state_dict(new_state_dict)
-    
-            figura = generate_images(net=self.net)
-            figura.savefig(f"mnist_CGAN_r{config['server_round']-1}_{self.local_epochs}e_{self.batch_size}_100z_10c_{self.lr}lr_niid_01dir_cliente{self.cid}.png")
+            if self.cid == 0:
+                figura = generate_images(net=self.net)
+                figura.savefig(f"mnist_CGAN_r{config['server_round']-1}_{self.local_epochs}e_{self.batch_size}_100z_10c_{self.lr}lr_niid_01dir_cliente{self.cid}.png")
 
             train_loss = train(
                 net=self.net,
@@ -124,7 +127,7 @@ class CGANClient(NumPyClient):
 
             figura = generate_images(net=self.net)
             figura.savefig(f"mnist_CGAN_r{config['server_round']}_{self.local_epochs}e_{self.batch_size}_100z_10c_{self.lr}lr_niid_01dir_cliente{self.cid}.png")
-            
+
             return (
                 get_weights_gen(self.net),
                 len(self.trainloader.dataset),
