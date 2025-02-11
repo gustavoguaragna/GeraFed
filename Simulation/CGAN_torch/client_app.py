@@ -101,9 +101,9 @@ class CGANClient(NumPyClient):
                         new_state_dict[name] = param
 
                 self.net.load_state_dict(new_state_dict)
-            if self.cid == 0:
-                figura = generate_images(net=self.net)
-                figura.savefig(f"mnist_CGAN_r{config['server_round']-1}_{self.local_epochs}e_{self.batch_size}_100z_10c_{self.lr}lr_niid_01dir_cliente{self.cid}.png")
+            
+            figura = generate_images(net=self.net)
+            figura.savefig(f"mnist_CGAN_r{config['server_round']-1}_{self.local_epochs}e_{self.batch_size}_100z_10c_{self.lr}lr_niid_01dir_cliente{self.cid}.png")
 
             train_loss = train(
                 net=self.net,
