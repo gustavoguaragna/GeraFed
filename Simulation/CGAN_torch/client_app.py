@@ -1,7 +1,7 @@
 """GeraFed: um framework para balancear dados heterogêneos em aprendizado federado."""
 
 import torch
-from Simulation.CGAN_torch.task import CGAN, get_weights, get_weights_gen, load_data, set_weights, test, train
+from Simulation.CGAN_torch.task import CGAN, get_weights, get_weights_gen, load_data, set_weights, test, train, generate_images
 from collections import OrderedDict
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import Context
@@ -22,13 +22,16 @@ if torch.cuda.is_available():
 
 class CGANClient(NumPyClient):
     def __init__(self, 
+                 cid,
                  trainloader,
                  testloader,
                  local_epochs, 
                  learning_rate, 
                  dataset, 
                  latent_dim,
-                 agg):
+                 agg,
+                 batch_size):
+        self.cid = cid
         self.latent_dim = latent_dim
         self.net = CGAN(dataset=dataset, latent_dim=self.latent_dim)
         self.trainloader = trainloader
@@ -39,22 +42,16 @@ class CGANClient(NumPyClient):
         # cudnn.benchmark = True
         self.dataset = dataset
         self.agg = agg
+        self.batch_size = batch_size
 
     def fit(self, parameters, config):
         """Train the model with data of this client."""
-        # set_weights(self.net, parameters)
-        # train(
-        #     self.net,
-        #     self.trainloader,
-        #     epochs=self.local_epochs,
-        #     learning_rate=self.lr,
-        #     device=self.device,
-        #     dataset=self.dataset,
-        #     latent_dim=self.latent_dim
-        # )
-        # return get_weights(self.net), len(self.trainloader), {}
+
         if self.agg == "full":
             set_weights(self.net, parameters)
+            # Gera imagens do modelo agregado do round anterior
+            figura = generate_images(net=self.net)
+            figura.savefig(f"mnist_CGAN_r{config['server_round']-1}_{self.local_epochs}e_{self.batch_size}_100z_10c_{self.lr}lr_niid_01dir_cliente{self.cid}.png")
             train_loss = train(
             net=self.net,
             trainloader=self.trainloader,
@@ -101,6 +98,9 @@ class CGANClient(NumPyClient):
                         new_state_dict[name] = param
 
                 self.net.load_state_dict(new_state_dict)
+    
+            figura = generate_images(net=self.net)
+            figura.savefig(f"mnist_CGAN_r{config['server_round']-1}_{self.local_epochs}e_{self.batch_size}_100z_10c_{self.lr}lr_niid_01dir_cliente{self.cid}.png")
 
             train_loss = train(
                 net=self.net,
@@ -121,6 +121,10 @@ class CGANClient(NumPyClient):
 
             model_path = f"modelo_gen_round_{config['round']}_client_{self.cid}.pt"
             torch.save(self.net.state_dict(), model_path)
+
+            figura = generate_images(net=self.net)
+            figura.savefig(f"mnist_CGAN_r{config['server_round']}_{self.local_epochs}e_{self.batch_size}_100z_10c_{self.lr}lr_niid_01dir_cliente{self.cid}.png")
+            
             return (
                 get_weights_gen(self.net),
                 len(self.trainloader.dataset),
@@ -159,13 +163,15 @@ def client_fn(context: Context):
     noise_dim = context.run_config["tam_ruido"]
     agg = context.run_config["agg"]
 
-    return CGANClient(trainloader, 
-                      testloader, 
-                      local_epochs, 
-                      learning_rate, 
-                      dataset, 
+    return CGANClient(cid=partition_id,
+                      trainloader=trainloader, 
+                      testloader=testloader, 
+                      local_epochs=local_epochs, 
+                      learning_rate=learning_rate, 
+                      dataset=dataset, 
                       latent_dim=noise_dim,
-                      agg=agg).to_client()
+                      agg=agg,
+                      batch_size=batch_size).to_client()
 
 
 app = ClientApp(client_fn=client_fn)

@@ -8,6 +8,7 @@ import torch
 import os  # Importar para verificar a existência de arquivos
 import random
 import numpy as np
+from flwr.common import FitIns
 
 SEED = 42
 random.seed(SEED)
@@ -24,6 +25,26 @@ class FedAvg_Save(FedAvg):
         self.agg = kwargs.pop("agg")
         super().__init__(**kwargs)
         self.dataset = dataset
+
+    def configure_fit(
+        self, server_round: int, parameters, client_manager):
+        """Configure the next round of training."""
+        config = {"server_round": server_round}
+        if self.on_fit_config_fn is not None:
+            # Custom fit config function provided
+            config = self.on_fit_config_fn(server_round)
+        fit_ins = FitIns(parameters, config)
+
+        # Sample clients
+        sample_size, min_num_clients = self.num_fit_clients(
+            client_manager.num_available()
+        )
+        clients = client_manager.sample(
+            num_clients=sample_size, min_num_clients=min_num_clients
+        )
+
+        # Return client/config pairs
+        return [(client, fit_ins) for client in clients]
 
     def aggregate_fit(self, server_round, results, failures):
         # Agrega os resultados da rodada

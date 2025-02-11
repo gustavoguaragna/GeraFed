@@ -10,6 +10,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose, Normalize, ToTensor, Resize
 import numpy as np
+import matplotlib.pyplot as plt
 
 import random
 
@@ -256,3 +257,25 @@ def load_data(partition_id: int,
     testloader = DataLoader(test_partition, batch_size=batch_size)
 
     return trainloader, testloader
+
+def generate_images(net, examples_per_class = 5, classes = 10, latent_dim = 100):
+    """Gera plot de imagens de cada classe"""
+
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    net.eval()
+    batch_size = examples_per_class * classes
+
+    latent_vectors = torch.randn(batch_size, latent_dim, device=device)
+    labels = torch.tensor([i for i in range(classes) for _ in range(examples_per_class)], device=device)
+
+    with torch.no_grad():
+        generated_images = net(latent_vectors, labels)
+
+    fig = plt.figure(figsize=(examples_per_class, classes))
+    plt.title("Generated Images")
+    for i in range(generated_images.shape[0]):
+        plt.subplot(10, 5, i+1)
+        plt.imshow(generated_images[i, 0, :, :], cmap='gray')
+        plt.axis('off')
+    
+    return fig
