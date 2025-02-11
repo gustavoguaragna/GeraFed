@@ -74,7 +74,6 @@ class CGAN(nn.Module):
     def forward(self, input, labels):
         device = input.device  # Ensure all tensors are on the same device
         labels = labels.to(device)  # Move labels to the same device as input
-        print(f"DEVICE GAN: {device}")
 
         if input.dim() == 2:
             z = torch.cat((self.label_embedding(labels), input), -1)
@@ -95,8 +94,6 @@ def train(net, trainloader, epochs, lr, device, dataset="mnist", latent_dim=100)
       imagem = "image"
     elif dataset == "cifar10":
       imagem = "img"
-    
-    print(f"DEVICE TRAIN: {device}")
 
     net.to(device)  # move model to GPU if available
     optim_G = torch.optim.Adam(net.generator.parameters(), lr=lr, betas=(0.5, 0.999))
@@ -147,6 +144,7 @@ def train(net, trainloader, epochs, lr, device, dataset="mnist", latent_dim=100)
 
 def test(net, testloader, device, dataset="mnist", latent_dim=100):
     """Validate the network on the entire test set."""
+    net.to(device)
     if dataset == "mnist":
       imagem = "image"
     elif dataset == "cifar10":
@@ -275,7 +273,7 @@ def generate_images(net, device, examples_per_class = 5, classes = 10, latent_di
     labels = torch.tensor([i for i in range(classes) for _ in range(examples_per_class)], device=device)
 
     with torch.no_grad():
-        generated_images = net(latent_vectors, labels)
+        generated_images = net(latent_vectors, labels).cpu()
 
     fig = plt.figure(figsize=(examples_per_class, classes))
     plt.title("Generated Images")

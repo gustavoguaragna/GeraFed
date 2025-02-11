@@ -39,7 +39,6 @@ class CGANClient(NumPyClient):
         self.local_epochs = local_epochs
         self.lr = learning_rate
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        print(f"DEVICE CLIENT: {self.device}")
         # cudnn.benchmark = True
         self.dataset = dataset
         self.agg = agg
@@ -52,7 +51,7 @@ class CGANClient(NumPyClient):
             set_weights(self.net, parameters)
             # Gera imagens do modelo agregado do round anterior
             if self.cid == 0:
-                figura = generate_images(net=self.net)
+                figura = generate_images(net=self.net, device=self.device)
                 figura.savefig(f"mnist_CGAN_r{config['server_round']-1}_{self.local_epochs}e_{self.batch_size}_100z_10c_{self.lr}lr_niid_01dir.png")
             train_loss = train(
             net=self.net,
@@ -63,7 +62,7 @@ class CGANClient(NumPyClient):
             dataset=self.dataset,
             latent_dim=self.latent_dim
         )
-            figura = generate_images(net=self.net, device=device)
+            figura = generate_images(net=self.net, device=self.device)
             figura.savefig(f"mnist_CGAN_r{config['server_round']}_{self.local_epochs}e_{self.batch_size}_100z_10c_{self.lr}lr_niid_01dir_cliente{self.cid}.png")
             return (
             get_weights(self.net),
@@ -103,7 +102,7 @@ class CGANClient(NumPyClient):
 
                 self.net.load_state_dict(new_state_dict)
             
-            figura = generate_images(net=self.net)
+            figura = generate_images(net=self.net, device=self.device)
             figura.savefig(f"mnist_CGAN_r{config['server_round']-1}_{self.local_epochs}e_{self.batch_size}_100z_10c_{self.lr}lr_niid_01dir_cliente{self.cid}.png")
 
             train_loss = train(
@@ -126,7 +125,7 @@ class CGANClient(NumPyClient):
             model_path = f"modelo_gen_round_{config['round']}_client_{self.cid}.pt"
             torch.save(self.net.state_dict(), model_path)
 
-            figura = generate_images(net=self.net)
+            figura = generate_images(net=self.net, device=self.device)
             figura.savefig(f"mnist_CGAN_r{config['server_round']}_{self.local_epochs}e_{self.batch_size}_100z_10c_{self.lr}lr_niid_01dir_cliente{self.cid}.png")
 
             return (
@@ -138,7 +137,6 @@ class CGANClient(NumPyClient):
 
     def evaluate(self, parameters, config):
         """Evaluate the model on the data this client has."""
-        print("ENTROU EVALUATE NO CLIENTE")
         set_weights(self.net, parameters)
         g_loss, d_loss = test(self.net, self.testloader, self.device, dataset=self.dataset)
         return g_loss, len(self.testloader), {}
