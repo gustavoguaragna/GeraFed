@@ -268,6 +268,7 @@ def generate_images(net, examples_per_class = 5, classes = 10, latent_dim = 100)
     """Gera plot de imagens de cada classe"""
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    net.to(device) 
     net.eval()
     batch_size = examples_per_class * classes
 
