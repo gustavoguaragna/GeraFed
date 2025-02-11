@@ -72,10 +72,14 @@ class CGAN(nn.Module):
         return layers
 
     def forward(self, input, labels):
+        device = input.device  # Ensure all tensors are on the same device
+        labels = labels.to(device)  # Move labels to the same device as input
+        print(f"DEVICE GAN: {device}")
+
         if input.dim() == 2:
             z = torch.cat((self.label_embedding(labels), input), -1)
             x = self.generator(z)
-            x = x.view(x.size(0), *self.img_shape) #Em
+            x = x.view(x.size(0), *self.img_shape)
             return x 
         elif input.dim() == 4:
             x = torch.cat((input.view(input.size(0), -1), self.label_embedding(labels)), -1)
@@ -92,6 +96,8 @@ def train(net, trainloader, epochs, lr, device, dataset="mnist", latent_dim=100)
     elif dataset == "cifar10":
       imagem = "img"
     
+    print(f"DEVICE TRAIN: {device}")
+
     net.to(device)  # move model to GPU if available
     optim_G = torch.optim.Adam(net.generator.parameters(), lr=lr, betas=(0.5, 0.999))
     optim_D = torch.optim.Adam(net.discriminator.parameters(), lr=lr, betas=(0.5, 0.999))

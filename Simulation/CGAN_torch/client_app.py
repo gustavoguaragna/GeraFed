@@ -39,6 +39,7 @@ class CGANClient(NumPyClient):
         self.local_epochs = local_epochs
         self.lr = learning_rate
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        print(f"DEVICE CLIENT: {self.device}")
         # cudnn.benchmark = True
         self.dataset = dataset
         self.agg = agg
