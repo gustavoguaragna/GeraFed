@@ -51,7 +51,7 @@ class CGANClient(NumPyClient):
             set_weights(self.net, parameters)
             # Gera imagens do modelo agregado do round anterior
             if self.cid == 0:
-                figura = generate_images(net=self.net, device=self.device, server_round=config["server_round"])
+                figura = generate_images(net=self.net, device=self.device, round_number=config["server_round"])
                 figura.savefig(f"mnist_CGAN_r{config['server_round']-1}_{self.local_epochs}e_{self.batch_size}b_100z_10c_{self.lr}lr_niid_01dir.png")
             train_loss = train(
             net=self.net,
@@ -62,7 +62,7 @@ class CGANClient(NumPyClient):
             dataset=self.dataset,
             latent_dim=self.latent_dim
         )
-            figura = generate_images(net=self.net, device=self.device, server_round=config["server_round"], client_id=self.cid)
+            figura = generate_images(net=self.net, device=self.device, round_number=config["server_round"], client_id=self.cid)
             figura.savefig(f"mnist_CGAN_r{config['server_round']}_{self.local_epochs}e_{self.batch_size}b_100z_10c_{self.lr}lr_niid_01dir_cliente{self.cid}.png")
             return (
             get_weights(self.net),
@@ -125,7 +125,7 @@ class CGANClient(NumPyClient):
             model_path = f"modelo_gen_round_{config['round']}_client_{self.cid}.pt"
             torch.save(self.net.state_dict(), model_path)
 
-            figura = generate_images(net=self.net, device=self.device, server_round=config["server_round"], client_id=self.cid)
+            figura = generate_images(net=self.net, device=self.device, round_number=config["server_round"], client_id=self.cid)
             figura.savefig(f"mnist_CGAN_r{config['server_round']}_{self.local_epochs}e_{self.batch_size}b_100z_10c_{self.lr}lr_niid_01dir_cliente{self.cid}.png")
 
             return (

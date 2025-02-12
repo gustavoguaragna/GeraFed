@@ -232,6 +232,12 @@ def load_data(partition_id: int,
         else:
             raise ValueError(f"Dataset {dataset} not supported")
     train_partition = fds.load_partition(partition_id, split="train")
+    #### Teste para contabilizar distribuicao do cliente
+    from collections import Counter
+    labels = train_partition["label"]
+    class_distribution = Counter(labels)
+    print(class_distribution)
+
     test_partition = fds.load_split("test")
 
     # Divide data on each node: 80% train, 20% test
@@ -262,7 +268,7 @@ def load_data(partition_id: int,
 
     return trainloader, testloader
 
-def generate_images(net, device, round_number, client_id, examples_per_class = 5, classes = 10, latent_dim = 100):
+def generate_images(net, device, round_number, client_id = None, examples_per_class = 5, classes = 10, latent_dim = 100):
     """Gera plot de imagens de cada classe"""
 
     net.to(device) 
@@ -282,7 +288,7 @@ def generate_images(net, device, round_number, client_id, examples_per_class = 5
     if client_id:
         fig.text(0.5, 0.98, f"Round: {round_number} | Client: {client_id}", ha="center", fontsize=12)
     else:
-        fig.text(0.5, 0.98, f"Round: {round_number}", ha="center", fontsize=12)
+        fig.text(0.5, 0.98, f"Round: {round_number-1}", ha="center", fontsize=12)
 
     # Exibir as imagens nos subplots
     for i, ax in enumerate(axes.flat):
