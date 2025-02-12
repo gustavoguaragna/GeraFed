@@ -262,7 +262,7 @@ def load_data(partition_id: int,
 
     return trainloader, testloader
 
-def generate_images(net, device, examples_per_class = 5, classes = 10, latent_dim = 100):
+def generate_images(net, device, round_number, client_id, examples_per_class = 5, classes = 10, latent_dim = 100):
     """Gera plot de imagens de cada classe"""
 
     net.to(device) 
@@ -275,11 +275,36 @@ def generate_images(net, device, examples_per_class = 5, classes = 10, latent_di
     with torch.no_grad():
         generated_images = net(latent_vectors, labels).cpu()
 
-    fig = plt.figure(figsize=(examples_per_class, classes))
-    plt.title("Generated Images")
-    for i in range(generated_images.shape[0]):
-        plt.subplot(10, 5, i+1)
-        plt.imshow(generated_images[i, 0, :, :], cmap='gray')
-        plt.axis('off')
+    # Criar uma figura com 10 linhas e 5 colunas de subplots
+    fig, axes = plt.subplots(classes, examples_per_class, figsize=(5, 9))
+
+    # Adiciona título no topo da figura
+    if client_id:
+        fig.text(0.5, 0.98, f"Round: {round_number} | Client: {client_id}", ha="center", fontsize=12)
+    else:
+        fig.text(0.5, 0.98, f"Round: {round_number}", ha="center", fontsize=12)
+
+    # Exibir as imagens nos subplots
+    for i, ax in enumerate(axes.flat):
+        ax.imshow(generated_images[i, 0, :, :], cmap='gray')
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+    # Ajustar o layout antes de calcular as posições
+    plt.tight_layout(rect=[0.05, 0, 1, 0.96])
+
+    # Reduzir espaço entre colunas
+    # plt.subplots_adjust(wspace=0.05)
+
+    # Adicionar os rótulos das classes corretamente alinhados
+    fig.canvas.draw()  # Atualiza a renderização para obter posições corretas
+    for row in range(classes):
+        # Obter posição do subplot em coordenadas da figura
+        bbox = axes[row, 0].get_window_extent(fig.canvas.get_renderer())
+        pos = fig.transFigure.inverted().transform([(bbox.x0, bbox.y0), (bbox.x1, bbox.y1)])
+        center_y = (pos[0, 1] + pos[1, 1]) / 2  # Centro exato da linha
+
+        # Adicionar o rótulo
+        fig.text(0.04, center_y, str(row), va='center', fontsize=12, color='black')
     
     return fig
