@@ -29,6 +29,7 @@ class CGANClient(NumPyClient):
                  learning_rate, 
                  dataset, 
                  latent_dim,
+                 context: Context,
                  agg,
                  batch_size):
         self.cid = cid
@@ -39,6 +40,7 @@ class CGANClient(NumPyClient):
         self.local_epochs = local_epochs
         self.lr = learning_rate
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        print(f"DEVICE CLIENT: {self.device}")
         # cudnn.benchmark = True
         self.dataset = dataset
         self.agg = agg
@@ -69,7 +71,7 @@ class CGANClient(NumPyClient):
             figura.savefig(f"mnist_CGAN_r{config['server_round']}_{self.local_epochs}e_{self.batch_size}b_100z_10c_{self.lr}lr_niid_01dir_cliente{self.cid}.png")
             return (
             get_weights(self.net),
-            len(self.trainloader.dataset),
+            1,
             {"train_loss": train_loss, "modelo": "gen"},
         )
 
@@ -106,7 +108,7 @@ class CGANClient(NumPyClient):
                 self.net.load_state_dict(new_state_dict)
             
             figura = generate_images(net=self.net, device=self.device, round_number=config["server_round"])
-            figura.savefig(f"mnist_CGAN_r{config['server_round']-1}_{self.local_epochs}e_{self.batch_size}b_100z_10c_{self.lr}lr_niid_01dir_cliente{self.cid}.png")
+            figura.savefig(f"mnist_CGAN_r{config['server_round']-1}_{self.local_epochs}e_{self.batch_size}b_100z_10c_{self.lr}lr_niid_01dir.png")
 
             train_loss = train(
                 net=self.net,
@@ -125,7 +127,7 @@ class CGANClient(NumPyClient):
             # Add to a context
             self.client_state.parameters_records["net_parameters"] = p_record
 
-            model_path = f"modelo_gen_round_{config['round']}_client_{self.cid}.pt"
+            model_path = f"modelo_gen_round_{config['server_round']}_client_{self.cid}.pt"
             torch.save(self.net.state_dict(), model_path)
 
             figura = generate_images(net=self.net, device=self.device, round_number=config["server_round"], client_id=self.cid)
@@ -140,7 +142,39 @@ class CGANClient(NumPyClient):
 
     def evaluate(self, parameters, config):
         """Evaluate the model on the data this client has."""
-        set_weights(self.net, parameters)
+        if self.agg == "full":
+            set_weights(self.net, parameters)
+        elif self.agg == "disc":
+             # Supondo que net seja o modelo e parameters seja a lista de parâmetros fornecida
+            state_keys = [k for k in self.net.state_dict().keys() if 'generator' not in k]
+        
+            # Criando o OrderedDict com as chaves filtradas e os parâmetros fornecidos
+            disc_dict = OrderedDict({k: torch.tensor(v) for k, v in zip(state_keys, parameters)})
+
+            state_dict = {}
+            # Extract record from context
+            if "net_parameters" in self.client_state.parameters_records:
+                p_record = self.client_state.parameters_records["net_parameters"]
+
+                # Deserialize arrays
+                for k, v in p_record.items():
+                    state_dict[k] = torch.from_numpy(v.numpy())
+
+                # Apply state dict to a new model instance
+                model_ = CGAN()
+                model_.load_state_dict(state_dict)
+
+                new_state_dict = {}
+
+                for name, param in self.net.state_dict().items():
+                    if 'generator' in name:
+                        new_state_dict[name] = model_.state_dict()[name]
+                    elif 'discriminator' in name or 'label' in name:
+                        new_state_dict[name] = disc_dict[name]
+                    else:
+                        new_state_dict[name] = param
+
+                self.net.load_state_dict(new_state_dict)
         g_loss, d_loss = test(self.net, self.testloader, self.device, dataset=self.dataset)
         return g_loss, len(self.testloader), {}
 
@@ -175,6 +209,7 @@ def client_fn(context: Context):
                       learning_rate=learning_rate, 
                       dataset=dataset, 
                       latent_dim=noise_dim,
+                      context=context,
                       agg=agg,
                       batch_size=batch_size).to_client()
 

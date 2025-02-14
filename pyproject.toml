@@ -27,21 +27,21 @@ serverapp = "Simulation.server_app:app"
 clientapp = "Simulation.client_app:app"
 
 [tool.flwr.app.config]
-num_rodadas = 3
+num_rodadas = 5
 fraction_fit_alvo = 1.0
 fraction_fit_gen = 1.0
 tam_ruido = 100
 tam_batch = 64
 tam_img = 28
 epocas_alvo = 2
-epocas_gen = 2
+epocas_gen = 100
 num_dadosssyn = 10
 learn_rate_alvo = 0.001
 learn_rate_gen = 0.0001
 modelo_alvo = "mlp"
 modelo_gen = "gan"
 dataset = "mnist"
-niid = false
+niid = true
 alpha_dir = 0.1
 agg = "full" # 'disc', 'full'
 xgb_params.objective = "binary:logistic"
@@ -59,5 +59,5 @@ default = "local-simulation"
 [tool.flwr.federations.local-simulation]
 options.num-supernodes = 4
 options.backend.client-resources.num-cpus = 1
-options.backend.client-resources.num-gpus = 0
+options.backend.client-resources.num-gpus = 0.25
 
