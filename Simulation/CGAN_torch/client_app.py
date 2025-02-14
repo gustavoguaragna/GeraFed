@@ -71,7 +71,7 @@ class CGANClient(NumPyClient):
             figura.savefig(f"mnist_CGAN_r{config['server_round']}_{self.local_epochs}e_{self.batch_size}b_100z_10c_{self.lr}lr_niid_01dir_cliente{self.cid}.png")
             return (
             get_weights(self.net),
-            1,
+            len(self.trainloader.dataset),
             {"train_loss": train_loss, "modelo": "gen"},
         )
 
