@@ -26,7 +26,7 @@ if torch.cuda.is_available():
     
 # Define the GAN model
 class CGAN(nn.Module):
-    def __init__(self, dataset, latent_dim=100):
+    def __init__(self, dataset="mnist", latent_dim=100):
         super(CGAN, self).__init__()
         if dataset == "mnist":
             self.classes = 10
