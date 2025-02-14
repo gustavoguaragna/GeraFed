@@ -42,6 +42,9 @@ class CGANClient(NumPyClient):
         # cudnn.benchmark = True
         self.dataset = dataset
         self.agg = agg
+        self.client_state = (
+            context.state
+        ) 
         self.batch_size = batch_size
 
     def fit(self, parameters, config):

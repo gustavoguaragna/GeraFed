@@ -236,7 +236,7 @@ def load_data(partition_id: int,
     from collections import Counter
     labels = train_partition["label"]
     class_distribution = Counter(labels)
-    print(class_distribution)
+    print(f"CID {partition_id}: {class_distribution}")
 
     test_partition = fds.load_split("test")
 
