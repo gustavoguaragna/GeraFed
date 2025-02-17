@@ -95,3 +95,5 @@ Rodada 38, Perda: 2.4436993568566194, Acuracia: 0.1616
 Rodada 40, Perda: 2.5860266670299943, Acuracia: 0.16
 Rodada 41, Perda: 2.6393250948304585, Acuracia: 0.1085
 Rodada 42, Perda: 2.611535711652914, Acuracia: 0.1349
+Rodada 1, Perda: 2.0186567200217276, Acuracia: 0.6425
+Rodada 2, Perda: 1.9865874553182323, Acuracia: 0.6925

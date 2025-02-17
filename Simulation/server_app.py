@@ -29,6 +29,7 @@ def server_fn(context: Context):
     img_size = context.run_config["tam_img"]
     latent_dim = context.run_config["tam_ruido"]
     agg = context.run_config["agg"]
+    model = context.run_config["model"]
 
     # Initialize model parameters
     ndarrays_alvo = get_weights(Net())
@@ -52,6 +53,7 @@ def server_fn(context: Context):
         latent_dim=latent_dim,
         client_counter=client_counter,
         agg=agg,
+        model=model
     )
     config = ServerConfig(num_rounds=num_rounds)
 

@@ -100,7 +100,8 @@ class GeraFed(Strategy):
         img_size: int = 28,
         latent_dim: int = 100,
         client_counter: Counter,
-        agg: str = "full"
+        agg: str = "full",
+        model: str = "both"
     ) -> None:
         super().__init__()
 
@@ -132,6 +133,7 @@ class GeraFed(Strategy):
         self.latent_dim = latent_dim
         self.client_counter = client_counter
         self.agg = agg
+        self.model = model
 
     def __repr__(self) -> str:
         """Compute a string representation of the strategy."""
@@ -202,11 +204,27 @@ class GeraFed(Strategy):
         clients = list(client_manager.sample(
             num_clients=sample_size, min_num_clients=min_num_clients
         ))
-    
-        sorted_clients = sorted(clients, key=lambda c: self.client_counter[c])
-        metade = len(clients) // 2
-        conjunto_gen = sorted_clients[:metade]
-        conjunto_alvo = sorted_clients[metade:]
+
+        if self.model == "both":
+            print("MODEL BOTH")
+            sorted_clients = sorted(clients, key=lambda c: self.client_counter[c])
+            metade = len(clients) // 2
+            conjunto_gen = sorted_clients[:metade]
+            conjunto_alvo = sorted_clients[metade:]
+        elif self.model == "alvo":
+            print("MODEL ALVO")
+            conjunto_alvo = clients
+            conjunto_gen = []
+        elif self.model == "gen":
+            print("MODEL GEN")
+            conjunto_alvo = []
+            conjunto_gen = clients
+        else:
+            print(f"Modelo {self.model} não reconhecido. O treinamento será feito para ambos os modelos.")
+            sorted_clients = sorted(clients, key=lambda c: self.client_counter[c])
+            metade = len(clients) // 2
+            conjunto_gen = sorted_clients[:metade]
+            conjunto_alvo = sorted_clients[metade:]
 
         self.client_counter.update(conjunto_gen)
 
@@ -279,8 +297,14 @@ class GeraFed(Strategy):
 
         if self.inplace:
             # Does in-place weighted average of results
-            aggregated_ndarrays_alvo = aggregate_inplace(results_alvo)
-            aggregated_ndarrays_gen = aggregate_inplace(results_gen)
+            if results_alvo:
+                aggregated_ndarrays_alvo = aggregate_inplace(results_alvo)
+                parameters_aggregated_alvo = ndarrays_to_parameters(aggregated_ndarrays_alvo)
+                self.parameters_alvo = parameters_aggregated_alvo
+            if results_gen:
+                aggregated_ndarrays_gen = aggregate_inplace(results_gen)
+                parameters_aggregated_gen = ndarrays_to_parameters(aggregated_ndarrays_gen)
+                self.parameters_gen = parameters_aggregated_gen
         else:
             # Convert results
             weights_results = [
@@ -289,11 +313,11 @@ class GeraFed(Strategy):
             ]
             aggregated_ndarrays = aggregate(weights_results)
 
-        parameters_aggregated_alvo = ndarrays_to_parameters(aggregated_ndarrays_alvo)
-        parameters_aggregated_gen = ndarrays_to_parameters(aggregated_ndarrays_gen)
+            parameters_aggregated_alvo = ndarrays_to_parameters(aggregated_ndarrays_alvo)
+            parameters_aggregated_gen = ndarrays_to_parameters(aggregated_ndarrays_gen)
 
-        self.parameters_alvo = parameters_aggregated_alvo
-        self.parameters_gen = parameters_aggregated_gen
+            self.parameters_alvo = parameters_aggregated_alvo
+            self.parameters_gen = parameters_aggregated_gen
 
         # Aggregate custom metrics if aggregation fn was provided
         metrics_aggregated = {}
@@ -315,7 +339,7 @@ class GeraFed(Strategy):
             torch.save(model.state_dict(), model_path)
             print(f"Modelo salvo em {model_path}")
 
-        if parameters_aggregated_gen is not None and self.agg == "full":
+        if self.model == "gen" and parameters_aggregated_gen is not None and self.agg == "full":
             ndarrays = parameters_to_ndarrays(parameters_aggregated_gen)
             # Cria uma instância do modelo
             model = CGAN(dataset=self.dataset,

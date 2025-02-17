@@ -117,6 +117,7 @@ class CGAN(nn.Module):
         return self.adv_loss(output, label)
 
 def generate_images(cgan, examples_per_class):
+    cgan.eval()
     device = next(cgan.parameters()).device
     latent_dim = cgan.latent_dim
     classes = cgan.classes
@@ -207,7 +208,7 @@ def load_data(partition_id: int,
               alpha_dir: float, 
               batch_size: int, 
               cgan=None, 
-              examples_per_class=0):
+              examples_per_class=5000):
     
     """Carrega MNIST com splits de treino e teste separados. Se examples_per_class > 0, inclui dados gerados."""
    

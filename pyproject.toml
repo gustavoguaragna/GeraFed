@@ -23,27 +23,28 @@ packages = ["."]
 publisher = "gustavoguaragna"
 
 [tool.flwr.app.components]
-serverapp = "Simulation.CNN.server_app:app"
-clientapp = "Simulation.CNN.client_app:app"
+serverapp = "Simulation.server_app:app"
+clientapp = "Simulation.client_app:app"
 
 [tool.flwr.app.config]
-num_rodadas = 100
+num_rodadas = 2
 fraction_fit_alvo = 1.0
 fraction_fit_gen = 1.0
 tam_ruido = 100
 tam_batch = 64
 tam_img = 28
-epocas_alvo = 10
-epocas_gen = 10
+epocas_alvo = 2
+epocas_gen = 2
 num_dadosssyn = 10
 learn_rate_alvo = 0.001
 learn_rate_gen = 0.0001
 modelo_alvo = "mlp"
 modelo_gen = "gan"
 dataset = "mnist"
-niid = true
+niid = false
 alpha_dir = 0.1
-agg = "true" # 'disc', 'full'
+agg = "full" # 'disc', 'full'
+model = "gen" # 'alvo', 'gen', 'both'
 xgb_params.objective = "binary:logistic"
 xgb_params.eta = 0.1 # Learning rate
 xgb_params.max-depth = 8
