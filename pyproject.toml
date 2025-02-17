@@ -23,17 +23,17 @@ packages = ["."]
 publisher = "gustavoguaragna"
 
 [tool.flwr.app.components]
-serverapp = "Simulation.CGAN_torch.server_app:app"
-clientapp = "Simulation.CGAN_torch.client_app:app"
+serverapp = "Simulation.CNN.server_app:app"
+clientapp = "Simulation.CNN.client_app:app"
 
 [tool.flwr.app.config]
-num_rodadas = 10
+num_rodadas = 100
 fraction_fit_alvo = 1.0
 fraction_fit_gen = 1.0
 tam_ruido = 100
 tam_batch = 64
 tam_img = 28
-epocas_alvo = 2
+epocas_alvo = 10
 epocas_gen = 10
 num_dadosssyn = 10
 learn_rate_alvo = 0.001
@@ -43,7 +43,7 @@ modelo_gen = "gan"
 dataset = "mnist"
 niid = true
 alpha_dir = 0.1
-agg = "full" # 'disc', 'full'
+agg = "true" # 'disc', 'full'
 xgb_params.objective = "binary:logistic"
 xgb_params.eta = 0.1 # Learning rate
 xgb_params.max-depth = 8
