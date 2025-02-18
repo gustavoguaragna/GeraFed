@@ -148,7 +148,6 @@ class FlowerClient(NumPyClient):
                 )
 
     def evaluate(self, parameters, config):
-        print("ENTROU EVALUATE")
         if self.model == "gen":
             """Evaluate the model on the data this client has."""
             if self.agg == "full":
@@ -189,7 +188,6 @@ class FlowerClient(NumPyClient):
         else:
             set_weights(self.net_alvo, parameters)
             loss, accuracy = test(self.net_alvo, self.valloader, self.device, model=self.model)
-            print("SAINDO EVALUATE")
             return loss, len(self.valloader.dataset), {"accuracy": accuracy}
 
 
