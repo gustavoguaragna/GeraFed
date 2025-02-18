@@ -190,7 +190,6 @@ class GeraFed(Strategy):
         self, server_round: int, parameters: Parameters, client_manager: ClientManager
     ) -> list[tuple[ClientProxy, FitIns]]:
         """Configure the next round of training."""
-        print("ENTROU CONFUGURE FIT")
         config = {}
         if self.on_fit_config_fn is not None:
             # Custom fit config function provided
@@ -240,7 +239,6 @@ class GeraFed(Strategy):
             fit_ins_gen = FitIns(parameters=self.parameters_gen, config=config_gen)
             fit_instructions.append((c, fit_ins_gen))
 
-        print("SAIU CONFIGURE FIT")
         # Return client/config pairs
         return fit_instructions
 
@@ -250,7 +248,6 @@ class GeraFed(Strategy):
     def configure_evaluate(
         self, server_round: int, parameters: Parameters, client_manager: ClientManager
     ) -> list[tuple[ClientProxy, EvaluateIns]]:
-        print("ENTROU CONFIGURE EVALUATE")
         """Configure the next round of evaluation."""
         # Do not configure federated evaluation if fraction eval is 0.
         if self.fraction_evaluate_alvo == 0.0:
@@ -272,7 +269,6 @@ class GeraFed(Strategy):
         )
 
         # Return client/config pairs
-        print("SAIU CONFIGURE EVALUATE")
         return [(client, evaluate_ins) for client in clients]
 
 
@@ -285,7 +281,6 @@ class GeraFed(Strategy):
         failures: list[Union[tuple[ClientProxy, FitRes], BaseException]],
     ) -> tuple[Optional[Parameters], dict[str, Scalar]]:
         """Aggregate fit results using weighted average."""
-        print("ENTROU AGGREGATE FIT")
         if not results:
             return None, {}
         # Do not aggregate if there are failures and failures are not accepted
@@ -327,7 +322,7 @@ class GeraFed(Strategy):
         elif server_round == 1:  # Only log this warning once
             log(WARNING, "No fit_metrics_aggregation_fn provided")
 
-        if parameters_aggregated_alvo is not None:
+        if self.model == "alvo" and parameters_aggregated_alvo is not None:
             # Salva o modelo após a agregação
             ndarrays = parameters_to_ndarrays(parameters_aggregated_alvo)
             # Cria uma instância do modelo
@@ -339,20 +334,25 @@ class GeraFed(Strategy):
             torch.save(model.state_dict(), model_path)
             print(f"Modelo salvo em {model_path}")
 
-        if self.model == "gen" and parameters_aggregated_gen is not None and self.agg == "full":
-            ndarrays = parameters_to_ndarrays(parameters_aggregated_gen)
-            # Cria uma instância do modelo
-            model = CGAN(dataset=self.dataset,
-                         img_size=self.img_size,
-                         latent_dim=self.latent_dim)
-            # Define os pesos do modelo
-            set_weights(model, ndarrays)
-            # Salva o modelo no disco com o nome específico do dataset
-            model_path = f"modelo_gen_round_{server_round}_mnist.pt"
-            torch.save(model.state_dict(), model_path)
-            print(f"Modelo salvo em {model_path}")
-        print("SAIU AGGREGATE FIT")
+        elif self.model == "gen" and parameters_aggregated_gen is not None:
+            if self.agg == "full":
+                ndarrays = parameters_to_ndarrays(parameters_aggregated_gen)
+                # Cria uma instância do modelo
+                model = CGAN(dataset=self.dataset,
+                            img_size=self.img_size,
+                            latent_dim=self.latent_dim)
+                # Define os pesos do modelo
+                set_weights(model, ndarrays)
+                # Salva o modelo no disco com o nome específico do dataset
+                model_path = f"modelo_gen_round_{server_round}_mnist.pt"
+                torch.save(model.state_dict(), model_path)
+                print(f"Modelo salvo em {model_path}")
+            return parameters_aggregated_gen, metrics_aggregated
+
         return parameters_aggregated_alvo, metrics_aggregated
+
+
+        
 
 
 
@@ -364,7 +364,6 @@ class GeraFed(Strategy):
         failures: list[Union[tuple[ClientProxy, EvaluateRes], BaseException]],
     ) -> tuple[Optional[float], dict[str, Scalar]]:
         """Aggregate evaluation losses using weighted average."""
-        print("ENTROU AGGREGATE EVALUATE")
         if not results:
             return None, {}
         # Do not aggregate if there are failures and failures are not accepted
@@ -378,29 +377,30 @@ class GeraFed(Strategy):
                 for _, evaluate_res in results
             ]
         )
+        if self.model != "gen":
+            accuracies = [
+                evaluate_res.metrics["accuracy"] * evaluate_res.num_examples
+                for _, evaluate_res in results
+            ]
+            examples = [evaluate_res.num_examples for _, evaluate_res in results]
+            accuracy_aggregated = (
+                sum(accuracies) / sum(examples) if sum(examples) != 0 else 0
+            )
 
-        accuracies = [
-            evaluate_res.metrics["accuracy"] * evaluate_res.num_examples
-            for _, evaluate_res in results
-        ]
-        examples = [evaluate_res.num_examples for _, evaluate_res in results]
-        accuracy_aggregated = (
-            sum(accuracies) / sum(examples) if sum(examples) != 0 else 0
-        )
-
-        loss_file = f"losses.txt"
-        with open(loss_file, "a") as f:
-            f.write(f"Rodada {server_round}, Perda: {loss_aggregated}, Acuracia: {accuracy_aggregated}\n")
-        print(f"Perda da rodada {server_round} salva em {loss_file}")
+            loss_file = f"losses.txt"
+            with open(loss_file, "a") as f:
+                f.write(f"Rodada {server_round}, Perda: {loss_aggregated}, Acuracia: {accuracy_aggregated}\n")
+            print(f"Perda da rodada {server_round} salva em {loss_file}")
 
 
-        # Aggregate custom metrics if aggregation fn was provided
-        metrics_aggregated = {"loss": loss_aggregated, "accuracy": accuracy_aggregated}
+            # Aggregate custom metrics if aggregation fn was provided
+            metrics_aggregated = {"loss": loss_aggregated, "accuracy": accuracy_aggregated}
+        else:
+            metrics_aggregated = {}
         if self.evaluate_metrics_aggregation_fn:
             eval_metrics = [(res.num_examples, res.metrics) for _, res in results]
             metrics_aggregated = self.evaluate_metrics_aggregation_fn(eval_metrics)
         elif server_round == 1:  # Only log this warning once
             log(WARNING, "No evaluate_metrics_aggregation_fn provided")
-        print("SAIU AGGREGATE FIT")
         return loss_aggregated, metrics_aggregated
 

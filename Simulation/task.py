@@ -336,21 +336,56 @@ def train_gen(net, trainloader, epochs, lr, device, dataset="mnist", latent_dim=
     return np.mean(g_losses)   
 
 
-def test(net, testloader, device):
+def test(net, testloader, device, model):
     """Validate the model on the test set."""
     net.to(device)
-    criterion = torch.nn.CrossEntropyLoss()
-    correct, loss = 0, 0.0
-    with torch.no_grad():
-        for batch in testloader:
-            images = batch["image"].to(device)
-            labels = batch["label"].to(device)
-            outputs = net(images)
-            loss += criterion(outputs, labels).item()
-            correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
-    accuracy = correct / len(testloader.dataset)
-    loss = loss / len(testloader)
-    return loss, accuracy
+    if model == "gen":
+        imagem = "image"
+        g_losses = []
+        d_losses = []
+        with torch.no_grad():
+            for batch_idx, batch in enumerate(testloader):
+                images, labels = batch[imagem].to(device), batch["label"].to(device)
+                batch_size = images.size(0)
+                real_ident = torch.full((batch_size, 1), 1., device=device)
+                fake_ident = torch.full((batch_size, 1), 0., device=device)
+                
+                #Gen loss
+                z_noise = torch.randn(batch_size, 100, device=device)
+                x_fake_labels = torch.randint(0, 10, (batch_size,), device=device)
+                x_fake = net(z_noise, x_fake_labels)
+                y_fake_g = net(x_fake, x_fake_labels)
+                g_loss = net.loss(y_fake_g, real_ident)
+
+                #Disc loss
+                y_real = net(images, labels)
+                d_real_loss = net.loss(y_real, real_ident)
+                y_fake_d = net(x_fake.detach(), x_fake_labels)
+                d_fake_loss = net.loss(y_fake_d, fake_ident)
+                d_loss = (d_real_loss + d_fake_loss) / 2
+
+                g_losses.append(g_loss.item())
+                d_losses.append(d_loss.item())
+
+                if batch_idx % 100 == 0 and batch_idx > 0:
+                    print('[{}/{}] loss_D_teste: {:.4f} loss_G_teste: {:.4f}'.format(
+                                batch_idx, len(testloader),
+                                d_loss.mean().item(),
+                                g_loss.mean().item()))
+        return np.mean(g_losses), np.mean(d_losses)
+    else:
+        criterion = torch.nn.CrossEntropyLoss()
+        correct, loss = 0, 0.0
+        with torch.no_grad():
+            for batch in testloader:
+                images = batch["image"].to(device)
+                labels = batch["label"].to(device)
+                outputs = net(images)
+                loss += criterion(outputs, labels).item()
+                correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
+        accuracy = correct / len(testloader.dataset)
+        loss = loss / len(testloader)
+        return loss, accuracy
 
 
 def get_weights(net):
