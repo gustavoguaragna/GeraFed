@@ -22,7 +22,7 @@ Epoca: 8, D_loss: -0.0139, G_loss: 0.3317, Acc: 0.9468, Tempo: 133.4647
 Epoca: 9, D_loss: -0.1923, G_loss: 0.4302, Acc: 0.9370, Tempo: 146.9764
 Epoca: 10, D_loss: -1.3683, G_loss: 1.4137, Acc: 0.9228, Tempo: 137.8820
 Epoca: 11, D_loss: -6.0315, G_loss: 5.2014, Acc: 0.9385, Tempo: 124.5654
-32 Batch 0.02LR
+32Batch 0.02LR
 Epoca: 1, D_loss: -0.0557, G_loss: 0.9627, Acc: 0.8157, Tempo: 124.4208
 Epoca: 2, D_loss: -0.1117, G_loss: 1.5285, Acc: 0.7900, Tempo: 123.7930
 Epoca: 3, D_loss: -62.8148, G_loss: -48.5193, Acc: 0.6625, Tempo: 123.9558
@@ -32,7 +32,7 @@ Epoca: 6, D_loss: -4254.3973, G_loss: -7288.5606, Acc: 0.0878, Tempo: 124.4065
 Epoca: 7, D_loss: -13270.0559, G_loss: -6544.3138, Acc: 0.2056, Tempo: 124.5889
 Epoca: 8, D_loss: -14988.7338, G_loss: -35825.2087, Acc: 0.3727, Tempo: 124.5693
 Epoca: 9, D_loss: -19.0610, G_loss: -47129.4861, Acc: 0.1111, Tempo: 124.3706
-32 Batch 0.0002LR
+32Batch 0.0002LR
 Epoca: 1, D_loss: -0.0711, G_loss: 0.0298, Acc: 0.9387, Tempo: 96.4480
 Epoca: 2, D_loss: -0.0698, G_loss: -0.0809, Acc: 0.9440, Tempo: 96.0409
 Epoca: 3, D_loss: -0.6007, G_loss: -0.1890, Acc: 0.9365, Tempo: 96.0199
@@ -42,3 +42,40 @@ Epoca: 6, D_loss: -25.3852, G_loss: 12.5821, Acc: 0.9345, Tempo: 95.5967
 Epoca: 7, D_loss: -44.8631, G_loss: 22.0195, Acc: 0.9236, Tempo: 95.8034
 Epoca: 8, D_loss: -62.2728, G_loss: 35.2572, Acc: 0.9443, Tempo: 95.7970
 Epoca: 9, D_loss: -98.7353, G_loss: 50.3405, Acc: 0.9397, Tempo: 96.3743
+128Batch 0.00002LR
+Epoca: 1, D_loss: -0.0243, G_loss: 0.0118, Acc: 0.8680, Tempo: 65.2344
+Epoca: 2, D_loss: -0.0134, G_loss: 0.0115, Acc: 0.9298, Tempo: 64.7986
+Epoca: 3, D_loss: -0.0103, G_loss: 0.0014, Acc: 0.9271, Tempo: 64.9601
+Epoca: 4, D_loss: -0.0117, G_loss: -0.0118, Acc: 0.9215, Tempo: 64.7590
+Epoca: 5, D_loss: -0.0303, G_loss: -0.0399, Acc: 0.9470, Tempo: 64.7895
+Epoca: 6, D_loss: -0.0680, G_loss: -0.0679, Acc: 0.9408, Tempo: 64.8415
+Epoca: 7, D_loss: -0.0853, G_loss: -0.0469, Acc: 0.9361, Tempo: 64.8871
+Epoca: 8, D_loss: -0.2034, G_loss: -0.0163, Acc: 0.9386, Tempo: 64.8496
+Epoca: 9, D_loss: -0.5014, G_loss: 0.0430, Acc: 0.9191, Tempo: 64.7147
+Epoca: 10, D_loss: -0.7921, G_loss: 0.1485, Acc: 0.9584, Tempo: 64.7281
+Epoca: 11, D_loss: -1.0386, G_loss: 0.2772, Acc: 0.9269, Tempo: 64.7146
+Epoca: 12, D_loss: -1.5595, G_loss: 0.5515, Acc: 0.9392, Tempo: 64.6388
+Epoca: 13, D_loss: -1.3722, G_loss: 0.8149, Acc: 0.9368, Tempo: 64.6335
+Epoca: 14, D_loss: -2.4361, G_loss: 0.8973, Acc: 0.9363, Tempo: 64.5767
+Epoca: 15, D_loss: -3.2181, G_loss: 1.2582, Acc: 0.9504, Tempo: 64.7364
+Epoca: 16, D_loss: -4.0043, G_loss: 1.6363, Acc: 0.9543, Tempo: 64.7926
+Epoca: 17, D_loss: -4.6346, G_loss: 1.9002, Acc: 0.9468, Tempo: 64.7868
+Epoca: 18, D_loss: -5.7632, G_loss: 2.2949, Acc: 0.9565, Tempo: 64.5101
+Epoca: 19, D_loss: -6.6093, G_loss: 2.6360, Acc: 0.9478, Tempo: 64.5396
+Epoca: 20, D_loss: -7.6764, G_loss: 3.2270, Acc: 0.9633, Tempo: 64.7900
+Epoca: 21, D_loss: -8.6971, G_loss: 3.6844, Acc: 0.9435, Tempo: 64.5924
+Epoca: 22, D_loss: -10.1132, G_loss: 4.4670, Acc: 0.9500, Tempo: 64.6235
+Epoca: 23, D_loss: -11.3487, G_loss: 5.0073, Acc: 0.9512, Tempo: 64.7921
+Epoca: 24, D_loss: -13.1664, G_loss: 5.7398, Acc: 0.9594, Tempo: 64.6602
+Epoca: 25, D_loss: -14.9123, G_loss: 6.4960, Acc: 0.9561, Tempo: 64.6756
+Epoca: 26, D_loss: -15.3290, G_loss: 7.2344, Acc: 0.9509, Tempo: 64.4051
+Epoca: 27, D_loss: -18.3614, G_loss: 8.3064, Acc: 0.9615, Tempo: 64.7752
+Epoca: 28, D_loss: -20.2853, G_loss: 8.8619, Acc: 0.9636, Tempo: 65.1427
+Epoca: 29, D_loss: -22.2185, G_loss: 9.8313, Acc: 0.9621, Tempo: 64.4956
+Epoca: 30, D_loss: -24.5962, G_loss: 11.2522, Acc: 0.9572, Tempo: 64.6324
+Epoca: 31, D_loss: -27.2889, G_loss: 12.6621, Acc: 0.9554, Tempo: 64.9131
+Epoca: 32, D_loss: -29.9957, G_loss: 14.0346, Acc: 0.9524, Tempo: 64.7087
+Epoca: 33, D_loss: -31.8133, G_loss: 15.3145, Acc: 0.9524, Tempo: 64.6819
+Epoca: 34, D_loss: -35.6269, G_loss: 16.9689, Acc: 0.9471, Tempo: 64.6097
+Epoca: 35, D_loss: -39.8690, G_loss: 18.5658, Acc: 0.9597, Tempo: 65.1753
+Epoca: 36, D_loss: -41.6101, G_loss: 19.9206, Acc: 0.9465, Tempo: 65.0294
