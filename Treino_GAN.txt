@@ -1,4 +1,4 @@
-32Batch 0.002LR CPU
+32Batch 0.002LR CPU I5
 Epoca: 1, D_loss: -0.1756, G_loss: 0.5853, Acc: 0.7631, Tempo: 3446.4080
 Epoca: 2, D_loss: -2.6809, G_loss: 1.5855, Acc: 0.5405, Tempo: 3532.7352
 Epoca: 3, D_loss: -216.4729, G_loss: 112.9022, Acc: 0.4308, Tempo: 4445.8841
@@ -10,7 +10,7 @@ Epoca: 8, D_loss: -17076.3167, G_loss: 9316.0487, Acc: 0.0980, Tempo: 2665.5783
 Epoca: 9, D_loss: -22393.2240, G_loss: 10883.0877, Acc: 0.0577, Tempo: 2809.0358
 Epoca: 10, D_loss: -18851.0304, G_loss: 2467.0362, Acc: 0.0892, Tempo: 2716.1828
 Epoca: 11, D_loss: -11157.5159, G_loss: -6575.4020, Acc: 0.0844, Tempo: 2683.6872
-32Batch 0.002LR GPU
+32Batch 0.002LR GPU RTX2050
 Epoca: 1, D_loss: -0.0120, G_loss: 0.0712, Acc: 0.9016, Tempo: 144.0264
 Epoca: 2, D_loss: -0.0032, G_loss: 0.3111, Acc: 0.8788, Tempo: 136.0485
 Epoca: 3, D_loss: -0.0009, G_loss: 0.4169, Acc: 0.9206, Tempo: 137.3548
@@ -22,7 +22,7 @@ Epoca: 8, D_loss: -0.0139, G_loss: 0.3317, Acc: 0.9468, Tempo: 133.4647
 Epoca: 9, D_loss: -0.1923, G_loss: 0.4302, Acc: 0.9370, Tempo: 146.9764
 Epoca: 10, D_loss: -1.3683, G_loss: 1.4137, Acc: 0.9228, Tempo: 137.8820
 Epoca: 11, D_loss: -6.0315, G_loss: 5.2014, Acc: 0.9385, Tempo: 124.5654
-32Batch 0.02LR
+32Batch 0.02LR RTX2050
 Epoca: 1, D_loss: -0.0557, G_loss: 0.9627, Acc: 0.8157, Tempo: 124.4208
 Epoca: 2, D_loss: -0.1117, G_loss: 1.5285, Acc: 0.7900, Tempo: 123.7930
 Epoca: 3, D_loss: -62.8148, G_loss: -48.5193, Acc: 0.6625, Tempo: 123.9558
@@ -32,7 +32,7 @@ Epoca: 6, D_loss: -4254.3973, G_loss: -7288.5606, Acc: 0.0878, Tempo: 124.4065
 Epoca: 7, D_loss: -13270.0559, G_loss: -6544.3138, Acc: 0.2056, Tempo: 124.5889
 Epoca: 8, D_loss: -14988.7338, G_loss: -35825.2087, Acc: 0.3727, Tempo: 124.5693
 Epoca: 9, D_loss: -19.0610, G_loss: -47129.4861, Acc: 0.1111, Tempo: 124.3706
-32Batch 0.0002LR
+32Batch 0.0002LR RTX2050
 Epoca: 1, D_loss: -0.0711, G_loss: 0.0298, Acc: 0.9387, Tempo: 96.4480
 Epoca: 2, D_loss: -0.0698, G_loss: -0.0809, Acc: 0.9440, Tempo: 96.0409
 Epoca: 3, D_loss: -0.6007, G_loss: -0.1890, Acc: 0.9365, Tempo: 96.0199
@@ -42,7 +42,7 @@ Epoca: 6, D_loss: -25.3852, G_loss: 12.5821, Acc: 0.9345, Tempo: 95.5967
 Epoca: 7, D_loss: -44.8631, G_loss: 22.0195, Acc: 0.9236, Tempo: 95.8034
 Epoca: 8, D_loss: -62.2728, G_loss: 35.2572, Acc: 0.9443, Tempo: 95.7970
 Epoca: 9, D_loss: -98.7353, G_loss: 50.3405, Acc: 0.9397, Tempo: 96.3743
-128Batch 0.00002LR
+128Batch 0.00002LR RTX2050
 Epoca: 1, D_loss: -0.0243, G_loss: 0.0118, Acc: 0.8680, Tempo: 65.2344
 Epoca: 2, D_loss: -0.0134, G_loss: 0.0115, Acc: 0.9298, Tempo: 64.7986
 Epoca: 3, D_loss: -0.0103, G_loss: 0.0014, Acc: 0.9271, Tempo: 64.9601
@@ -79,7 +79,7 @@ Epoca: 33, D_loss: -31.8133, G_loss: 15.3145, Acc: 0.9524, Tempo: 64.6819
 Epoca: 34, D_loss: -35.6269, G_loss: 16.9689, Acc: 0.9471, Tempo: 64.6097
 Epoca: 35, D_loss: -39.8690, G_loss: 18.5658, Acc: 0.9597, Tempo: 65.1753
 Epoca: 36, D_loss: -41.6101, G_loss: 19.9206, Acc: 0.9465, Tempo: 65.0294
-64Batch 0.0002LR
+64Batch 0.0002LR T4
 Epoca: 1, D_loss: -0.0422, G_loss: 0.0137, Acc: 0.9204, Tempo: 87.1471
 Epoca: 2, D_loss: -0.0201, G_loss: -0.0155, Acc: 0.9299, Tempo: 86.9294
 Epoca: 3, D_loss: -0.0302, G_loss: -0.0585, Acc: 0.9315, Tempo: 87.2250
@@ -112,7 +112,7 @@ Epoca: 35, D_loss: -477.5822, G_loss: 243.9188, Acc: 0.9527, Tempo: 87.4273
 Epoca: 36, D_loss: -494.4616, G_loss: 251.9813, Acc: 0.9578, Tempo: 86.8680
 Epoca: 37, D_loss: -532.2931, G_loss: 275.4657, Acc: 0.9497, Tempo: 86.3447
 Epoca: 38, D_loss: -573.4148, G_loss: 298.0096, Acc: 0.9520, Tempo: 86.5288
-32Batch 2e-05lr
+32Batch 2e-05lr T4
 Epoca: 1, D_loss: -0.2518, G_loss: 0.1375, Acc: 0.7660, Tempo: 99.9464
 Epoca: 2, D_loss: -0.2204, G_loss: 0.1261, Acc: 0.8020, Tempo: 100.2307
 Epoca: 3, D_loss: -0.5947, G_loss: 0.2443, Acc: 0.8288, Tempo: 100.2397
@@ -146,3 +146,54 @@ Epoca: 30, D_loss: -142.4949, G_loss: 71.9966, Acc: 0.9433, Tempo: 100.0654
 Epoca: 31, D_loss: -151.0320, G_loss: 77.1151, Acc: 0.9340, Tempo: 99.7049
 Epoca: 32, D_loss: -160.1127, G_loss: 80.5013, Acc: 0.9405, Tempo: 100.7909
 Epoca: 33, D_loss: -170.1247, G_loss: 86.0788, Acc: 0.9398, Tempo: 100.6701
+512Batch 0.0002lr(step5,gamma0.9) RTX2050
+Epoca: 1, D_loss: -0.0059, G_loss: 0.0003, Acc: 0.7302, Tempo: 65.2813
+Epoca: 2, D_loss: -0.0065, G_loss: 0.0019, Acc: 0.8308, Tempo: 65.1320
+Epoca: 3, D_loss: -0.0062, G_loss: 0.0033, Acc: 0.8956, Tempo: 64.9757
+Epoca: 4, D_loss: -0.0047, G_loss: 0.0036, Acc: 0.9276, Tempo: 64.9254
+Epoca: 5, D_loss: -0.0037, G_loss: 0.0033, Acc: 0.9055, Tempo: 63.8747
+Epoca: 6, D_loss: -0.0034, G_loss: 0.0034, Acc: 0.9092, Tempo: 64.7196
+Epoca: 7, D_loss: -0.0030, G_loss: 0.0031, Acc: 0.9349, Tempo: 64.2530
+Epoca: 8, D_loss: -0.0028, G_loss: 0.0029, Acc: 0.9322, Tempo: 64.7405
+Epoca: 9, D_loss: -0.0027, G_loss: 0.0023, Acc: 0.9354, Tempo: 64.9426
+Epoca: 10, D_loss: -0.0027, G_loss: 0.0013, Acc: 0.9512, Tempo: 64.5620
+Epoca: 11, D_loss: -0.0028, G_loss: -0.0001, Acc: 0.9484, Tempo: 64.1812
+Epoca: 12, D_loss: -0.0030, G_loss: -0.0010, Acc: 0.9461, Tempo: 63.9922
+Epoca: 13, D_loss: -0.0026, G_loss: -0.0017, Acc: 0.9523, Tempo: 64.6720
+Epoca: 14, D_loss: -0.0033, G_loss: -0.0030, Acc: 0.9547, Tempo: 64.4870
+Epoca: 15, D_loss: -0.0038, G_loss: -0.0047, Acc: 0.9442, Tempo: 67.7791
+Epoca: 16, D_loss: -0.0040, G_loss: -0.0060, Acc: 0.9496, Tempo: 66.9236
+Epoca: 17, D_loss: -0.0046, G_loss: -0.0077, Acc: 0.9291, Tempo: 66.6098
+Epoca: 18, D_loss: -0.0052, G_loss: -0.0091, Acc: 0.9439, Tempo: 67.5508
+Epoca: 19, D_loss: -0.0077, G_loss: -0.0124, Acc: 0.9477, Tempo: 65.1386
+Epoca: 20, D_loss: -0.0095, G_loss: -0.0149, Acc: 0.9505, Tempo: 64.1256
+Epoca: 21, D_loss: -0.0123, G_loss: -0.0182, Acc: 0.9611, Tempo: 64.4516
+Epoca: 22, D_loss: -0.0136, G_loss: -0.0193, Acc: 0.9656, Tempo: 64.4579
+Epoca: 23, D_loss: -0.0163, G_loss: -0.0217, Acc: 0.9539, Tempo: 67.7835
+Epoca: 24, D_loss: -0.0196, G_loss: -0.0233, Acc: 0.9398, Tempo: 58.0602
+Epoca: 25, D_loss: -0.0134, G_loss: -0.0160, Acc: 0.9576, Tempo: 58.2382
+Epoca: 26, D_loss: -0.0270, G_loss: -0.0248, Acc: 0.9626, Tempo: 58.1393
+Epoca: 27, D_loss: -0.0322, G_loss: -0.0233, Acc: 0.9463, Tempo: 58.2268
+Epoca: 28, D_loss: -0.0359, G_loss: -0.0229, Acc: 0.9525, Tempo: 58.4987
+Epoca: 29, D_loss: -0.0446, G_loss: -0.0217, Acc: 0.9595, Tempo: 58.1947
+Epoca: 30, D_loss: -0.0526, G_loss: -0.0194, Acc: 0.9443, Tempo: 58.1022
+Epoca: 31, D_loss: -0.0632, G_loss: -0.0152, Acc: 0.9510, Tempo: 58.2822
+Epoca: 32, D_loss: -0.0725, G_loss: -0.0118, Acc: 0.9591, Tempo: 58.0807
+Epoca: 33, D_loss: -0.0850, G_loss: -0.0088, Acc: 0.9601, Tempo: 58.2684
+Epoca: 34, D_loss: -0.0945, G_loss: -0.0048, Acc: 0.9573, Tempo: 58.0627
+Epoca: 35, D_loss: -0.1034, G_loss: 0.0007, Acc: 0.9537, Tempo: 58.0965
+Epoca: 36, D_loss: -0.1236, G_loss: 0.0097, Acc: 0.9598, Tempo: 57.9624
+Epoca: 37, D_loss: -0.1351, G_loss: 0.0209, Acc: 0.9417, Tempo: 58.1680
+Epoca: 38, D_loss: -0.1476, G_loss: 0.0196, Acc: 0.9525, Tempo: 58.1466
+Epoca: 39, D_loss: -0.1640, G_loss: 0.0307, Acc: 0.9310, Tempo: 58.0064
+Epoca: 40, D_loss: -0.1757, G_loss: 0.0372, Acc: 0.9664, Tempo: 58.5462
+Epoca: 41, D_loss: -0.1998, G_loss: 0.0506, Acc: 0.9465, Tempo: 58.0142
+Epoca: 42, D_loss: -0.2181, G_loss: 0.0618, Acc: 0.9543, Tempo: 57.9338
+Epoca: 43, D_loss: -0.2272, G_loss: 0.0592, Acc: 0.9613, Tempo: 58.0909
+Epoca: 44, D_loss: -0.2540, G_loss: 0.0828, Acc: 0.9633, Tempo: 58.2480
+Epoca: 45, D_loss: -0.2535, G_loss: 0.0787, Acc: 0.9646, Tempo: 58.1242
+Epoca: 46, D_loss: -0.2888, G_loss: 0.0987, Acc: 0.9464, Tempo: 58.0521
+Epoca: 47, D_loss: -0.3129, G_loss: 0.1079, Acc: 0.9643, Tempo: 58.0129
+Epoca: 48, D_loss: -0.3272, G_loss: 0.1178, Acc: 0.9684, Tempo: 58.1366
+Epoca: 49, D_loss: -0.3389, G_loss: 0.1329, Acc: 0.9593, Tempo: 58.2625
+Epoca: 50, D_loss: -0.3471, G_loss: 0.1392, Acc: 0.9592, Tempo: 58.1763
