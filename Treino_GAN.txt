@@ -1,3 +1,12 @@
-Epoca: 1, D_loss: -0.0982, G_loss: -0.0249, Acc: 0.4339, Tempo: 143.8137
-Epoca: 2, D_loss: -0.1306, G_loss: 0.0046, Acc: 0.5544, Tempo: 134.1380
-Epoca: 3, D_loss: -0.0920, G_loss: 0.0387, Acc: 0.5999, Tempo: 167.9382
+32Batch 0.002LR
+Epoca: 1, D_loss: -0.1756, G_loss: 0.5853, Acc: 0.7631, Tempo: 3446.4080
+Epoca: 2, D_loss: -2.6809, G_loss: 1.5855, Acc: 0.5405, Tempo: 3532.7352
+Epoca: 3, D_loss: -216.4729, G_loss: 112.9022, Acc: 0.4308, Tempo: 4445.8841
+Epoca: 4, D_loss: -2572.7301, G_loss: 1416.6408, Acc: 0.0980, Tempo: 3133.1946
+Epoca: 5, D_loss: -6541.9515, G_loss: 2949.0920, Acc: 0.1135, Tempo: 2646.9094
+Epoca: 6, D_loss: -20.6164, G_loss: -4791.4097, Acc: 0.1010, Tempo: 2662.4409
+Epoca: 7, D_loss: -3403.0308, G_loss: -1378.1956, Acc: 0.0892, Tempo: 2657.5625
+Epoca: 8, D_loss: -17076.3167, G_loss: 9316.0487, Acc: 0.0980, Tempo: 2665.5783
+Epoca: 9, D_loss: -22393.2240, G_loss: 10883.0877, Acc: 0.0577, Tempo: 2809.0358
+Epoca: 10, D_loss: -18851.0304, G_loss: 2467.0362, Acc: 0.0892, Tempo: 2716.1828
+Epoca: 11, D_loss: -11157.5159, G_loss: -6575.4020, Acc: 0.0844, Tempo: 2683.6872
