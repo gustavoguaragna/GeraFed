@@ -1,4 +1,3 @@
-Epoca: 4, D_loss: -0.0155, G_loss: 0.0738, Acc: 0.8234
-Epoca: 4, D_loss: -0.0124, G_loss: 0.0638, Acc: 0.8430
-Epoca: 4, D_loss: -0.0137, G_loss: 0.0627, Acc: 0.8416
-Epoca: 4, D_loss: -0.0179, G_loss: 0.1061, Acc: 0.8081
+Epoca: 1, D_loss: -0.0982, G_loss: -0.0249, Acc: 0.4339, Tempo: 143.8137
+Epoca: 2, D_loss: -0.1306, G_loss: 0.0046, Acc: 0.5544, Tempo: 134.1380
+Epoca: 3, D_loss: -0.0920, G_loss: 0.0387, Acc: 0.5999, Tempo: 167.9382
