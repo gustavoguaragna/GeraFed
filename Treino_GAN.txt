@@ -1,4 +1,4 @@
-32Batch 0.002LR
+32Batch 0.002LR CPU
 Epoca: 1, D_loss: -0.1756, G_loss: 0.5853, Acc: 0.7631, Tempo: 3446.4080
 Epoca: 2, D_loss: -2.6809, G_loss: 1.5855, Acc: 0.5405, Tempo: 3532.7352
 Epoca: 3, D_loss: -216.4729, G_loss: 112.9022, Acc: 0.4308, Tempo: 4445.8841
@@ -10,3 +10,25 @@ Epoca: 8, D_loss: -17076.3167, G_loss: 9316.0487, Acc: 0.0980, Tempo: 2665.5783
 Epoca: 9, D_loss: -22393.2240, G_loss: 10883.0877, Acc: 0.0577, Tempo: 2809.0358
 Epoca: 10, D_loss: -18851.0304, G_loss: 2467.0362, Acc: 0.0892, Tempo: 2716.1828
 Epoca: 11, D_loss: -11157.5159, G_loss: -6575.4020, Acc: 0.0844, Tempo: 2683.6872
+32Batch 0.002LR GPU
+Epoca: 1, D_loss: -0.0120, G_loss: 0.0712, Acc: 0.9016, Tempo: 144.0264
+Epoca: 2, D_loss: -0.0032, G_loss: 0.3111, Acc: 0.8788, Tempo: 136.0485
+Epoca: 3, D_loss: -0.0009, G_loss: 0.4169, Acc: 0.9206, Tempo: 137.3548
+Epoca: 4, D_loss: -0.0007, G_loss: 0.4409, Acc: 0.8965, Tempo: 138.0641
+Epoca: 5, D_loss: -0.0007, G_loss: 0.4731, Acc: 0.9125, Tempo: 137.0715
+Epoca: 6, D_loss: -0.0017, G_loss: 0.3924, Acc: 0.9041, Tempo: 137.0450
+Epoca: 7, D_loss: -0.0037, G_loss: 0.3399, Acc: 0.9474, Tempo: 134.8872
+Epoca: 8, D_loss: -0.0139, G_loss: 0.3317, Acc: 0.9468, Tempo: 133.4647
+Epoca: 9, D_loss: -0.1923, G_loss: 0.4302, Acc: 0.9370, Tempo: 146.9764
+Epoca: 10, D_loss: -1.3683, G_loss: 1.4137, Acc: 0.9228, Tempo: 137.8820
+Epoca: 11, D_loss: -6.0315, G_loss: 5.2014, Acc: 0.9385, Tempo: 124.5654
+32 Batch 0.02LR
+Epoca: 1, D_loss: -0.0557, G_loss: 0.9627, Acc: 0.8157, Tempo: 124.4208
+Epoca: 2, D_loss: -0.1117, G_loss: 1.5285, Acc: 0.7900, Tempo: 123.7930
+Epoca: 3, D_loss: -62.8148, G_loss: -48.5193, Acc: 0.6625, Tempo: 123.9558
+Epoca: 4, D_loss: -246.1857, G_loss: -667.6340, Acc: 0.4905, Tempo: 124.6675
+Epoca: 5, D_loss: -655.1291, G_loss: -1225.0414, Acc: 0.4502, Tempo: 124.5954
+Epoca: 6, D_loss: -4254.3973, G_loss: -7288.5606, Acc: 0.0878, Tempo: 124.4065
+Epoca: 7, D_loss: -13270.0559, G_loss: -6544.3138, Acc: 0.2056, Tempo: 124.5889
+Epoca: 8, D_loss: -14988.7338, G_loss: -35825.2087, Acc: 0.3727, Tempo: 124.5693
+Epoca: 9, D_loss: -19.0610, G_loss: -47129.4861, Acc: 0.1111, Tempo: 124.3706
