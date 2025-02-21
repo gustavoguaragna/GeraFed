@@ -32,3 +32,13 @@ Epoca: 6, D_loss: -4254.3973, G_loss: -7288.5606, Acc: 0.0878, Tempo: 124.4065
 Epoca: 7, D_loss: -13270.0559, G_loss: -6544.3138, Acc: 0.2056, Tempo: 124.5889
 Epoca: 8, D_loss: -14988.7338, G_loss: -35825.2087, Acc: 0.3727, Tempo: 124.5693
 Epoca: 9, D_loss: -19.0610, G_loss: -47129.4861, Acc: 0.1111, Tempo: 124.3706
+32 Batch 0.0002LR
+Epoca: 1, D_loss: -0.0711, G_loss: 0.0298, Acc: 0.9387, Tempo: 96.4480
+Epoca: 2, D_loss: -0.0698, G_loss: -0.0809, Acc: 0.9440, Tempo: 96.0409
+Epoca: 3, D_loss: -0.6007, G_loss: -0.1890, Acc: 0.9365, Tempo: 96.0199
+Epoca: 4, D_loss: -4.5202, G_loss: 1.6068, Acc: 0.9368, Tempo: 95.4737
+Epoca: 5, D_loss: -11.7255, G_loss: 6.4025, Acc: 0.9448, Tempo: 95.7925
+Epoca: 6, D_loss: -25.3852, G_loss: 12.5821, Acc: 0.9345, Tempo: 95.5967
+Epoca: 7, D_loss: -44.8631, G_loss: 22.0195, Acc: 0.9236, Tempo: 95.8034
+Epoca: 8, D_loss: -62.2728, G_loss: 35.2572, Acc: 0.9443, Tempo: 95.7970
+Epoca: 9, D_loss: -98.7353, G_loss: 50.3405, Acc: 0.9397, Tempo: 96.3743
