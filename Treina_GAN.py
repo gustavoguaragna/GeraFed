@@ -7,7 +7,6 @@ import torchvision.datasets as datasets
 import numpy as np
 import torch.optim as optim
 from tqdm import tqdm
-import logging
 import time
 
 class Net(nn.Module):
@@ -137,99 +136,6 @@ class CGAN(nn.Module):
     def loss(self, output, label):
         return self.adv_loss(output, label)
 
-
-def train(net, trainloader, epochs, learning_rate, device, dataset="mnist", latent_dim=100):
-    """Train the network on the training set."""
-    if dataset == "mnist":
-      imagem = "image"
-    elif dataset == "cifar10":
-      imagem = "img"
-
-    net.to(device)  # move model to GPU if available
-    optim_G = torch.optim.Adam(net.generator.parameters(), lr=learning_rate, betas=(0.5, 0.999))
-    optim_D = torch.optim.Adam(net.discriminator.parameters(), lr=learning_rate, betas=(0.5, 0.999))
-
-    g_losses = []
-    d_losses = []
-
-
-    for epoch in range(epochs):
-        for batch_idx, batch in enumerate(trainloader):
-            images, labels = batch[0].to(device), batch[1].to(device)
-            batch_size = images.size(0)
-            real_ident = torch.full((batch_size, 1), 1., device=device)
-            fake_ident = torch.full((batch_size, 1), 0., device=device)
-
-            # Train G
-            net.zero_grad()
-            z_noise = torch.randn(batch_size, latent_dim, device=device)
-            x_fake_labels = torch.randint(0, 10, (batch_size,), device=device)
-            x_fake = net(z_noise, x_fake_labels)
-            y_fake_g = net(x_fake, x_fake_labels)
-            g_loss = net.loss(y_fake_g, real_ident)
-            g_loss.backward()
-            optim_G.step()
-
-            # Train D
-            net.zero_grad()
-            y_real = net(images, labels)
-            d_real_loss = net.loss(y_real, real_ident)
-            y_fake_d = net(x_fake.detach(), x_fake_labels)
-            d_fake_loss = net.loss(y_fake_d, fake_ident)
-            d_loss = (d_real_loss + d_fake_loss) / 2
-            d_loss.backward()
-            optim_D.step()
-
-            g_losses.append(g_loss.item())
-            d_losses.append(d_loss.item())
-
-            if batch_idx % 100 == 0 and batch_idx > 0:
-                print('Epoch {} [{}/{}] loss_D_treino: {:.4f} loss_G_treino: {:.4f}'.format(
-                            epoch, batch_idx, len(trainloader),
-                            d_loss.mean().item(),
-                            g_loss.mean().item()))
-
-
-
-def test(net, testloader, device, dataset="mnist", latent_dim=100):
-    """Validate the network on the entire test set."""
-    if dataset == "mnist":
-      imagem = "image"
-    elif dataset == "cifar10":
-      imagem = "img"
-    g_losses = []
-    d_losses = []
-    with torch.no_grad():
-        for batch_idx, batch in enumerate(testloader):
-            images, labels = batch[imagem].to(device), batch["label"].to(device)
-            batch_size = images.size(0)
-            real_ident = torch.full((batch_size, 1), 1., device=device)
-            fake_ident = torch.full((batch_size, 1), 0., device=device)
-
-            #Gen loss
-            z_noise = torch.randn(batch_size, latent_dim, device=device)
-            x_fake_labels = torch.randint(0, 10, (batch_size,), device=device)
-            x_fake = net(z_noise, x_fake_labels)
-            y_fake_g = net(x_fake, x_fake_labels)
-            g_loss = net.loss(y_fake_g, real_ident)
-
-            #Disc loss
-            y_real = net(images, labels)
-            d_real_loss = net.loss(y_real, real_ident)
-            y_fake_d = net(x_fake.detach(), x_fake_labels)
-            d_fake_loss = net.loss(y_fake_d, fake_ident)
-            d_loss = (d_real_loss + d_fake_loss) / 2
-
-            g_losses.append(g_loss.item())
-            d_losses.append(d_loss.item())
-
-            if batch_idx % 100 == 0 and batch_idx > 0:
-                print('[{}/{}] loss_D_teste: {:.4f} loss_G_teste: {:.4f}'.format(
-                            batch_idx, len(testloader),
-                            d_loss.mean().item(),
-                            g_loss.mean().item()))
-    return np.mean(g_losses), np.mean(d_losses)
-
 # Camada de Convolução para o Discriminador
 def conv_block(in_channels, out_channels, kernel_size=5, stride=2, padding=2, use_bn=False):
     layers = [nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)]
@@ -315,7 +221,6 @@ def gradient_penalty(D, real_samples, fake_samples):
 
 # Treinamento
 historico_metricas = []
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 epoch_bar = tqdm(range(EPOCHS), desc="Treinamento")
 for epoch in epoch_bar:
 
@@ -328,42 +233,59 @@ for epoch in epoch_bar:
 
     start_time = time.time()
 
+    wgan = True
+
     for real_images, labels in batch_bar:
-        real_images = real_images.to(device)
-        labels = torch.nn.functional.one_hot(labels, NUM_CLASSES).float().to(device)
-        fake_labels = torch.randint(0, NUM_CLASSES, (real_images.size(0),), device=device)
-        fake_labels = torch.nn.functional.one_hot(fake_labels, NUM_CLASSES).float()
 
-        # Adicionar labels ao real_images para treinamento do Discriminador
-        image_labels = labels.view(labels.size(0), NUM_CLASSES, 1, 1).expand(-1, -1, 28, 28)
-        image_fake_labels = fake_labels.view(fake_labels.size(0), NUM_CLASSES, 1, 1).expand(-1, -1, 28, 28)
-        
-        real_images = torch.cat([real_images, image_labels], dim=1)
+        if wgan:
+            real_images = real_images.to(device)
+            batch = real_images.size(0)
+            labels = torch.nn.functional.one_hot(labels, NUM_CLASSES).float().to(device) ##
+            fake_labels = torch.randint(0, NUM_CLASSES, (batch,), device=device)
+            fake_labels = torch.nn.functional.one_hot(fake_labels, NUM_CLASSES).float() ##
 
-        # Treinar Discriminador
-        z = torch.randn(real_images.size(0), LATENT_DIM).to(device)
-        z = torch.cat([z, fake_labels], dim=1)
-        fake_images = G(z).detach()
-        fake_images = torch.cat([fake_images, image_fake_labels], dim=1)
+            # Adicionar labels ao real_images para treinamento do Discriminador
+            image_labels = labels.view(labels.size(0), NUM_CLASSES, 1, 1).expand(-1, -1, 28, 28)
+            image_fake_labels = fake_labels.view(fake_labels.size(0), NUM_CLASSES, 1, 1).expand(-1, -1, 28, 28)
+            
+            real_images = torch.cat([real_images, image_labels], dim=1)
 
-        optimizer_D.zero_grad() 
-        D(real_images)
-        loss_D = discriminator_loss(D(real_images), D(fake_images)) + GP_SCALE * gradient_penalty(D, real_images, fake_images)
-        loss_D.backward()
-        optimizer_D.step()
+            # Treinar Discriminador
+            z = torch.randn(batch, LATENT_DIM).to(device)
+            z = torch.cat([z, fake_labels], dim=1)
+            fake_images = G(z).detach()
+            fake_images = torch.cat([fake_images, image_fake_labels], dim=1)
 
-        optimizer_G.zero_grad()
-        z = torch.randn(real_images.size(0), LATENT_DIM).to(device)
-        z = torch.cat([z, fake_labels], dim=1)
-        fake_images = G(z)
-        loss_G = generator_loss(D(torch.cat([fake_images, image_fake_labels], dim=1)))
-        loss_G.backward()
-        optimizer_G.step()
+            optimizer_D.zero_grad() 
+            D(real_images)
+            loss_D = discriminator_loss(D(real_images), D(fake_images)) + GP_SCALE * gradient_penalty(D, real_images, fake_images)
+            loss_D.backward()
+            optimizer_D.step()
 
-        G_loss += loss_G.item()
-        D_loss += loss_D.item()
-        batches += BATCH_SIZE
-    
+            optimizer_G.zero_grad()
+            z = torch.randn(batch, LATENT_DIM).to(device)
+            z = torch.cat([z, fake_labels], dim=1)
+            fake_images = G(z)
+            loss_G = generator_loss(D(torch.cat([fake_images, image_fake_labels], dim=1)))
+            loss_G.backward()
+            optimizer_G.step()
+
+            G_loss += loss_G.item()
+            D_loss += loss_D.item()
+            batches += BATCH_SIZE
+
+        else:
+            real_images = real_images.to(device)
+            labels.to(device)
+            batch = real_images.size(0)
+            real_ident = torch.full((batch, 1), 1., device=device)
+            fake_ident = torch.full((batch, 1), 0., device=device)
+            fake_labels = torch.randint(0, NUM_CLASSES, (batch,), device=device)
+
+            #Treina Disc
+            net.zero_grad()
+            z = torch.randn(batch, LATENT_DIM).to(device)
+
     avg_epoch_G_loss = G_loss/batches
     avg_epoch_D_loss = D_loss/batches
     # Create the dataset and dataloader
@@ -401,8 +323,6 @@ for epoch in epoch_bar:
         "G_loss": f"{avg_epoch_G_loss:.4f}",
         "Acc": f"{accuracy:.4f}"
     })
-
-    logging.info(f"✅ Epoch {epoch+1}: D_loss={avg_epoch_D_loss:.4f}, G_loss={avg_epoch_G_loss:.4f}, Acc={accuracy:.4f}")
 
     with open("Treino_GAN.txt", "a") as f:
             f.write(f"Epoca: {epoch+1}, D_loss: {avg_epoch_D_loss:.4f}, G_loss: {avg_epoch_G_loss:.4f}, Acc: {accuracy:.4f}, Tempo: {total_time:.4f}\n")
