@@ -346,3 +346,4 @@ Epoca: 11, D_loss: -90.9518, G_loss: 45.7768, Acc: 0.9589, Tempo: 65.1791
 Epoca: 12, D_loss: -93.0717, G_loss: 46.3724, Acc: 0.9648, Tempo: 65.1509
 Epoca: 13, D_loss: -95.6701, G_loss: 47.5430, Acc: 0.9544, Tempo: 64.9937
 Epoca: 14, D_loss: -97.1397, G_loss: 48.6624, Acc: 0.9582, Tempo: 65.1865
+Epoca: 1, D_loss: -0.0049, G_loss: -0.0049, Acc: 0.1576, Tempo: 132.5398
