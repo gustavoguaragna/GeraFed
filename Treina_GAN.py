@@ -31,7 +31,7 @@ class Net(nn.Module):
 # Configurações
 BATCH_SIZE = 128
 LATENT_DIM = 128
-LEARNING_RATE = 0.00002
+LEARNING_RATE = 0.002
 BETA1 = 0.5
 BETA2 = 0.9
 GP_SCALE = 10
