@@ -58,17 +58,22 @@ class GeneratedDataset(Dataset):
         self.latent_dim = latent_dim
         self.num_classes = num_classes
         self.device = device
+        self.model = type(self.generator).__name__
         self.images, self.labels = self.generate_data()
+        
 
     def generate_data(self):
         self.generator.eval()
         labels = torch.tensor([i for i in range(self.num_classes) for _ in range(self.num_samples // self.num_classes)], device=self.device)
-        labels_one_hot = F.one_hot(labels, self.num_classes).float().to(self.device) #
+        if self.model == 'Generator':
+            labels_one_hot = F.one_hot(labels, self.num_classes).float().to(self.device) #
         z = torch.randn(self.num_samples, self.latent_dim, device=self.device)
         with torch.no_grad():
-            gen_imgs = self.generator(torch.cat([z, labels_one_hot], dim=1))
-            #gen_imgs = self.generator(z, labels)
-            
+            if self.model == 'Generator':
+                gen_imgs = self.generator(torch.cat([z, labels_one_hot], dim=1))
+            elif self.model == 'CGAN':
+                gen_imgs = self.generator(z, labels)
+
         return gen_imgs.cpu(), labels.cpu()
 
     def __len__(self):
@@ -191,22 +196,29 @@ class Generator(nn.Module):
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+wgan = False
 # Inicializar modelos
-D = Discriminator().to(device)
-G = Generator(latent_dim=LATENT_DIM).to(device)
-# Otimizadores
-optimizer_D = optim.Adam(D.parameters(), lr=LEARNING_RATE, betas=(BETA1, BETA2))
-optimizer_G = optim.Adam(G.parameters(), lr=LEARNING_RATE, betas=(BETA1, BETA2))
+if wgan:
+    D = Discriminator().to(device)
+    G = Generator(latent_dim=LATENT_DIM).to(device)
+    # Otimizadores
+    optimizer_D = optim.Adam(D.parameters(), lr=LEARNING_RATE, betas=(BETA1, BETA2))
+    optimizer_G = optim.Adam(G.parameters(), lr=LEARNING_RATE, betas=(BETA1, BETA2))
+    # Função de perda Wasserstein
+    def discriminator_loss(real_output, fake_output):
+        return fake_output.mean() - real_output.mean()
+
+    def generator_loss(fake_output):
+         return -fake_output.mean()
+else:
+    gan = CGAN(latent_dim=128).to(device)
+    optimizer_D = torch.optim.Adam(gan.discriminator.parameters(), lr=0.0002, betas=(0.5, 0.999))
+    optimizer_G = torch.optim.Adam(gan.generator.parameters(), lr=0.0002, betas=(0.5, 0.999))
+
  
-scheduler_D = torch.optim.lr_scheduler.StepLR(optimizer_D, step_size=5, gamma=0.9)
-scheduler_G = torch.optim.lr_scheduler.StepLR(optimizer_G, step_size=5, gamma=0.9)
+# scheduler_D = torch.optim.lr_scheduler.StepLR(optimizer_D, step_size=5, gamma=0.9)
+# scheduler_G = torch.optim.lr_scheduler.StepLR(optimizer_G, step_size=5, gamma=0.9)
 
- # Função de perda Wasserstein
-def discriminator_loss(real_output, fake_output):
-    return fake_output.mean() - real_output.mean()
-
-def generator_loss(fake_output):
-    return -fake_output.mean()
 
 # Função para calcular Gradient Penalty
 def gradient_penalty(D, real_samples, fake_samples):
@@ -229,67 +241,73 @@ for epoch in epoch_bar:
     D_loss = 0
     batches = 0
 
-    batch_bar = tqdm(trainloader_reduzido, desc="Batches")
+    batch_bar = tqdm(trainloader, desc="Batches")
 
     start_time = time.time()
 
-    wgan = True
-
     for real_images, labels in batch_bar:
-
+        real_images = real_images.to(device)
+        batch = real_images.size(0)
+        fake_labels = torch.randint(0, NUM_CLASSES, (batch,), device=device)
+        z = torch.randn(batch, LATENT_DIM).to(device)
+        optimizer_D.zero_grad() 
         if wgan:
-            real_images = real_images.to(device)
-            batch = real_images.size(0)
-            labels = torch.nn.functional.one_hot(labels, NUM_CLASSES).float().to(device) ##
-            fake_labels = torch.randint(0, NUM_CLASSES, (batch,), device=device)
-            fake_labels = torch.nn.functional.one_hot(fake_labels, NUM_CLASSES).float() ##
+            labels = torch.nn.functional.one_hot(labels, NUM_CLASSES).float().to(device)
+            fake_labels = torch.nn.functional.one_hot(fake_labels, NUM_CLASSES).float()
 
             # Adicionar labels ao real_images para treinamento do Discriminador
             image_labels = labels.view(labels.size(0), NUM_CLASSES, 1, 1).expand(-1, -1, 28, 28)
             image_fake_labels = fake_labels.view(fake_labels.size(0), NUM_CLASSES, 1, 1).expand(-1, -1, 28, 28)
-            
+        
             real_images = torch.cat([real_images, image_labels], dim=1)
 
             # Treinar Discriminador
-            z = torch.randn(batch, LATENT_DIM).to(device)
             z = torch.cat([z, fake_labels], dim=1)
             fake_images = G(z).detach()
             fake_images = torch.cat([fake_images, image_fake_labels], dim=1)
 
-            optimizer_D.zero_grad() 
             D(real_images)
             loss_D = discriminator_loss(D(real_images), D(fake_images)) + GP_SCALE * gradient_penalty(D, real_images, fake_images)
-            loss_D.backward()
-            optimizer_D.step()
-
-            optimizer_G.zero_grad()
-            z = torch.randn(batch, LATENT_DIM).to(device)
-            z = torch.cat([z, fake_labels], dim=1)
-            fake_images = G(z)
-            loss_G = generator_loss(D(torch.cat([fake_images, image_fake_labels], dim=1)))
-            loss_G.backward()
-            optimizer_G.step()
-
-            G_loss += loss_G.item()
-            D_loss += loss_D.item()
-            batches += BATCH_SIZE
-
+        
         else:
-            real_images = real_images.to(device)
-            labels.to(device)
-            batch = real_images.size(0)
             real_ident = torch.full((batch, 1), 1., device=device)
             fake_ident = torch.full((batch, 1), 0., device=device)
-            fake_labels = torch.randint(0, NUM_CLASSES, (batch,), device=device)
+            x_fake = gan(z, fake_labels)
 
-            #Treina Disc
-            net.zero_grad()
-            z = torch.randn(batch, LATENT_DIM).to(device)
+            y_real = gan(real_images, labels)
+            d_real_loss = gan.loss(y_real, real_ident)
+            y_fake_d = gan(x_fake.detach(), fake_labels)
+            d_fake_loss = gan.loss(y_fake_d, fake_ident)
+            loss_D = (d_real_loss + d_fake_loss) / 2
 
+        loss_D.backward()
+        optimizer_D.step()
+
+        optimizer_G.zero_grad()
+        
+        # z = torch.randn(batch, LATENT_DIM).to(device)
+        # z = torch.cat([z, fake_labels], dim=1)
+        if wgan:
+            fake_images = G(z)
+            loss_G = generator_loss(D(torch.cat([fake_images, image_fake_labels], dim=1)))
+        else:
+            y_fake_g = gan(x_fake, fake_labels)
+            loss_G = gan.loss(y_fake_g, real_ident)
+        
+        loss_G.backward()
+        optimizer_G.step()
+
+        G_loss += loss_G.item()
+        D_loss += loss_D.item()
+        batches += BATCH_SIZE
+    
     avg_epoch_G_loss = G_loss/batches
     avg_epoch_D_loss = D_loss/batches
     # Create the dataset and dataloader
-    generated_dataset = GeneratedDataset(generator=G, num_samples=10000, latent_dim=128, num_classes=10, device=device)
+    if wgan:
+        generated_dataset = GeneratedDataset(generator=G, num_samples=10000, latent_dim=128, num_classes=10, device=device)
+    else:
+        generated_dataset = GeneratedDataset(generator=gan, num_samples=10000, latent_dim=128, num_classes=10, device=device)
     generated_dataloader = DataLoader(generated_dataset, batch_size=64, shuffle=True)
 
     net = Net()
@@ -328,12 +346,17 @@ for epoch in epoch_bar:
             f.write(f"Epoca: {epoch+1}, D_loss: {avg_epoch_D_loss:.4f}, G_loss: {avg_epoch_G_loss:.4f}, Acc: {accuracy:.4f}, Tempo: {total_time:.4f}\n")
 
 
-    # Salvar modelo a cada época
-    torch.save({"generator": G.state_dict(), "discriminator": D.state_dict()}, f"wgan_{epoch+1}e_{BATCH_SIZE}b_{LEARNING_RATE}lr.pth")
-    
+   
     #Atualiza o learning_rate
-    scheduler_G.step()
-    scheduler_D.step()
-    print(f"Após Epoch {epoch+1}, LR_G: {optimizer_G.param_groups[0]['lr']:.6f}, LR_D: {optimizer_D.param_groups[0]['lr']:.6f}")
+    if wgan:
+         # Salvar modelo a cada época
+        torch.save({"generator": G.state_dict(), "discriminator": D.state_dict()}, f"wgan_{epoch+1}e_{BATCH_SIZE}b_{LEARNING_RATE}lr.pth")
+    
+        scheduler_G.step()
+        scheduler_D.step()
+        print(f"Após Epoch {epoch+1}, LR_G: {optimizer_G.param_groups[0]['lr']:.6f}, LR_D: {optimizer_D.param_groups[0]['lr']:.6f}")
+    else:
+        torch.save(gan.state_dict(), f"cgan_{epoch+1}e_{BATCH_SIZE}b_{LEARNING_RATE}lr.pth")
+        
     
 print("✅ Treinamento Concluído!")
