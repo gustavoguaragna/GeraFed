@@ -241,7 +241,7 @@ for epoch in epoch_bar:
     D_loss = 0
     batches = 0
 
-    batch_bar = tqdm(trainloader_reduzido, desc="Batches")
+    batch_bar = tqdm(trainloader, desc="Batches")
 
     start_time = time.time()
 
