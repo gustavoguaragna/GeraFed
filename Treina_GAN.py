@@ -29,7 +29,7 @@ class Net(nn.Module):
         return x
     
 # Configurações
-BATCH_SIZE = 256
+BATCH_SIZE = 64
 LATENT_DIM = 128
 LEARNING_RATE = 0.0002
 BETA1 = 0.5
