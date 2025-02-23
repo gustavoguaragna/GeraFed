@@ -29,9 +29,9 @@ class Net(nn.Module):
         return x
     
 # Configurações
-BATCH_SIZE = 128
+BATCH_SIZE = 256
 LATENT_DIM = 128
-LEARNING_RATE = 0.000002
+LEARNING_RATE = 0.0002
 BETA1 = 0.5
 BETA2 = 0.9
 GP_SCALE = 10
@@ -216,8 +216,8 @@ else:
     optimizer_G = torch.optim.Adam(gan.generator.parameters(), lr=0.0002, betas=(0.5, 0.999))
 
  
-# scheduler_D = torch.optim.lr_scheduler.StepLR(optimizer_D, step_size=5, gamma=0.9)
-# scheduler_G = torch.optim.lr_scheduler.StepLR(optimizer_G, step_size=5, gamma=0.9)
+scheduler_D = torch.optim.lr_scheduler.StepLR(optimizer_D, step_size=5, gamma=0.9)
+scheduler_G = torch.optim.lr_scheduler.StepLR(optimizer_G, step_size=5, gamma=0.9)
 
 
 # Função para calcular Gradient Penalty
@@ -231,7 +231,7 @@ def gradient_penalty(D, real_samples, fake_samples):
     gradients = gradients.view(gradients.size(0), -1)
     return ((gradients.norm(2, dim=1) - 1) ** 2).mean()
 
-# Treinamento
+############### Treinamento ###############
 historico_metricas = []
 epoch_bar = tqdm(range(EPOCHS), desc="Treinamento")
 for epoch in epoch_bar:
@@ -241,7 +241,7 @@ for epoch in epoch_bar:
     D_loss = 0
     batches = 0
 
-    batch_bar = tqdm(trainloader, desc="Batches")
+    batch_bar = tqdm(trainloader_reduzido, desc="Batches")
 
     start_time = time.time()
 
@@ -348,13 +348,12 @@ for epoch in epoch_bar:
 
    
     #Atualiza o learning_rate
+    scheduler_G.step()
+    scheduler_D.step()
+    print(f"Após Epoch {epoch+1}, LR_G: {optimizer_G.param_groups[0]['lr']:.6f}, LR_D: {optimizer_D.param_groups[0]['lr']:.6f}")
     if wgan:
          # Salvar modelo a cada época
         torch.save({"generator": G.state_dict(), "discriminator": D.state_dict()}, f"wgan_{epoch+1}e_{BATCH_SIZE}b_{LEARNING_RATE}lr.pth")
-    
-        scheduler_G.step()
-        scheduler_D.step()
-        print(f"Após Epoch {epoch+1}, LR_G: {optimizer_G.param_groups[0]['lr']:.6f}, LR_D: {optimizer_D.param_groups[0]['lr']:.6f}")
     else:
         torch.save(gan.state_dict(), f"cgan_{epoch+1}e_{BATCH_SIZE}b_{LEARNING_RATE}lr.pth")
         

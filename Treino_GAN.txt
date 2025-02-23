@@ -550,4 +550,8 @@ Epoca: 46, D_loss: 0.0050, G_loss: 0.0075, Acc: 0.9338, Tempo: 68.0038
 Epoca: 47, D_loss: 0.0050, G_loss: 0.0075, Acc: 0.9496, Tempo: 67.8918
 Epoca: 48, D_loss: 0.0050, G_loss: 0.0075, Acc: 0.9459, Tempo: 68.6257
 Epoca: 49, D_loss: 0.0050, G_loss: 0.0075, Acc: 0.9406, Tempo: 69.6227
-Epoca: 50, D_loss: 0.0050, G_loss: 0.0076, Acc: 0.9273, Tempo: 68.9815
+Epoca: 50, D_loss: 0.0050, G_loss: 0.0076, Acc: 0.9273, Tempo: 68.9815Epoca: 1, D_loss: 0.0047, G_loss: 0.0049, Acc: 0.0956, Tempo: 11.4990
+Epoca: 2, D_loss: 0.0037, G_loss: 0.0050, Acc: 0.0958, Tempo: 12.9665
+Epoca: 3, D_loss: 0.0052, G_loss: 0.0052, Acc: 0.0892, Tempo: 11.5851
+Epoca: 4, D_loss: 0.0053, G_loss: 0.0066, Acc: 0.1009, Tempo: 11.6073
+Epoca: 5, D_loss: 0.0052, G_loss: 0.0075, Acc: 0.1009, Tempo: 11.3686
