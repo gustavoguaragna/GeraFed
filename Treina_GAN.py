@@ -37,7 +37,7 @@ BETA2 = 0.9
 GP_SCALE = 10
 NUM_CHANNELS = 1
 NUM_CLASSES = 10
-EPOCHS = 50
+EPOCHS = 10
 
     # Define a transform to normalize the data
 transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
