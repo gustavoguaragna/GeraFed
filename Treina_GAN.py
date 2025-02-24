@@ -29,7 +29,7 @@ class Net(nn.Module):
         return x
     
 # Configurações
-BATCH_SIZE = 64
+BATCH_SIZE = 256
 LATENT_DIM = 128
 LEARNING_RATE = 0.0002
 BETA1 = 0.5
@@ -247,6 +247,7 @@ for epoch in epoch_bar:
 
     for real_images, labels in batch_bar:
         real_images = real_images.to(device)
+        labels = labels.to(device)
         batch = real_images.size(0)
         fake_labels = torch.randint(0, NUM_CLASSES, (batch,), device=device)
         z = torch.randn(batch, LATENT_DIM).to(device)
@@ -284,9 +285,7 @@ for epoch in epoch_bar:
         optimizer_D.step()
 
         optimizer_G.zero_grad()
-        
-        # z = torch.randn(batch, LATENT_DIM).to(device)
-        # z = torch.cat([z, fake_labels], dim=1)
+
         if wgan:
             fake_images = G(z)
             loss_G = generator_loss(D(torch.cat([fake_images, image_fake_labels], dim=1)))
@@ -305,9 +304,9 @@ for epoch in epoch_bar:
     avg_epoch_D_loss = D_loss/batches
     # Create the dataset and dataloader
     if wgan:
-        generated_dataset = GeneratedDataset(generator=G, num_samples=10000, latent_dim=128, num_classes=10, device=device)
+        generated_dataset = GeneratedDataset(generator=G, num_samples=10000, latent_dim=LATENT_DIM, num_classes=10, device=device)
     else:
-        generated_dataset = GeneratedDataset(generator=gan, num_samples=10000, latent_dim=128, num_classes=10, device=device)
+        generated_dataset = GeneratedDataset(generator=gan, num_samples=10000, latent_dim=LATENT_DIM, num_classes=10, device=device)
     generated_dataloader = DataLoader(generated_dataset, batch_size=64, shuffle=True)
 
     net = Net()
