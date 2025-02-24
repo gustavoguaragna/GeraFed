@@ -19,8 +19,8 @@ testset = datasets.MNIST(root='./data', train=False, download=True, transform=tr
 trainset_reduzido = torch.utils.data.random_split(trainset, [1000, len(trainset) - 1000])[0]
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model="wgan"
-EPOCHS = 20
+model="cgan"
+EPOCHS = 2
 NUM_CLASSES = 10
 NUM_CHANNELS = 1
 
@@ -271,9 +271,24 @@ def objective(trial):
 
     return avg_loss  # Optuna tentará minimizar essa métrica
 
+def save_trial_callback(study, trial):
+    data = {
+    "trial_number": trial.number,
+    "best_params": study.best_params,
+    "best_value": study.best_value,
+    "trial_params": trial.params,
+    "trial_value": trial.value,
+    }   
+        
+    with open("optuna_results.json", "a") as file:
+        json.dump(data, file)
+        file.write("\n")
+
+    print(f"🔔 Informações salvas para trial {trial.number}")
+
 # Criar estudo do Optuna e otimizar hiperparâmetros
 study = optuna.create_study(direction="minimize")
-study.optimize(objective, n_trials=50)
+study.optimize(objective, n_trials=3, callbacks=[save_trial_callback])
 
 # Exibir os melhores hiperparâmetros encontrados
 print("\n🔹 Melhores Hiperparâmetros Encontrados:")
