@@ -550,7 +550,7 @@ Epoca: 46, D_loss: 0.0050, G_loss: 0.0075, Acc: 0.9338, Tempo: 68.0038
 Epoca: 47, D_loss: 0.0050, G_loss: 0.0075, Acc: 0.9496, Tempo: 67.8918
 Epoca: 48, D_loss: 0.0050, G_loss: 0.0075, Acc: 0.9459, Tempo: 68.6257
 Epoca: 49, D_loss: 0.0050, G_loss: 0.0075, Acc: 0.9406, Tempo: 69.6227
-Epoca: 50, D_loss: 0.0050, G_loss: 0.0076, Acc: 0.9273, Tempo: 68.9815Epoca: 1, D_loss: 0.0047, G_loss: 0.0049, Acc: 0.0956, Tempo: 11.4990
+Epoca: 50, D_loss: 0.0050, G_loss: 0.0076, Acc: 0.9273, Tempo: 68.9815
 256Batch 0.0002LR(step5, gamma0.9) CPU MAC
 Epoca: 1, D_loss: 0.0025, G_loss: 0.0038, Acc: 0.2278, Tempo: 92.5293
 Epoca: 2, D_loss: 0.0024, G_loss: 0.0048, Acc: 0.1010, Tempo: 56.0621

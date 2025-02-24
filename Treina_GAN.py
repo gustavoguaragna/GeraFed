@@ -29,15 +29,15 @@ class Net(nn.Module):
         return x
     
 # Configurações
-BATCH_SIZE = 32
-LATENT_DIM = 128
-LEARNING_RATE = 0.0002
+BATCH_SIZE = 128
+LATENT_DIM = 100
+LEARNING_RATE = 0.002
 BETA1 = 0.5
 BETA2 = 0.9
 GP_SCALE = 10
 NUM_CHANNELS = 1
 NUM_CLASSES = 10
-EPOCHS = 3
+EPOCHS = 50
 wgan = False
 
     # Define a transform to normalize the data
@@ -211,13 +211,13 @@ if wgan:
     def generator_loss(fake_output):
          return -fake_output.mean()
 else:
-    gan = CGAN(latent_dim=128).to(device)
-    optimizer_D = torch.optim.Adam(gan.discriminator.parameters(), lr=0.0002, betas=(0.5, 0.999))
-    optimizer_G = torch.optim.Adam(gan.generator.parameters(), lr=0.0002, betas=(0.5, 0.999))
+    gan = CGAN(latent_dim=LATENT_DIM).to(device)
+    optimizer_D = torch.optim.Adam(gan.discriminator.parameters(), lr=LEARNING_RATE, betas=(BETA1, BETA2))
+    optimizer_G = torch.optim.Adam(gan.generator.parameters(), lr=LEARNING_RATE, betas=(BETA1, BETA2))
 
  
-scheduler_D = torch.optim.lr_scheduler.StepLR(optimizer_D, step_size=5, gamma=0.9)
-scheduler_G = torch.optim.lr_scheduler.StepLR(optimizer_G, step_size=5, gamma=0.9)
+scheduler_D = torch.optim.lr_scheduler.StepLR(optimizer_D, step_size=5, gamma=0.7)
+scheduler_G = torch.optim.lr_scheduler.StepLR(optimizer_G, step_size=5, gamma=0.7)
 
 
 # Função para calcular Gradient Penalty

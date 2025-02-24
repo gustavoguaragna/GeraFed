@@ -98,7 +98,7 @@ def objective(trial):
         gp_scale = trial.suggest_int("gp_scale", 0, 100)
 
     # Criar DataLoader com batch_size otimizado
-    trainloader = DataLoader(trainset_reduzido, batch_size=batch_size, shuffle=True)
+    trainloader = DataLoader(trainset, batch_size=batch_size, shuffle=True)
 
     # Criar novos modelos e otimizadores
     if model == "wgan":
