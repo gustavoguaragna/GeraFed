@@ -29,7 +29,7 @@ class Net(nn.Module):
         return x
     
 # Configurações
-BATCH_SIZE = 256
+BATCH_SIZE = 32
 LATENT_DIM = 128
 LEARNING_RATE = 0.0002
 BETA1 = 0.5
@@ -37,7 +37,8 @@ BETA2 = 0.9
 GP_SCALE = 10
 NUM_CHANNELS = 1
 NUM_CLASSES = 10
-EPOCHS = 10
+EPOCHS = 3
+wgan = False
 
     # Define a transform to normalize the data
 transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
@@ -196,7 +197,6 @@ class Generator(nn.Module):
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-wgan = False
 # Inicializar modelos
 if wgan:
     D = Discriminator().to(device)

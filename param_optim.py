@@ -22,7 +22,7 @@ trainset_reduzido = torch.utils.data.random_split(trainset, [1000, len(trainset)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model="cgan"
-EPOCHS = 5
+EPOCHS = 20
 NUM_CLASSES = 10
 
 class CGAN(nn.Module):
@@ -204,7 +204,7 @@ def objective(trial):
 
 # Criar estudo do Optuna e otimizar hiperparâmetros
 study = optuna.create_study(direction="minimize")
-study.optimize(objective, n_trials=3)
+study.optimize(objective, n_trials=50)
 
 # Exibir os melhores hiperparâmetros encontrados
 print("\n🔹 Melhores Hiperparâmetros Encontrados:")
