@@ -20,7 +20,7 @@ trainset_reduzido = torch.utils.data.random_split(trainset, [1000, len(trainset)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model="cgan"
-EPOCHS = 20
+EPOCHS = 2
 NUM_CLASSES = 10
 NUM_CHANNELS = 1
 
@@ -150,7 +150,7 @@ def objective(trial):
         gp_scale = trial.suggest_int("gp_scale", 0, 100)
 
     # Criar DataLoader com batch_size otimizado
-    trainloader = DataLoader(trainset, batch_size=batch_size, shuffle=True)
+    trainloader = DataLoader(trainset_reduzido, batch_size=batch_size, shuffle=True)
 
     # Criar novos modelos e otimizadores
     if model == "wgan":
@@ -271,9 +271,24 @@ def objective(trial):
 
     return avg_loss  # Optuna tentará minimizar essa métrica
 
+def save_trial_callback(study, trial):
+    data = {
+    "trial_number": trial.number,
+    "best_params": study.best_params,
+    "best_value": study.best_value,
+    "trial_params": trial.params,
+    "trial_value": trial.value,
+    }   
+        
+    with open("optuna_results.json", "a") as file:
+        json.dump(data, file)
+        file.write("\n")
+
+    print(f"🔔 Informações salvas para trial {trial.number}")
+
 # Criar estudo do Optuna e otimizar hiperparâmetros
 study = optuna.create_study(direction="minimize")
-study.optimize(objective, n_trials=50)
+study.optimize(objective, n_trials=3, callbacks=[save_trial_callback])
 
 # Exibir os melhores hiperparâmetros encontrados
 print("\n🔹 Melhores Hiperparâmetros Encontrados:")
