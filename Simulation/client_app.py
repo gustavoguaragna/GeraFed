@@ -197,7 +197,6 @@ def client_fn(context: Context):
     img_size = context.run_config["tam_img"]
     latent_dim = context.run_config["tam_ruido"]
     net_gen = CGAN(dataset=dataset, img_size=img_size, latent_dim=latent_dim)
-    net_gen.load_state_dict(torch.load("Imagens Testes/FULL_FEDAVG/epochs10/model_round_10_mnist.pt"))
     net_alvo = Net()
     partition_id = context.node_config["partition-id"]
     num_partitions = context.node_config["num-partitions"]
