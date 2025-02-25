@@ -31,7 +31,7 @@ class Net(nn.Module):
 # Configurações
 BATCH_SIZE = 128
 LATENT_DIM = 100
-LEARNING_RATE = 0.002
+LEARNING_RATE = 0.0002
 BETA1 = 0.5
 BETA2 = 0.9
 GP_SCALE = 10
@@ -216,8 +216,8 @@ else:
     optimizer_G = torch.optim.Adam(gan.generator.parameters(), lr=LEARNING_RATE, betas=(BETA1, BETA2))
 
  
-scheduler_D = torch.optim.lr_scheduler.StepLR(optimizer_D, step_size=5, gamma=0.7)
-scheduler_G = torch.optim.lr_scheduler.StepLR(optimizer_G, step_size=5, gamma=0.7)
+scheduler_D = torch.optim.lr_scheduler.StepLR(optimizer_D, step_size=5, gamma=0.99)
+scheduler_G = torch.optim.lr_scheduler.StepLR(optimizer_G, step_size=5, gamma=0.99)
 
 
 # Função para calcular Gradient Penalty
