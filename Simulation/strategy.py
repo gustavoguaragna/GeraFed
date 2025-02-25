@@ -352,10 +352,6 @@ class GeraFed(Strategy):
         return parameters_aggregated_alvo, metrics_aggregated
 
 
-        
-
-
-
 
     def aggregate_evaluate(
         self,
