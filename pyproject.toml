@@ -23,8 +23,8 @@ packages = ["."]
 publisher = "gustavoguaragna"
 
 [tool.flwr.app.components]
-serverapp = "Simulation.server_app:app"
-clientapp = "Simulation.client_app:app"
+serverapp = "Simulation.CGAN_torch.server_app:app"
+clientapp = "Simulation.CGAN_torch.client_app:app"
 
 [tool.flwr.app.config]
 num_rodadas = 10
