@@ -203,14 +203,13 @@ def client_fn(context: Context):
     niid = context.run_config["niid"]
     alpha_dir = context.run_config["alpha_dir"]
     batch_size = context.run_config["tam_batch"]
-    pretrained_cgan = CGAN()
-    pretrained_cgan.load_state_dict(torch.load("model_round_10_mnist.pt"))
+    # pretrained_cgan = CGAN()
+    # pretrained_cgan.load_state_dict(torch.load("model_round_10_mnist.pt"))
     trainloader, valloader = load_data(partition_id=partition_id,
                                        num_partitions=num_partitions,
                                        niid=niid,
                                        alpha_dir=alpha_dir,
                                        batch_size=batch_size,
-                                       cgan=pretrained_cgan,
                                       )
     local_epochs_alvo = context.run_config["epocas_alvo"]
     local_epochs_gen = context.run_config["epocas_gen"]
