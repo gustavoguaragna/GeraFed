@@ -1,0 +1,3 @@
+Configuracao CGAN: 100latent_dim, 0.0001lr, 0.5b1, 0.999b2
+FID para CGAN 50 epochs centralizada 0.95acc: 29.49
+FID para CGAN 20 rodadas de 10 epocas 4 clientes niid 0.1alpha 0.7acc: 136.86
