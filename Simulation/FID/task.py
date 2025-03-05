@@ -1,0 +1,783 @@
+"""GeraFed: um framework para balancear dados heterogêneos em aprendizado federado."""
+
+from collections import OrderedDict
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from flwr_datasets import FederatedDataset
+from flwr_datasets.partitioner import IidPartitioner, DirichletPartitioner
+from torch.utils.data import DataLoader
+from torchvision.transforms import Compose, Normalize, ToTensor
+import numpy as np
+from torchvision.transforms.functional import to_pil_image
+from datasets import Dataset, Features, ClassLabel, Image
+import random
+import torchvision
+from torch.utils.model_zoo import load_url as load_state_dict_from_url
+from PIL import Image as IMG
+
+SEED = 42
+random.seed(SEED)
+np.random.seed(SEED)
+torch.manual_seed(SEED)
+if torch.cuda.is_available():
+    torch.cuda.manual_seed_all(SEED)
+    # Para garantir determinismo total em operações com CUDA
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+
+class Net(nn.Module):
+    """Model (simple CNN adapted from 'PyTorch: A 60 Minute Blitz')"""
+
+    def __init__(self):
+        super(Net, self).__init__()
+        self.conv1 = nn.Conv2d(1, 6, 5)
+        self.pool = nn.MaxPool2d(2, 2)
+        self.conv2 = nn.Conv2d(6, 16, 5)
+        self.fc1 = nn.Linear(16 * 4 * 4, 120)
+        self.fc2 = nn.Linear(120, 84)
+        self.fc3 = nn.Linear(84, 10)
+
+    def forward(self, x):
+        x = self.pool(F.relu(self.conv1(x)))
+        x = self.pool(F.relu(self.conv2(x)))
+        x = x.view(-1, 16 * 4 * 4)
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        return self.fc3(x)
+
+
+# Define the GAN model
+class CGAN(nn.Module):
+    def __init__(self, dataset="mnist", img_size=28, latent_dim=100):
+        super(CGAN, self).__init__()
+        if dataset == "mnist":
+            self.classes = 10
+            self.channels = 1
+        self.img_size = img_size
+        self.latent_dim = latent_dim
+        self.img_shape = (self.channels, self.img_size, self.img_size)
+        self.label_embedding = nn.Embedding(self.classes, self.classes)
+        self.adv_loss = torch.nn.BCELoss()
+
+
+        self.generator = nn.Sequential(
+            *self._create_layer_gen(self.latent_dim + self.classes, 128, False),
+            *self._create_layer_gen(128, 256),
+            *self._create_layer_gen(256, 512),
+            *self._create_layer_gen(512, 1024),
+            nn.Linear(1024, int(np.prod(self.img_shape))),
+            nn.Tanh()
+        )
+
+        self.discriminator = nn.Sequential(
+            *self._create_layer_disc(self.classes + int(np.prod(self.img_shape)), 1024, False, True),
+            *self._create_layer_disc(1024, 512, True, True),
+            *self._create_layer_disc(512, 256, True, True),
+            *self._create_layer_disc(256, 128, False, False),
+            *self._create_layer_disc(128, 1, False, False),
+            nn.Sigmoid()
+        )
+
+        #self._initialize_weights()
+
+    def _create_layer_gen(self, size_in, size_out, normalize=True):
+        layers = [nn.Linear(size_in, size_out)]
+        if normalize:
+            layers.append(nn.BatchNorm1d(size_out))
+        layers.append(nn.LeakyReLU(0.2, inplace=True))
+        return layers
+    
+    def _create_layer_disc(self, size_in, size_out, drop_out=True, act_func=True):
+        layers = [nn.Linear(size_in, size_out)]
+        if drop_out:
+            layers.append(nn.Dropout(0.4))
+        if act_func:
+            layers.append(nn.LeakyReLU(0.2, inplace=True))
+        return layers
+
+    def _initialize_weights(self):
+        # Itera sobre todos os módulos da rede geradora
+        for m in self.generator:
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_normal_(m.weight)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0.0)
+
+    def forward(self, input, labels):
+        if input.dim() == 2:
+            z = torch.cat((self.label_embedding(labels), input), -1)
+            x = self.generator(z)
+            x = x.view(x.size(0), *self.img_shape) #Em
+            return x 
+        elif input.dim() == 4:
+            x = torch.cat((input.view(input.size(0), -1), self.label_embedding(labels)), -1)
+            return self.discriminator(x)
+
+    def loss(self, output, label):
+        return self.adv_loss(output, label)
+
+def generate_images(cgan, examples_per_class):
+    cgan.eval()
+    device = next(cgan.parameters()).device
+    latent_dim = cgan.latent_dim
+    classes = cgan.classes
+    
+    # Cria um vetor de rótulos balanceado
+    labels = torch.tensor([i for i in range(classes) for _ in range(examples_per_class)], device=device)
+    # Número total de imagens geradas
+    num_samples = examples_per_class * classes
+    # Gera vetores latentes aleatórios
+    z = torch.randn(num_samples, latent_dim, device=device)
+
+    with torch.no_grad():
+        cgan.eval()
+        gen_imgs = cgan(z, labels)  # [N, C, H, W]
+
+    # Retorna como lista para aplicar transforms depois
+    # Convertendo para CPU para aplicar transforms com PIL, se necessário
+    gen_imgs_list = [img.cpu() for img in gen_imgs]
+    gen_labels_list = labels.cpu().tolist()
+
+    #converte para PIL
+    gen_imgs_pil = [to_pil_image((img * 0.5 + 0.5).clamp(0,1)) for img in gen_imgs_list]
+
+    #Monta dataset como do FederatedDataset
+    features = Features({
+    "image": Image(),
+    "label": ClassLabel(names=[str(i) for i in range(classes)])
+    })
+
+    # Cria um dicionário com os dados
+    gen_dict = {"image": gen_imgs_pil, "label": gen_labels_list}
+
+    # Cria o dataset Hugging Face
+    gen_dataset_hf = Dataset.from_dict(gen_dict, features=features)
+    return gen_dataset_hf
+
+def split_balanced(gen_dataset_hf, num_clientes):
+    # Identificar as classes
+    class_label = gen_dataset_hf.features["label"]
+    num_classes = class_label.num_classes
+    
+    # Cria um mapeamento classe -> índices
+    class_to_indices = {c: [] for c in range(num_classes)}
+    for i in range(len(gen_dataset_hf)):
+        lbl = gen_dataset_hf[i]["label"]
+        class_to_indices[lbl].append(i)
+    
+    # Verifica quantos exemplos por classe temos
+    examples_per_class = len(class_to_indices[0])
+    # Garantir que o número de exemplos por classe seja divisível por num_clientes 
+    # (ou lidar com o resto de alguma forma)
+    if examples_per_class % num_clientes != 0:
+        raise ValueError("O número de exemplos por classe não é divisível igualmente pelo número de clientes.")
+        
+    # Número de exemplos por classe por cliente
+    examples_per_class_per_client = examples_per_class // num_clientes
+
+    # Agora, distribui igualmente os índices para cada cliente
+    client_indices = [[] for _ in range(num_clientes)]
+    for c in range(num_classes):
+        # Índices dessa classe
+        idxs = class_to_indices[c]
+        # Divide em partes iguais
+        for i in range(num_clientes):
+            start = i * examples_per_class_per_client
+            end = (i+1) * examples_per_class_per_client
+            client_indices[i].extend(idxs[start:end])
+    
+    # Agora criamos um DatasetDict com um subset para cada cliente
+    # Cada cliente terá a mesma quantidade total de exemplos (classes * examples_per_class_per_client)
+    client_datasets = {}
+    for i in range(num_clientes):
+        # Ordena os índices do cliente (opcional, mas pode manter a ordem)
+        client_indices[i].sort()
+        # Seleciona os exemplos
+        client_subset = gen_dataset_hf.select(client_indices[i])
+        client_datasets[i] = client_subset
+    
+    return client_datasets
+
+
+fds = None  # Cache FederatedDataset
+gen_img_part = None # Cache GeneratedDataset
+
+def load_data(partition_id: int, 
+              num_partitions: int, 
+              niid: bool, 
+              alpha_dir: float, 
+              batch_size: int, 
+              cgan=None, 
+              examples_per_class=5000):
+    
+    """Carrega MNIST com splits de treino e teste separados. Se examples_per_class > 0, inclui dados gerados."""
+   
+    global fds
+
+    if fds is None:
+        if niid:
+            partitioner = DirichletPartitioner(
+                num_partitions=num_partitions,
+                partition_by="label",
+                alpha=alpha_dir,
+                min_partition_size=0,
+                self_balancing=False
+            )
+        else:
+            partitioner = IidPartitioner(num_partitions=num_partitions)
+
+        fds = FederatedDataset(
+            dataset="mnist",
+            partitioners={"train": partitioner}
+        )
+
+    # Carrega a partição de treino e teste separadamente
+    test_partition = fds.load_split("test")
+
+    global gen_img_part
+
+    if cgan is not None and examples_per_class > 0:
+        if gen_img_part is None:
+            print("ENTRA GEN_IMG_PART NONE")
+            generated_images = generate_images(cgan, examples_per_class)
+            gen_img_part = split_balanced(gen_dataset_hf=generated_images, num_clientes=num_partitions)
+        train_partition = gen_img_part[partition_id]
+    else:
+        train_partition = fds.load_partition(partition_id, split="train")
+    
+    pytorch_transforms = Compose([
+        ToTensor(),
+        Normalize((0.5,), (0.5,))
+    ])
+
+    def apply_transforms(batch):
+        batch["image"] = [pytorch_transforms(img) for img in batch["image"]]
+        return batch
+
+    train_partition = train_partition.with_transform(apply_transforms)
+    test_partition = test_partition.with_transform(apply_transforms)
+    
+    trainloader = DataLoader(train_partition, batch_size=batch_size, shuffle=True)
+    testloader = DataLoader(test_partition, batch_size=batch_size)
+
+    return trainloader, testloader
+
+
+def train_alvo(net, trainloader, epochs, lr, device):
+    """Train the model on the training set."""
+    net.to(device)  # move model to GPU if available
+    criterion = torch.nn.CrossEntropyLoss().to(device)
+    optimizer = torch.optim.Adam(net.parameters(), lr=lr)
+    net.train()
+    running_loss = 0.0
+    for _ in range(epochs):
+        for batch in trainloader:
+            images = batch["image"]
+            labels = batch["label"]
+            optimizer.zero_grad()
+            loss = criterion(net(images.to(device)), labels.to(device))
+            loss.backward()
+            optimizer.step()
+            running_loss += loss.item()
+
+    avg_trainloss = running_loss / (len(trainloader) * epochs)
+    return avg_trainloss
+
+def train_gen(net, trainloader, epochs, lr, device, dataset="mnist", latent_dim=100):
+    """Train the network on the training set."""
+    if dataset == "mnist":
+      imagem = "image"
+    elif dataset == "cifar10":
+      imagem = "img"
+    
+    net.to(device)  # move model to GPU if available
+    optim_G = torch.optim.Adam(net.generator.parameters(), lr=lr, betas=(0.5, 0.999))
+    optim_D = torch.optim.Adam(net.discriminator.parameters(), lr=lr, betas=(0.5, 0.999))
+
+    g_losses = []
+    d_losses = []
+
+
+    for epoch in range(epochs):
+        for batch_idx, batch in enumerate(trainloader):
+            images, labels = batch[imagem].to(device), batch["label"].to(device)
+            batch_size = images.size(0)
+            real_ident = torch.full((batch_size, 1), 1., device=device)
+            fake_ident = torch.full((batch_size, 1), 0., device=device)
+
+            # Train G
+            net.zero_grad()
+            z_noise = torch.randn(batch_size, latent_dim, device=device)
+            x_fake_labels = torch.randint(0, 10, (batch_size,), device=device)
+            x_fake = net(z_noise, x_fake_labels)
+            y_fake_g = net(x_fake, x_fake_labels)
+            g_loss = net.loss(y_fake_g, real_ident)
+            g_loss.backward()
+            optim_G.step()
+
+            # Train D
+            net.zero_grad()
+            y_real = net(images, labels)
+            d_real_loss = net.loss(y_real, real_ident)
+            y_fake_d = net(x_fake.detach(), x_fake_labels)
+            d_fake_loss = net.loss(y_fake_d, fake_ident)
+            d_loss = (d_real_loss + d_fake_loss) / 2
+            d_loss.backward()
+            optim_D.step()
+
+            g_losses.append(g_loss.item())
+            d_losses.append(d_loss.item())
+
+            if batch_idx % 100 == 0 and batch_idx > 0:
+                print('Epoch {} [{}/{}] loss_D_treino: {:.4f} loss_G_treino: {:.4f}'.format(
+                            epoch, batch_idx, len(trainloader),
+                            d_loss.mean().item(),
+                            g_loss.mean().item()))
+    return np.mean(g_losses)   
+
+
+def test(net, testloader, device, model):
+    """Validate the model on the test set."""
+    net.to(device)
+    if model == "gen":
+        imagem = "image"
+        g_losses = []
+        d_losses = []
+        with torch.no_grad():
+            for batch_idx, batch in enumerate(testloader):
+                images, labels = batch[imagem].to(device), batch["label"].to(device)
+                batch_size = images.size(0)
+                real_ident = torch.full((batch_size, 1), 1., device=device)
+                fake_ident = torch.full((batch_size, 1), 0., device=device)
+                
+                #Gen loss
+                z_noise = torch.randn(batch_size, 100, device=device)
+                x_fake_labels = torch.randint(0, 10, (batch_size,), device=device)
+                x_fake = net(z_noise, x_fake_labels)
+                y_fake_g = net(x_fake, x_fake_labels)
+                g_loss = net.loss(y_fake_g, real_ident)
+
+                #Disc loss
+                y_real = net(images, labels)
+                d_real_loss = net.loss(y_real, real_ident)
+                y_fake_d = net(x_fake.detach(), x_fake_labels)
+                d_fake_loss = net.loss(y_fake_d, fake_ident)
+                d_loss = (d_real_loss + d_fake_loss) / 2
+
+                g_losses.append(g_loss.item())
+                d_losses.append(d_loss.item())
+
+                if batch_idx % 100 == 0 and batch_idx > 0:
+                    print('[{}/{}] loss_D_teste: {:.4f} loss_G_teste: {:.4f}'.format(
+                                batch_idx, len(testloader),
+                                d_loss.mean().item(),
+                                g_loss.mean().item()))
+        return np.mean(g_losses), np.mean(d_losses)
+    else:
+        criterion = torch.nn.CrossEntropyLoss()
+        correct, loss = 0, 0.0
+        with torch.no_grad():
+            for batch in testloader:
+                images = batch["image"].to(device)
+                labels = batch["label"].to(device)
+                outputs = net(images)
+                loss += criterion(outputs, labels).item()
+                correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
+        accuracy = correct / len(testloader.dataset)
+        loss = loss / len(testloader)
+        return loss, accuracy
+
+
+def get_weights(net):
+    return [val.cpu().numpy() for _, val in net.state_dict().items()]
+
+def get_weights_gen(net):
+    return [val.cpu().numpy() for key, val in net.state_dict().items() if 'discriminator' in key or 'label' in key]
+
+
+def set_weights(net, parameters):
+    params_dict = zip(net.state_dict().keys(), parameters)
+    state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
+    net.load_state_dict(state_dict, strict=True)
+
+# FID
+
+def _inception_v3(*args, **kwargs):
+    """Wraps `torchvision.models.inception_v3`"""
+    try:
+        version = tuple(map(int, torchvision.__version__.split(".")[:2]))
+    except ValueError:
+        # Just a caution against weird version strings
+        version = (0,)
+
+    # Skips default weight inititialization if supported by torchvision
+    # version. See https://github.com/mseitzer/pytorch-fid/issues/28.
+    if version >= (0, 6):
+        kwargs["init_weights"] = False
+
+    # Backwards compatibility: `weights` argument was handled by `pretrained`
+    # argument prior to version 0.13.
+    if version < (0, 13) and "weights" in kwargs:
+        if kwargs["weights"] == "DEFAULT":
+            kwargs["pretrained"] = True
+        elif kwargs["weights"] is None:
+            kwargs["pretrained"] = False
+        else:
+            raise ValueError(
+                "weights=={} not supported in torchvision {}".format(
+                    kwargs["weights"], torchvision.__version__
+                )
+            )
+        del kwargs["weights"]
+
+    return torchvision.models.inception_v3(*args, **kwargs)
+
+
+def fid_inception_v3():
+    """Build pretrained Inception model for FID computation
+
+    The Inception model for FID computation uses a different set of weights
+    and has a slightly different structure than torchvision's Inception.
+
+    This method first constructs torchvision's Inception and then patches the
+    necessary parts that are different in the FID Inception model.
+    """
+    inception = _inception_v3(num_classes=1008, aux_logits=False, weights=None)
+    inception.Mixed_5b = FIDInceptionA(192, pool_features=32)
+    inception.Mixed_5c = FIDInceptionA(256, pool_features=64)
+    inception.Mixed_5d = FIDInceptionA(288, pool_features=64)
+    inception.Mixed_6b = FIDInceptionC(768, channels_7x7=128)
+    inception.Mixed_6c = FIDInceptionC(768, channels_7x7=160)
+    inception.Mixed_6d = FIDInceptionC(768, channels_7x7=160)
+    inception.Mixed_6e = FIDInceptionC(768, channels_7x7=192)
+    inception.Mixed_7b = FIDInceptionE_1(1280)
+    inception.Mixed_7c = FIDInceptionE_2(2048)
+
+    state_dict = load_state_dict_from_url("https://github.com/mseitzer/pytorch-fid/releases/download/fid_weights/pt_inception-2015-12-05-6726825d.pth", progress=True)
+    inception.load_state_dict(state_dict)
+    return inception
+
+
+class FIDInceptionA(torchvision.models.inception.InceptionA):
+    """InceptionA block patched for FID computation"""
+
+    def __init__(self, in_channels, pool_features):
+        super(FIDInceptionA, self).__init__(in_channels, pool_features)
+
+    def forward(self, x):
+        branch1x1 = self.branch1x1(x)
+
+        branch5x5 = self.branch5x5_1(x)
+        branch5x5 = self.branch5x5_2(branch5x5)
+
+        branch3x3dbl = self.branch3x3dbl_1(x)
+        branch3x3dbl = self.branch3x3dbl_2(branch3x3dbl)
+        branch3x3dbl = self.branch3x3dbl_3(branch3x3dbl)
+
+        # Patch: Tensorflow's average pool does not use the padded zero's in
+        # its average calculation
+        branch_pool = F.avg_pool2d(
+            x, kernel_size=3, stride=1, padding=1, count_include_pad=False
+        )
+        branch_pool = self.branch_pool(branch_pool)
+
+        outputs = [branch1x1, branch5x5, branch3x3dbl, branch_pool]
+        return torch.cat(outputs, 1)
+
+
+class FIDInceptionC(torchvision.models.inception.InceptionC):
+    """InceptionC block patched for FID computation"""
+
+    def __init__(self, in_channels, channels_7x7):
+        super(FIDInceptionC, self).__init__(in_channels, channels_7x7)
+
+    def forward(self, x):
+        branch1x1 = self.branch1x1(x)
+
+        branch7x7 = self.branch7x7_1(x)
+        branch7x7 = self.branch7x7_2(branch7x7)
+        branch7x7 = self.branch7x7_3(branch7x7)
+
+        branch7x7dbl = self.branch7x7dbl_1(x)
+        branch7x7dbl = self.branch7x7dbl_2(branch7x7dbl)
+        branch7x7dbl = self.branch7x7dbl_3(branch7x7dbl)
+        branch7x7dbl = self.branch7x7dbl_4(branch7x7dbl)
+        branch7x7dbl = self.branch7x7dbl_5(branch7x7dbl)
+
+        # Patch: Tensorflow's average pool does not use the padded zero's in
+        # its average calculation
+        branch_pool = F.avg_pool2d(
+            x, kernel_size=3, stride=1, padding=1, count_include_pad=False
+        )
+        branch_pool = self.branch_pool(branch_pool)
+
+        outputs = [branch1x1, branch7x7, branch7x7dbl, branch_pool]
+        return torch.cat(outputs, 1)
+
+
+class FIDInceptionE_1(torchvision.models.inception.InceptionE):
+    """First InceptionE block patched for FID computation"""
+
+    def __init__(self, in_channels):
+        super(FIDInceptionE_1, self).__init__(in_channels)
+
+    def forward(self, x):
+        branch1x1 = self.branch1x1(x)
+
+        branch3x3 = self.branch3x3_1(x)
+        branch3x3 = [
+            self.branch3x3_2a(branch3x3),
+            self.branch3x3_2b(branch3x3),
+        ]
+        branch3x3 = torch.cat(branch3x3, 1)
+
+        branch3x3dbl = self.branch3x3dbl_1(x)
+        branch3x3dbl = self.branch3x3dbl_2(branch3x3dbl)
+        branch3x3dbl = [
+            self.branch3x3dbl_3a(branch3x3dbl),
+            self.branch3x3dbl_3b(branch3x3dbl),
+        ]
+        branch3x3dbl = torch.cat(branch3x3dbl, 1)
+
+        # Patch: Tensorflow's average pool does not use the padded zero's in
+        # its average calculation
+        branch_pool = F.avg_pool2d(
+            x, kernel_size=3, stride=1, padding=1, count_include_pad=False
+        )
+        branch_pool = self.branch_pool(branch_pool)
+
+        outputs = [branch1x1, branch3x3, branch3x3dbl, branch_pool]
+        return torch.cat(outputs, 1)
+
+
+class FIDInceptionE_2(torchvision.models.inception.InceptionE):
+    """Second InceptionE block patched for FID computation"""
+
+    def __init__(self, in_channels):
+        super(FIDInceptionE_2, self).__init__(in_channels)
+
+    def forward(self, x):
+        branch1x1 = self.branch1x1(x)
+
+        branch3x3 = self.branch3x3_1(x)
+        branch3x3 = [
+            self.branch3x3_2a(branch3x3),
+            self.branch3x3_2b(branch3x3),
+        ]
+        branch3x3 = torch.cat(branch3x3, 1)
+
+        branch3x3dbl = self.branch3x3dbl_1(x)
+        branch3x3dbl = self.branch3x3dbl_2(branch3x3dbl)
+        branch3x3dbl = [
+            self.branch3x3dbl_3a(branch3x3dbl),
+            self.branch3x3dbl_3b(branch3x3dbl),
+        ]
+        branch3x3dbl = torch.cat(branch3x3dbl, 1)
+
+        # Patch: The FID Inception model uses max pooling instead of average
+        # pooling. This is likely an error in this specific Inception
+        # implementation, as other Inception models use average pooling here
+        # (which matches the description in the paper).
+        branch_pool = F.max_pool2d(x, kernel_size=3, stride=1, padding=1)
+        branch_pool = self.branch_pool(branch_pool)
+
+        outputs = [branch1x1, branch3x3, branch3x3dbl, branch_pool]
+        return torch.cat(outputs, 1)
+
+
+class InceptionV3(nn.Module):
+    """Pretrained InceptionV3 network returning feature maps"""
+
+    # Index of default block of inception to return,
+    # corresponds to output of final average pooling
+    DEFAULT_BLOCK_INDEX = 3
+
+    # Maps feature dimensionality to their output blocks indices
+    BLOCK_INDEX_BY_DIM = {
+        64: 0,  # First max pooling features
+        192: 1,  # Second max pooling featurs
+        768: 2,  # Pre-aux classifier features
+        2048: 3,  # Final average pooling features
+    }
+
+    def __init__(
+        self,
+        output_blocks=(DEFAULT_BLOCK_INDEX,),
+        resize_input=True,
+        normalize_input=True,
+        requires_grad=False,
+        use_fid_inception=True,
+    ):
+        """Build pretrained InceptionV3
+
+        Parameters
+        ----------
+        output_blocks : list of int
+            Indices of blocks to return features of. Possible values are:
+                - 0: corresponds to output of first max pooling
+                - 1: corresponds to output of second max pooling
+                - 2: corresponds to output which is fed to aux classifier
+                - 3: corresponds to output of final average pooling
+        resize_input : bool
+            If true, bilinearly resizes input to width and height 299 before
+            feeding input to model. As the network without fully connected
+            layers is fully convolutional, it should be able to handle inputs
+            of arbitrary size, so resizing might not be strictly needed
+        normalize_input : bool
+            If true, scales the input from range (0, 1) to the range the
+            pretrained Inception network expects, namely (-1, 1)
+        requires_grad : bool
+            If true, parameters of the model require gradients. Possibly useful
+            for finetuning the network
+        use_fid_inception : bool
+            If true, uses the pretrained Inception model used in Tensorflow's
+            FID implementation. If false, uses the pretrained Inception model
+            available in torchvision. The FID Inception model has different
+            weights and a slightly different structure from torchvision's
+            Inception model. If you want to compute FID scores, you are
+            strongly advised to set this parameter to true to get comparable
+            results.
+        """
+        super(InceptionV3, self).__init__()
+
+        self.resize_input = resize_input
+        self.normalize_input = normalize_input
+        self.output_blocks = sorted(output_blocks)
+        self.last_needed_block = max(output_blocks)
+
+        assert self.last_needed_block <= 3, "Last possible output block index is 3"
+
+        self.blocks = nn.ModuleList()
+
+        if use_fid_inception:
+            inception = fid_inception_v3()
+        else:
+            inception = _inception_v3(weights="DEFAULT")
+
+        # Block 0: input to maxpool1
+        block0 = [
+            inception.Conv2d_1a_3x3,
+            inception.Conv2d_2a_3x3,
+            inception.Conv2d_2b_3x3,
+            nn.MaxPool2d(kernel_size=3, stride=2),
+        ]
+        self.blocks.append(nn.Sequential(*block0))
+
+        # Block 1: maxpool1 to maxpool2
+        if self.last_needed_block >= 1:
+            block1 = [
+                inception.Conv2d_3b_1x1,
+                inception.Conv2d_4a_3x3,
+                nn.MaxPool2d(kernel_size=3, stride=2),
+            ]
+            self.blocks.append(nn.Sequential(*block1))
+
+        # Block 2: maxpool2 to aux classifier
+        if self.last_needed_block >= 2:
+            block2 = [
+                inception.Mixed_5b,
+                inception.Mixed_5c,
+                inception.Mixed_5d,
+                inception.Mixed_6a,
+                inception.Mixed_6b,
+                inception.Mixed_6c,
+                inception.Mixed_6d,
+                inception.Mixed_6e,
+            ]
+            self.blocks.append(nn.Sequential(*block2))
+
+        # Block 3: aux classifier to final avgpool
+        if self.last_needed_block >= 3:
+            block3 = [
+                inception.Mixed_7a,
+                inception.Mixed_7b,
+                inception.Mixed_7c,
+                nn.AdaptiveAvgPool2d(output_size=(1, 1)),
+            ]
+            self.blocks.append(nn.Sequential(*block3))
+
+        for param in self.parameters():
+            param.requires_grad = requires_grad
+
+    def forward(self, inp):
+        """Get Inception feature maps
+
+        Parameters
+        ----------
+        inp : torch.autograd.Variable
+            Input tensor of shape Bx3xHxW. Values are expected to be in
+            range (0, 1)
+
+        Returns
+        -------
+        List of torch.autograd.Variable, corresponding to the selected output
+        block, sorted ascending by index
+        """
+        outp = []
+        x = inp
+
+        if self.resize_input:
+            x = F.interpolate(x, size=(299, 299), mode="bilinear", align_corners=False)
+
+        if self.normalize_input:
+            x = 2 * x - 1  # Scale from range (0, 1) to range (-1, 1)
+
+        for idx, block in enumerate(self.blocks):
+            x = block(x)
+            if idx in self.output_blocks:
+                outp.append(x)
+
+            if idx == self.last_needed_block:
+                break
+
+        return outp
+
+class GeneratedDataset(torch.utils.data.Dataset):
+    def __init__(self, generator, num_samples, latent_dim, num_classes, device):
+        self.generator = generator
+        self.num_samples = num_samples
+        self.latent_dim = latent_dim
+        self.num_classes = num_classes
+        self.device = device
+        self.model = type(self.generator).__name__
+        self.images, self.labels = self.generate_data()
+        self.classes = [i for i in range(self.num_classes)]
+
+
+    def generate_data(self):
+        self.generator.eval()
+        labels = torch.tensor([i for i in range(self.num_classes) for _ in range(self.num_samples // self.num_classes)], device=self.device)
+        if self.model == 'Generator':
+            labels_one_hot = F.one_hot(labels, self.num_classes).float().to(self.device) #
+        z = torch.randn(self.num_samples, self.latent_dim, device=self.device)
+        with torch.no_grad():
+            if self.model == 'Generator':
+                gen_imgs = self.generator(torch.cat([z, labels_one_hot], dim=1))
+            elif self.model == 'CGAN':
+                gen_imgs = self.generator(z, labels)
+
+        return gen_imgs.cpu(), labels.cpu()
+
+    def __len__(self):
+        return self.num_samples
+
+    def __getitem__(self, idx):
+        return self.images[idx], self.labels[idx]
+    
+class ImagePathDataset(torch.utils.data.Dataset):
+    def __init__(self, files, transforms=None):
+        self.files = files
+        self.transforms = transforms
+
+    def __len__(self):
+        return len(self.files)
+
+    def __getitem__(self, i):
+        path = self.files[i]
+        img = IMG.open(path).convert("RGB")
+        if self.transforms is not None:
+            img = self.transforms(img)
+        return img
