@@ -215,13 +215,16 @@ class GeraFed(Strategy):
             # Calcula FID
             print(self.fid)
             if self.fid:
-                from Simulation.task import InceptionV3, GeneratedDataset, ImagePathDataset
+                from Simulation.task import InceptionV3, GeneratedDataset, ImagePathDataset, select_samples_per_class
                 import numpy as np
                 import os
                 import pathlib
                 import torchvision
                 from scipy import linalg
                 import time
+                from tqdm import tqdm
+                import torchvision.transforms as transforms
+                import torchvision.datasets as datasets
                 start_time = time.time()
                 dims = 2048
                 device = torch.device("cuda" if (torch.cuda.is_available()) else "cpu")
@@ -238,11 +241,9 @@ class GeraFed(Strategy):
                 # Create the dataset and dataloader
                 generated_dataset = GeneratedDataset(generator=cgan, num_samples=2050, latent_dim=self.latent_dim, num_classes=10, device="cpu")
                 gen_dataset = generated_dataset.images
-                # Ajustar para o intervalo [0, 1]
-                gen_dataset = (gen_dataset + 1) / 2
-
-                # Expandir o canal para RGB (replicando o canal 1 para 3)
-                gen_dataset = gen_dataset.repeat(1, 3, 1, 1) # 1, 3, 28, 28
+                for c in gen_dataset.keys():
+                    gen_dataset[c] = (gen_dataset[c] + 1) / 2 #intervalo entre 0 e 1
+                    gen_dataset[c] = gen_dataset[c].repeat(1, 3, 1, 1) # 3 canais como na rede inception
 
                 try:
                     num_cpus = len(os.sched_getaffinity(0))
@@ -253,99 +254,107 @@ class GeraFed(Strategy):
                     num_cpus = os.cpu_count()
                 num_workers = min(8, num_cpus)
 
-                dataloader = torch.utils.data.DataLoader(gen_dataset, batch_size=50, num_workers=num_workers, shuffle=False)
+                dataloaders = [torch.utils.data.DataLoader(gen_dataset[c], batch_size=50, num_workers=num_workers, shuffle=False) for c in range(10)]
 
-                pred_arr = np.empty((len(gen_dataset), dims))
+                mus_gen = []
+                sigmas_gen = []
 
-                start_idx = 0
-                for batch in dataloader:
-                        batch = batch.to(device)
+                for c in range(10):
+                    pred_arr = np.empty((len(gen_dataset[c]), dims))
+                    start_idx = 0
+                    for batch in tqdm(dataloaders[c]):
+                            batch = batch.to(device)
 
-                        with torch.no_grad():
-                            pred = model(batch)[0]
+                            with torch.no_grad():
+                                pred = model(batch)[0]
 
-                        # If model output is not scalar, apply global spatial average pooling.
-                        # This happens if you choose a dimensionality not equal 2048.
-                        if pred.size(2) != 1 or pred.size(3) != 1:
-                            pred = torch.nn.functional.adaptive_avg_pool2d(pred, output_size=(1, 1))
+                            # If model output is not scalar, apply global spatial average pooling.
+                            # This happens if you choose a dimensionality not equal 2048.
+                            if pred.size(2) != 1 or pred.size(3) != 1:
+                                pred = torch.nn.functional.adaptive_avg_pool2d(pred, output_size=(1, 1))
 
-                        pred = pred.squeeze(3).squeeze(2).cpu().numpy()
+                            pred = pred.squeeze(3).squeeze(2).cpu().numpy()
 
-                        pred_arr[start_idx: start_idx + pred.shape[0]] = pred
+                            pred_arr[start_idx : start_idx + pred.shape[0]] = pred
 
-                        start_idx += pred.shape[0]
+                            start_idx += pred.shape[0]
 
-                mu_gen = np.mean(pred_arr, axis=0)
-                sigma_gen = np.cov(pred_arr, rowvar=False)
+                    mus_gen.append(np.mean(pred_arr, axis=0))
+                    sigmas_gen.append(np.cov(pred_arr, rowvar=False))
 
-                model = InceptionV3([block_idx]).to(device)
+                # Carrega MNIST test para calculo dist real
+                transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
+                testset = datasets.MNIST(root='./data', train=False, download=False, transform=transform)
+                img_reais = select_samples_per_class(testset, 800)
+                dataloaders = [torch.utils.data.DataLoader(img_reais[c], batch_size=50, num_workers=num_workers, shuffle=False) for c in range(10)]
 
-                path = "../mnist_samples_0"
-                path = pathlib.Path(path)
-                files = sorted(file for file in path.glob("*.png"))
-                model.eval()
-                dataset = ImagePathDataset(files, transforms=torchvision.transforms.ToTensor())
-                dataloader = torch.utils.data.DataLoader(dataset, batch_size=50, num_workers=num_workers, shuffle=False)
-                pred_arr = np.empty((len(files), dims))
-                start_idx = 0
-                for batch in dataloader:
-                        batch = batch.to(device)
+                mus_real = []
+                sigmas_real = []
+                for c in range(10):
+                    model = InceptionV3([block_idx]).to(device)
+                    model.eval()
+                    pred_arr = np.empty((len(img_reais[0]), dims))
+                    start_idx = 0
+                    for batch in tqdm(dataloaders[c]):
+                            batch = batch.to(device)
 
-                        with torch.no_grad():
-                            pred = model(batch)[0]
+                            with torch.no_grad():
+                                pred = model(batch)[0]
 
-                        # If model output is not scalar, apply global spatial average pooling.
-                        # This happens if you choose a dimensionality not equal 2048.
-                        if pred.size(2) != 1 or pred.size(3) != 1:
-                            pred = torch.nn.functional.adaptive_avg_pool2d(pred, output_size=(1, 1))
+                            # If model output is not scalar, apply global spatial average pooling.
+                            # This happens if you choose a dimensionality not equal 2048.
+                            if pred.size(2) != 1 or pred.size(3) != 1:
+                                pred = torch.nn.functional.adaptive_avg_pool2d(pred, output_size=(1, 1))
 
-                        pred = pred.squeeze(3).squeeze(2).cpu().numpy()
+                            pred = pred.squeeze(3).squeeze(2).cpu().numpy()
 
-                        pred_arr[start_idx : start_idx + pred.shape[0]] = pred
+                            pred_arr[start_idx : start_idx + pred.shape[0]] = pred
 
-                        start_idx = start_idx + pred.shape[0]
+                            start_idx += pred.shape[0]  # Corrected the operator to +=
+                    mus_real.append(np.mean(pred_arr, axis=0))
+                    sigmas_real.append(np.cov(pred_arr, rowvar=False))
 
-                mu_real = np.mean(pred_arr, axis=0)
-                sigma_real = np.cov(pred_arr, rowvar=False)
+                mus_gen = [np.atleast_1d(mu_gen) for mu_gen in mus_gen]
+                mus_real = [np.atleast_1d(mu_real) for mu_real in mus_real]
 
-                mu_gen = np.atleast_1d(mu_gen)
-                mu_real = np.atleast_1d(mu_real)
+                sigmas_gen = [np.atleast_2d(sigma_gen) for sigma_gen in sigmas_gen]
+                sigmas_real = [np.atleast_2d(sigma_real) for sigma_real in sigmas_real]
 
-                sigma_gen = np.atleast_2d(sigma_gen)
-                sigma_real = np.atleast_2d(sigma_real)
+                for mu_gen, mu_real, sigma_gen, sigma_real in zip(mus_gen, mus_real, sigmas_gen, sigmas_real):
+                    assert (
+                        mu_gen.shape == mu_real.shape
+                    ), "Training and test mean vectors have different lengths"
+                    assert (
+                        sigma_gen.shape == sigma_real.shape
+                    ), "Training and test covariances have different dimensions"
 
-                assert (
-                    mu_gen.shape == mu_real.shape
-                ), "Training and test mean vectors have different lengths"
-                assert (
-                    sigma_gen.shape == sigma_real.shape
-                ), "Training and test covariances have different dimensions"
-
-                diff = mu_gen - mu_real
+                diffs = [mu_gen - mu_real for mu_gen, mu_real in zip(mus_gen, mus_real)]
 
                 # Product might be almost singular
-                covmean, _ = linalg.sqrtm(sigma_gen.dot(sigma_real), disp=False)
-                if not np.isfinite(covmean).all():
-                    msg = (
-                        "fid calculation produces singular product; "
-                        "adding %s to diagonal of cov estimates"
-                    ) % 1e-6
-                    print(msg)
-                    offset = np.eye(sigma_gen.shape[0]) * 1e-6
-                    covmean = linalg.sqrtm((sigma_gen + offset).dot(sigma_real + offset))
+                covmeans = [linalg.sqrtm(sigmas_gen.dot(sigmas_real), disp=False)[0] for sigmas_gen, sigmas_real in zip(sigmas_gen, sigmas_real)]
+                for covmean, sigma_gen, sigma_real in zip(covmeans, sigmas_gen, sigmas_real):
+                    if not np.isfinite(covmean).all():
+                        msg = (
+                            "fid calculation produces singular product; "
+                            "adding %s to diagonal of cov estimates"
+                        ) % 1e-6
+                        print(msg)
+                        offset = np.eye(sigma_gen.shape[0]) * 1e-6
+                        covmean = linalg.sqrtm((sigma_gen + offset).dot(sigma_real + offset))
 
                 # Numerical error might give slight imaginary component
-                if np.iscomplexobj(covmean):
-                    if not np.allclose(np.diagonal(covmean).imag, 0, atol=1e-3):
-                        m = np.max(np.abs(covmean.imag))
-                        raise ValueError("Imaginary component {}".format(m))
-                    covmean = covmean.real
+                for i, covmean in enumerate(covmeans):
+                    if np.iscomplexobj(covmean):
+                        if not np.allclose(np.diagonal(covmean).imag, 0, atol=1e-3):
+                            m = np.max(np.abs(covmean.imag))
+                            raise ValueError("Imaginary component {}".format(m))
+                        covmeans[i] = covmean.real
 
-                tr_covmean = np.trace(covmean)
+                tr_covmeans = [np.trace(covmean) for covmean in covmeans]
 
-                fid = diff.dot(diff) + np.trace(sigma_gen) + np.trace(sigma_real) - 2 * tr_covmean
+                fids = [diff.dot(diff) + np.trace(sigma_gen) + np.trace(sigma_real) - 2 * tr_covmean for diff, sigma_gen, sigma_real, tr_covmean in zip(diffs, sigmas_gen, sigmas_real, tr_covmeans)]
                 end_time = time.time()
-                open("FID.txt", "a").write(f"Rodada {server_round}, FID: {fid}, Tempo: {end_time - start_time}\n")
+                open("FID.txt", "a").write(f"Rodada {server_round}, FIDS: {fids}, Tempo: {end_time - start_time}\n")
                 
 
         elif self.model == "alvo":

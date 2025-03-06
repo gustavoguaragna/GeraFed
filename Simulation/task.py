@@ -735,7 +735,7 @@ class InceptionV3(nn.Module):
 
         return outp
 
-class GeneratedDataset(torch.utils.data.Dataset):
+class GeneratedDataset(Dataset):
     def __init__(self, generator, num_samples, latent_dim, num_classes, device):
         self.generator = generator
         self.num_samples = num_samples
@@ -743,29 +743,36 @@ class GeneratedDataset(torch.utils.data.Dataset):
         self.num_classes = num_classes
         self.device = device
         self.model = type(self.generator).__name__
-        self.images, self.labels = self.generate_data()
+        self.images = self.generate_data()
         self.classes = [i for i in range(self.num_classes)]
 
 
     def generate_data(self):
+        gen_imgs = {}
         self.generator.eval()
-        labels = torch.tensor([i for i in range(self.num_classes) for _ in range(self.num_samples // self.num_classes)], device=self.device)
-        if self.model == 'Generator':
-            labels_one_hot = F.one_hot(labels, self.num_classes).float().to(self.device) #
-        z = torch.randn(self.num_samples, self.latent_dim, device=self.device)
-        with torch.no_grad():
-            if self.model == 'Generator':
-                gen_imgs = self.generator(torch.cat([z, labels_one_hot], dim=1))
-            elif self.model == 'CGAN':
-                gen_imgs = self.generator(z, labels)
+        labels = {c: torch.tensor([c for i in range(self.num_samples)], device=self.device) for c in range(self.num_classes)}
+        for c, label in labels.items():
+          if self.model == 'Generator':
+              labels_one_hot = F.one_hot(label, self.num_classes).float().to(self.device) #
+          z = torch.randn(self.num_samples, self.latent_dim, device=self.device)
+          with torch.no_grad():
+              if self.model == 'Generator':
+                  gen_imgs_class = self.generator(torch.cat([z, labels_one_hot], dim=1))
+              elif self.model == 'CGAN':
+                  gen_imgs_class = self.generator(z, label)
+          gen_imgs[c] = gen_imgs_class
 
-        return gen_imgs.cpu(), labels.cpu()
+        return gen_imgs
 
     def __len__(self):
-        return self.num_samples
+        return self.num_samples * self.num_classes
 
     def __getitem__(self, idx):
-        return self.images[idx], self.labels[idx]
+        # Mapear o índice global para (classe, índice interno)
+        class_idx = idx // self.num_samples
+        sample_idx = idx % self.num_samples
+        # Retorna apenas a imagem (sem o rótulo)
+        return self.images[class_idx][sample_idx]
     
 class ImagePathDataset(torch.utils.data.Dataset):
     def __init__(self, files, transforms=None):
@@ -781,3 +788,38 @@ class ImagePathDataset(torch.utils.data.Dataset):
         if self.transforms is not None:
             img = self.transforms(img)
         return img
+    
+def select_samples_per_class(dataset, num_samples):
+    """
+    Selects a specified number of samples per class from the dataset and returns them as tensors.
+
+    Parameters:
+    dataset (torch.utils.data.Dataset): The dataset to select samples from.
+    num_samples (int): The number of samples to select per class.
+
+    Returns:
+    dict: A dictionary where each key corresponds to a class and the value is a tensor of shape [num_samples, 1, 28, 28].
+    """
+    class_samples = {i: [] for i in range(len(dataset.classes))}
+    class_counts = {i: 0 for i in range(len(dataset.classes))}
+
+    for img, label in dataset:
+        if class_counts[label] < num_samples:
+            class_samples[label].append(img)
+            class_counts[label] += 1
+        if all(count >= num_samples for count in class_counts.values()):
+            break
+    else:
+        print("Warning: Not all classes have the requested number of samples.")
+
+    # Convert lists of tensors to a single tensor per class
+    for label in class_samples:
+        if class_samples[label]:  # Check if the list is not empty
+            class_samples[label] = torch.stack(class_samples[label], dim=0)
+            class_samples[label] = (class_samples[label] + 1) / 2
+            class_samples[label] = class_samples[label].repeat(1, 3, 1, 1)
+        else:
+            # Handle empty classes if necessary; here we leave an empty tensor
+            class_samples[label] = torch.Tensor()
+
+    return class_samples
