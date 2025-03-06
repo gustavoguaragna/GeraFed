@@ -837,7 +837,7 @@ def calculate_fid(instance: str, model_gen: CGAN, dims: int = 2048, param_model=
     if instance == "server":
         ndarrays = parameters_to_ndarrays(param_model)
         set_weights(model_gen, ndarrays)
-    generated_dataset = GeneratedDataset(generator=model_gen, num_samples=2050, latent_dim=100, num_classes=10, device=device)
+    generated_dataset = GeneratedDataset(generator=model_gen, num_samples=2050, latent_dim=100, num_classes=10, device="cpu")
     gen_dataset = generated_dataset.images
     for c in gen_dataset.keys():
         gen_dataset[c] = (gen_dataset[c] + 1) / 2 #intervalo entre 0 e 1
@@ -950,5 +950,5 @@ def calculate_fid(instance: str, model_gen: CGAN, dims: int = 2048, param_model=
             tr_covmeans = [np.trace(covmean) for covmean in covmeans]
 
             fids = [diff.dot(diff) + np.trace(sigma_gen) + np.trace(sigma_real) - 2 * tr_covmean for diff, sigma_gen, sigma_real, tr_covmean in zip(diffs, sigmas_gen, sigmas_real, tr_covmeans)]
-
+          
             return fids

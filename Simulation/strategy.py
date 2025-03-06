@@ -225,7 +225,9 @@ class GeraFed(Strategy):
                 import torchvision.datasets as datasets
                 start_time = time.time()
                 cgan = CGAN()
+                print("ENTRANDO CALCULATE FID")
                 fids = calculate_fid(instance="server", model_gen=cgan, param_model=self.parameters_gen)
+                print("SAIU CALCULATE FID")
                 end_time = time.time()
                 open("FID.txt", "a").write(f"Rodada {server_round}, FIDS: {fids}, Tempo: {end_time - start_time}\n")
                 
@@ -249,7 +251,7 @@ class GeraFed(Strategy):
 
         fit_instructions = []
         config_alvo = {"modelo": "alvo"}
-        config_gen = {"modelo": "gen", "round": server_round, "fid": fids}
+        config_gen = {"modelo": "gen", "round": server_round, "fid": np.array(fids)}
 
         for c in conjunto_alvo:
             fit_ins_alvo = FitIns(parameters=self.parameters_alvo, config=config_alvo)
