@@ -101,7 +101,8 @@ class GeraFed(Strategy):
         latent_dim: int = 100,
         client_counter: Counter,
         agg: str = "full",
-        model: str = "both"
+        model: str = "both",
+        fid: bool = False
     ) -> None:
         super().__init__()
 
@@ -134,6 +135,7 @@ class GeraFed(Strategy):
         self.client_counter = client_counter
         self.agg = agg
         self.model = model
+        self.fid = fid
 
     def __repr__(self) -> str:
         """Compute a string representation of the strategy."""
@@ -210,6 +212,142 @@ class GeraFed(Strategy):
             metade = len(clients) // 2
             conjunto_gen = sorted_clients[:metade]
             conjunto_alvo = sorted_clients[metade:]
+            # Calcula FID
+            print(self.fid)
+            if self.fid:
+                from Simulation.task import InceptionV3, GeneratedDataset, ImagePathDataset
+                import numpy as np
+                import os
+                import pathlib
+                import torchvision
+                from scipy import linalg
+                import time
+                start_time = time.time()
+                dims = 2048
+                device = torch.device("cuda" if (torch.cuda.is_available()) else "cpu")
+                block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[dims]
+                model = InceptionV3([block_idx]).to(device)
+                model.eval()
+                ndarrays = parameters_to_ndarrays(self.parameters_gen)
+                # Cria uma instância do modelo
+                cgan = CGAN(dataset=self.dataset,
+                            img_size=self.img_size,
+                            latent_dim=self.latent_dim)
+                # Define os pesos do modelo
+                set_weights(cgan, ndarrays)
+                # Create the dataset and dataloader
+                generated_dataset = GeneratedDataset(generator=cgan, num_samples=2050, latent_dim=self.latent_dim, num_classes=10, device="cpu")
+                gen_dataset = generated_dataset.images
+                # Ajustar para o intervalo [0, 1]
+                gen_dataset = (gen_dataset + 1) / 2
+
+                # Expandir o canal para RGB (replicando o canal 1 para 3)
+                gen_dataset = gen_dataset.repeat(1, 3, 1, 1) # 1, 3, 28, 28
+
+                try:
+                    num_cpus = len(os.sched_getaffinity(0))
+                except AttributeError:
+                    # os.sched_getaffinity is not available under Windows, use
+                    # os.cpu_count instead (which may not return the *available* number
+                    # of CPUs).
+                    num_cpus = os.cpu_count()
+                num_workers = min(8, num_cpus)
+
+                dataloader = torch.utils.data.DataLoader(gen_dataset, batch_size=50, num_workers=num_workers, shuffle=False)
+
+                pred_arr = np.empty((len(gen_dataset), dims))
+
+                start_idx = 0
+                for batch in dataloader:
+                        batch = batch.to(device)
+
+                        with torch.no_grad():
+                            pred = model(batch)[0]
+
+                        # If model output is not scalar, apply global spatial average pooling.
+                        # This happens if you choose a dimensionality not equal 2048.
+                        if pred.size(2) != 1 or pred.size(3) != 1:
+                            pred = torch.nn.functional.adaptive_avg_pool2d(pred, output_size=(1, 1))
+
+                        pred = pred.squeeze(3).squeeze(2).cpu().numpy()
+
+                        pred_arr[start_idx: start_idx + pred.shape[0]] = pred
+
+                        start_idx += pred.shape[0]
+
+                mu_gen = np.mean(pred_arr, axis=0)
+                sigma_gen = np.cov(pred_arr, rowvar=False)
+
+                model = InceptionV3([block_idx]).to(device)
+
+                path = "../mnist_samples_0"
+                path = pathlib.Path(path)
+                files = sorted(file for file in path.glob("*.png"))
+                model.eval()
+                dataset = ImagePathDataset(files, transforms=torchvision.transforms.ToTensor())
+                dataloader = torch.utils.data.DataLoader(dataset, batch_size=50, num_workers=num_workers, shuffle=False)
+                pred_arr = np.empty((len(files), dims))
+                start_idx = 0
+                for batch in dataloader:
+                        batch = batch.to(device)
+
+                        with torch.no_grad():
+                            pred = model(batch)[0]
+
+                        # If model output is not scalar, apply global spatial average pooling.
+                        # This happens if you choose a dimensionality not equal 2048.
+                        if pred.size(2) != 1 or pred.size(3) != 1:
+                            pred = torch.nn.functional.adaptive_avg_pool2d(pred, output_size=(1, 1))
+
+                        pred = pred.squeeze(3).squeeze(2).cpu().numpy()
+
+                        pred_arr[start_idx : start_idx + pred.shape[0]] = pred
+
+                        start_idx = start_idx + pred.shape[0]
+
+                mu_real = np.mean(pred_arr, axis=0)
+                sigma_real = np.cov(pred_arr, rowvar=False)
+
+                mu_gen = np.atleast_1d(mu_gen)
+                mu_real = np.atleast_1d(mu_real)
+
+                sigma_gen = np.atleast_2d(sigma_gen)
+                sigma_real = np.atleast_2d(sigma_real)
+
+                assert (
+                    mu_gen.shape == mu_real.shape
+                ), "Training and test mean vectors have different lengths"
+                assert (
+                    sigma_gen.shape == sigma_real.shape
+                ), "Training and test covariances have different dimensions"
+
+                diff = mu_gen - mu_real
+
+                # Product might be almost singular
+                covmean, _ = linalg.sqrtm(sigma_gen.dot(sigma_real), disp=False)
+                if not np.isfinite(covmean).all():
+                    msg = (
+                        "fid calculation produces singular product; "
+                        "adding %s to diagonal of cov estimates"
+                    ) % 1e-6
+                    print(msg)
+                    offset = np.eye(sigma_gen.shape[0]) * 1e-6
+                    covmean = linalg.sqrtm((sigma_gen + offset).dot(sigma_real + offset))
+
+                # Numerical error might give slight imaginary component
+                if np.iscomplexobj(covmean):
+                    if not np.allclose(np.diagonal(covmean).imag, 0, atol=1e-3):
+                        m = np.max(np.abs(covmean.imag))
+                        raise ValueError("Imaginary component {}".format(m))
+                    covmean = covmean.real
+
+                tr_covmean = np.trace(covmean)
+
+                fid = diff.dot(diff) + np.trace(sigma_gen) + np.trace(sigma_real) - 2 * tr_covmean
+                end_time = time.time()
+                open("FID.txt", "a").write(f"Rodada {server_round}, FID: {fid}, Tempo: {end_time - start_time}\n")
+                
+
         elif self.model == "alvo":
             print("MODEL ALVO")
             conjunto_alvo = clients
