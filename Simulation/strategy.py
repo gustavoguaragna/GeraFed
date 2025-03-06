@@ -218,8 +218,6 @@ class GeraFed(Strategy):
                 from Simulation.task import InceptionV3, GeneratedDataset, ImagePathDataset, select_samples_per_class
                 import numpy as np
                 import os
-                import pathlib
-                import torchvision
                 from scipy import linalg
                 import time
                 from tqdm import tqdm
@@ -376,7 +374,7 @@ class GeraFed(Strategy):
 
         fit_instructions = []
         config_alvo = {"modelo": "alvo"}
-        config_gen = {"modelo": "gen", "round": server_round}
+        config_gen = {"modelo": "gen", "round": server_round, "fid": fids}
 
         for c in conjunto_alvo:
             fit_ins_alvo = FitIns(parameters=self.parameters_alvo, config=config_alvo)

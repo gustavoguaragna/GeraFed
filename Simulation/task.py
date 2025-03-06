@@ -823,3 +823,6 @@ def select_samples_per_class(dataset, num_samples):
             class_samples[label] = torch.Tensor()
 
     return class_samples
+
+def calculate_fid()
+    
