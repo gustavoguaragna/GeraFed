@@ -251,7 +251,7 @@ class GeraFed(Strategy):
 
         fit_instructions = []
         config_alvo = {"modelo": "alvo"}
-        config_gen = {"modelo": "gen", "round": server_round, "fid": np.array(fids)}
+        config_gen = {"modelo": "gen", "round": server_round, "fids": np.array(fids)}
 
         for c in conjunto_alvo:
             fit_ins_alvo = FitIns(parameters=self.parameters_alvo, config=config_alvo)

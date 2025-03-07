@@ -4,7 +4,7 @@ import torch
 from collections import OrderedDict
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import Context, ParametersRecord, array_from_numpy
-from Simulation.task import Net, CGAN, get_weights, get_weights_gen, load_data, set_weights, test, train_alvo, train_gen
+from Simulation.task import Net, CGAN, get_weights, get_weights_gen, load_data, set_weights, test, train_alvo, train_gen, calculate_fid
 
 import random
 import numpy as np
@@ -35,7 +35,11 @@ class FlowerClient(NumPyClient):
                 latent_dim: int, 
                 context: Context,
                 agg: str,
-                model: str):
+                model: str,
+                num_partitions: 4,
+                niid: bool,
+                alpha_dir: str,
+                batch_size: int):
         self.cid=cid
         self.net_alvo = net_alvo
         self.net_gen = net_gen
@@ -55,6 +59,10 @@ class FlowerClient(NumPyClient):
         ) 
         self.agg = agg
         self.model = model
+        self.num_partitions = num_partitions
+        self.niid = niid
+        self.alpha_dir = alpha_dir
+        self.batch_size = batch_size
 
 
     def fit(self, parameters, config):
@@ -74,6 +82,17 @@ class FlowerClient(NumPyClient):
             )
         elif config["modelo"] == "gen":
             if self.agg == "full":
+                if config["round"] >= 3:
+                    fids_client = calculate_fid(instance="client", model_gen=self.net_gen)
+                    classes_train = np.where(np.array(fids_client) < config["fids"])[0]
+                    self.trainloader, _ = load_data(partition_id=self.cid,
+                                       num_partitions=self.num_partitions,
+                                       niid=self.niid,
+                                       alpha_dir=self.alpha_dir,
+                                       batch_size=self.batch_size,
+                                       filter_classes=classes_train
+                                      )
+                print(f"tamanho dataset: {len(self.trainloader)*self.batch_size}")
                 set_weights(self.net_gen, parameters)
                 train_loss = train_gen(
                 net=self.net_gen,
@@ -233,7 +252,11 @@ def client_fn(context: Context):
                         latent_dim=latent_dim,
                         context=context,
                         agg=agg,
-                        model=model).to_client()
+                        model=model,
+                        num_partitions=num_partitions,
+                        niid=niid,
+                        alpha_dir=alpha_dir,
+                        batch_size=batch_size).to_client()
 
 
 # Flower ClientApp

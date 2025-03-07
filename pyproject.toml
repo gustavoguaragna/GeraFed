@@ -27,7 +27,7 @@ serverapp = "Simulation.server_app:app"
 clientapp = "Simulation.client_app:app"
 
 [tool.flwr.app.config]
-num_rodadas = 2
+num_rodadas = 4
 fraction_fit_alvo = 1.0
 fraction_fit_gen = 1.0
 tam_ruido = 100
@@ -61,5 +61,5 @@ default = "local-simulation"
 [tool.flwr.federations.local-simulation]
 options.num-supernodes = 4
 options.backend.client-resources.num-cpus = 1
-options.backend.client-resources.num-gpus = 0
+options.backend.client-resources.num-gpus = 0.25
 

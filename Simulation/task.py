@@ -216,7 +216,8 @@ def load_data(partition_id: int,
               alpha_dir: float, 
               batch_size: int, 
               cgan=None, 
-              examples_per_class=5000):
+              examples_per_class=5000,
+              filter_classes=None):
     
     """Carrega MNIST com splits de treino e teste separados. Se examples_per_class > 0, inclui dados gerados."""
    
@@ -252,6 +253,9 @@ def load_data(partition_id: int,
         train_partition = gen_img_part[partition_id]
     else:
         train_partition = fds.load_partition(partition_id, split="train")
+
+    if filter_classes is not None:
+        train_partition = train_partition.filter(lambda x: x["label"] in filter_classes)
     
     pytorch_transforms = Compose([
         ToTensor(),
