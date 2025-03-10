@@ -4,8 +4,19 @@ import torch
 from collections import OrderedDict
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import Context, ParametersRecord, array_from_numpy
-from Simulation.task import Net, CGAN, get_weights, get_weights_gen, load_data, set_weights, test, train_alvo, train_gen, calculate_fid
-
+from Simulation.task import (
+    Net, 
+    CGAN, 
+    get_weights, 
+    get_weights_gen, 
+    load_data, 
+    set_weights, 
+    test, 
+    train_alvo, 
+    train_gen, 
+    calculate_fid, 
+    generate_plot
+)
 import random
 import numpy as np
 
@@ -92,8 +103,11 @@ class FlowerClient(NumPyClient):
                                        batch_size=self.batch_size,
                                        filter_classes=classes_train
                                       )
-                print(f"tamanho dataset: {len(self.trainloader)*self.batch_size}")
+                print(f"tamanho dataset: {len(self.trainloader)*self.batch_size}", flush=True)
                 set_weights(self.net_gen, parameters)
+                #Gera imagens do modelo agregado do round anterior
+                figura = generate_plot(net=self.net_gen, device=self.device, round_number=config["server_round"])
+                figura.savefig(f"mnist_CGAN_r{config['server_round']-1}_{self.local_epochs}e_{self.batch_size}b_100z_4c_{self.lr}lr_niid_01dir.png")
                 train_loss = train_gen(
                 net=self.net_gen,
                 trainloader=self.trainloader,
@@ -103,6 +117,8 @@ class FlowerClient(NumPyClient):
                 dataset=self.dataset,
                 latent_dim=self.latent_dim
             )
+                figura = generate_plot(net=self.net_gen, device=self.device, round_number=config["server_round"]+10, client_id=self.cid)
+                figura.savefig(f"mnist_CGAN_r{config['server_round']+10}_{self.local_epochs}e_{self.batch_size}b_100z_4c_{self.lr}lr_niid_01dir_cliente{self.cid}.png")
                 return (
                 get_weights(self.net_gen),
                 len(self.trainloader.dataset),
@@ -141,6 +157,9 @@ class FlowerClient(NumPyClient):
 
                     self.net_gen.load_state_dict(new_state_dict)
 
+                    figura = generate_plot(net=self.net_gen, device=self.device, round_number=config["server_round"])
+                    figura.savefig(f"mnist_CGAN_r{config['server_round']-1}_{self.local_epochs}e_{self.batch_size}b_100z_4c_{self.lr}lr_niid_01dir.png")
+
                 train_loss = train_gen(
                     net=self.net_gen,
                     trainloader=self.trainloader,
@@ -160,6 +179,9 @@ class FlowerClient(NumPyClient):
 
                 model_path = f"modelo_gen_round_{config['round']}_client_{self.cid}.pt"
                 torch.save(self.net_gen.state_dict(), model_path)
+
+                figura = generate_plot(net=self.net_gen, device=self.device, round_number=config["server_round"], client_id=self.cid)
+                figura.savefig(f"mnist_CGAN_r{config['server_round']}_{self.local_epochs}e_{self.batch_size}b_100z_10c_{self.lr}lr_niid_01dir_cliente{self.cid}.png")
                 return (
                     get_weights_gen(self.net_gen),
                     len(self.trainloader.dataset),

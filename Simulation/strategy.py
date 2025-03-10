@@ -213,7 +213,6 @@ class GeraFed(Strategy):
             conjunto_gen = sorted_clients[:metade]
             conjunto_alvo = sorted_clients[metade:]
             # Calcula FID
-            print(self.fid)
             if self.fid:
                 from Simulation.task import InceptionV3, GeneratedDataset, ImagePathDataset, select_samples_per_class, calculate_fid
                 import numpy as np
@@ -225,9 +224,7 @@ class GeraFed(Strategy):
                 import torchvision.datasets as datasets
                 start_time = time.time()
                 cgan = CGAN()
-                print("ENTRANDO CALCULATE FID")
                 fids = calculate_fid(instance="server", model_gen=cgan, param_model=self.parameters_gen)
-                print("SAIU CALCULATE FID")
                 end_time = time.time()
                 open("FID.txt", "a").write(f"Rodada {server_round}, FIDS: {fids}, Tempo: {end_time - start_time}\n")
                 
