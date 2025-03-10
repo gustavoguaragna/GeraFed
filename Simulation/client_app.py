@@ -47,9 +47,9 @@ class FlowerClient(NumPyClient):
                 context: Context,
                 agg: str,
                 model: str,
-                num_partitions: 4,
+                num_partitions: int,
                 niid: bool,
-                alpha_dir: str,
+                alpha_dir: float,
                 batch_size: int):
         self.cid=cid
         self.net_alvo = net_alvo
@@ -92,8 +92,10 @@ class FlowerClient(NumPyClient):
                 {"train_loss": train_loss, "modelo": "alvo"},
             )
         elif config["modelo"] == "gen":
+            print("ENTRA GEN")
             if self.agg == "full":
-                if config["round"] >= 3:
+                print("ENTRA FULL")
+                if config["round"] >= 3 and config["fids"]:
                     fids_client = calculate_fid(instance="client", model_gen=self.net_gen)
                     classes_train = np.where(np.array(fids_client) < config["fids"])[0]
                     self.trainloader, _ = load_data(partition_id=self.cid,
@@ -103,11 +105,11 @@ class FlowerClient(NumPyClient):
                                        batch_size=self.batch_size,
                                        filter_classes=classes_train
                                       )
-                print(f"tamanho dataset: {len(self.trainloader)*self.batch_size}", flush=True)
+                print(f"tamanho dataset: {len(self.trainloader)*self.batch_size}")
                 set_weights(self.net_gen, parameters)
                 #Gera imagens do modelo agregado do round anterior
-                figura = generate_plot(net=self.net_gen, device=self.device, round_number=config["server_round"])
-                figura.savefig(f"mnist_CGAN_r{config['server_round']-1}_{self.local_epochs}e_{self.batch_size}b_100z_4c_{self.lr}lr_niid_01dir.png")
+                #figura = generate_plot(net=self.net_gen, device=self.device, round_number=config["server_round"])
+                #figura.savefig(f"mnist_CGAN_r{config['server_round']-1}_{self.local_epochs}e_{self.batch_size}b_100z_4c_{self.lr}lr_niid_01dir.png")
                 train_loss = train_gen(
                 net=self.net_gen,
                 trainloader=self.trainloader,
@@ -117,8 +119,10 @@ class FlowerClient(NumPyClient):
                 dataset=self.dataset,
                 latent_dim=self.latent_dim
             )
-                figura = generate_plot(net=self.net_gen, device=self.device, round_number=config["server_round"]+10, client_id=self.cid)
-                figura.savefig(f"mnist_CGAN_r{config['server_round']+10}_{self.local_epochs}e_{self.batch_size}b_100z_4c_{self.lr}lr_niid_01dir_cliente{self.cid}.png")
+                # figura = generate_plot(net=self.net_gen, device=self.device, round_number=config["server_round"]+10, client_id=self.cid)
+                # figura.savefig(f"mnist_CGAN_r{config['server_round']+10}_{self.local_epochs}e_{self.batch_size}b_100z_4c_{self.lr}lr_niid_01dir_cliente{self.cid}.png")
+                print(f"weights:{get_weights(self.net_gen)}")
+                print(f"lendata: {len(self.trainloader.dataset)}")
                 return (
                 get_weights(self.net_gen),
                 len(self.trainloader.dataset),

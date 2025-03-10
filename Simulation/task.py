@@ -113,6 +113,9 @@ class CGAN(nn.Module):
                     nn.init.constant_(m.bias, 0.0)
 
     def forward(self, input, labels):
+        device = input.device  # Ensure all tensors are on the same device
+        labels = labels.to(device)  # Move labels to the same device as input
+        
         if input.dim() == 2:
             z = torch.cat((self.label_embedding(labels), input), -1)
             x = self.generator(z)
