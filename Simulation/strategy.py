@@ -203,9 +203,9 @@ class GeraFed(Strategy):
         sample_size, min_num_clients = self.num_fit_clients(
             client_manager.num_available()
         )
-        clients = list(client_manager.sample(
+        clients = client_manager.sample(
             num_clients=sample_size, min_num_clients=min_num_clients
-        ))
+        )
 
         fids = []
         if self.model == "both":
@@ -253,15 +253,13 @@ class GeraFed(Strategy):
         fit_instructions = []
         config_alvo = {"modelo": "alvo"}
         config_gen = {"modelo": "gen", "round": server_round, "fids": np.array(fids)}
-
-        for c in conjunto_alvo:
-            fit_ins_alvo = FitIns(parameters=self.parameters_alvo, config=config_alvo)
-            print(f"fit_ins_alvo: {fit_ins_alvo.config}")
-            fit_instructions.append((c, fit_ins_alvo))
         
+        fit_ins_alvo = FitIns(parameters=self.parameters_alvo, config=config_alvo)
+        for c in conjunto_alvo:
+            fit_instructions.append((c, fit_ins_alvo))
+
+        fit_ins_gen = FitIns(parameters=self.parameters_gen, config=config_gen)
         for c in conjunto_gen:
-            fit_ins_gen = FitIns(parameters=self.parameters_gen, config=config_gen)
-            print(f"fit_ins_gen: {fit_ins_gen.config}")
             fit_instructions.append((c, fit_ins_gen))
 
         # Return client/config pairs
