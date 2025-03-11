@@ -19,6 +19,8 @@ from Simulation.task import (
 )
 import random
 import numpy as np
+from logging import WARNING
+from flwr.common.logger import log
 
 SEED = 42
 random.seed(SEED)
@@ -75,7 +77,6 @@ class FlowerClient(NumPyClient):
         self.alpha_dir = alpha_dir
         self.batch_size = batch_size
 
-
     def fit(self, parameters, config):
         if config["modelo"] == "alvo":
             set_weights(self.net_alvo, parameters)
@@ -94,7 +95,7 @@ class FlowerClient(NumPyClient):
         elif config["modelo"] == "gen":
             if self.agg == "full":
                 # if config["round"] >= 3 and config["fids"]:
-                #     fids_client = calculate_fid(instance="client", model_gen=self.net_gen)
+                #     fids_client = calculate_faid(instance="client", model_gen=self.net_gen)
                 #     classes_train = np.where(np.array(fids_client) < config["fids"])[0]
                 #     self.trainloader, _ = load_data(partition_id=self.cid,
                 #                        num_partitions=self.num_partitions,

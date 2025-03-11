@@ -69,6 +69,7 @@ class CGANClient(NumPyClient):
         )
             figura = generate_images(net=self.net, device=self.device, round_number=config["server_round"]+10, client_id=self.cid)
             figura.savefig(f"mnist_CGAN_r{config['server_round']+10}_{self.local_epochs}e_{self.batch_size}b_100z_4c_{self.lr}lr_niid_01dir_cliente{self.cid}.png")
+            print(f"tipo: {type(get_weights(self.net)[0])}")
             return (
             get_weights(self.net),
             len(self.trainloader.dataset),

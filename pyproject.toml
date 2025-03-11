@@ -23,8 +23,8 @@ packages = ["."]
 publisher = "gustavoguaragna"
 
 [tool.flwr.app.components]
-serverapp = "Simulation.server_app:app"
-clientapp = "Simulation.client_app:app"
+serverapp = "Simulation.CGAN_torch.server_app:app"
+clientapp = "Simulation.CGAN_torch.client_app:app"
 
 [tool.flwr.app.config]
 num_rodadas = 4
@@ -61,5 +61,5 @@ default = "local-simulation"
 [tool.flwr.federations.local-simulation]
 options.num-supernodes = 4
 options.backend.client-resources.num-cpus = 1
-options.backend.client-resources.num-gpus = 0.25
+options.backend.client-resources.num-gpus = 0
 
