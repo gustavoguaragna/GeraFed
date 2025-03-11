@@ -25,6 +25,7 @@ import random
 from Simulation.task import Net, CGAN, set_weights
 import torch
 import numpy as np
+import json
 
 WARNING_MIN_AVAILABLE_CLIENTS_TOO_LOW = """
     Setting `min_available_clients` lower than `min_fit_clients` or
@@ -214,8 +215,6 @@ class GeraFed(Strategy):
             metade = len(clients) // 2
             conjunto_gen = sorted_clients[:metade]
             conjunto_alvo = sorted_clients[metade:]
-            print(f"conjunto_gen: {conjunto_gen}")
-            print(f"conjunto_alvo: {conjunto_alvo}")
             
             # Calcula FID
             if self.fid:
@@ -252,7 +251,7 @@ class GeraFed(Strategy):
 
         fit_instructions = []
         config_alvo = {"modelo": "alvo"}
-        config_gen = {"modelo": "gen", "round": server_round, "fids": np.array(fids)}
+        config_gen = {"modelo": "gen", "round": server_round, "fids": json.dumps(fids)}
         
         fit_ins_alvo = FitIns(parameters=self.parameters_alvo, config=config_alvo)
         for c in conjunto_alvo:
@@ -346,7 +345,6 @@ class GeraFed(Strategy):
             log(WARNING, "No fit_metrics_aggregation_fn provided")
 
 
-        print("ANTES DE SALVAR ALVO OU GEN")
         if self.model == "alvo" and parameters_aggregated_alvo is not None:
             # Salva o modelo após a agregação
             ndarrays = parameters_to_ndarrays(parameters_aggregated_alvo)

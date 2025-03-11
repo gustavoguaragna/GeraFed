@@ -23,6 +23,8 @@ from tqdm import tqdm
 from flwr.common import parameters_to_ndarrays
 import matplotlib.pyplot as plt
 
+os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
+
 SEED = 42
 random.seed(SEED)
 np.random.seed(SEED)
@@ -259,6 +261,7 @@ def load_data(partition_id: int,
 
     if filter_classes is not None:
         train_partition = train_partition.filter(lambda x: x["label"] in filter_classes)
+        print(f"selecionadas classes: {filter_classes}")
     
     pytorch_transforms = Compose([
         ToTensor(),
@@ -762,6 +765,7 @@ class GeneratedDataset(Dataset):
 
     def generate_data(self):
         gen_imgs = {}
+        self.generator.to(self.device)
         self.generator.eval()
         labels = {c: torch.tensor([c for i in range(self.num_samples)], device=self.device) for c in range(self.num_classes)}
         for c, label in labels.items():
@@ -845,7 +849,7 @@ def calculate_fid(instance: str, model_gen: CGAN, dims: int = 2048, param_model=
     if instance == "server":
         ndarrays = parameters_to_ndarrays(param_model)
         set_weights(model_gen, ndarrays)
-    generated_dataset = GeneratedDataset(generator=model_gen, num_samples=2050, latent_dim=100, num_classes=10, device="cpu")
+    generated_dataset = GeneratedDataset(generator=model_gen, num_samples=2050, latent_dim=100, num_classes=10, device=device)
     gen_dataset = generated_dataset.images
     for c in gen_dataset.keys():
         gen_dataset[c] = (gen_dataset[c] + 1) / 2 #intervalo entre 0 e 1
