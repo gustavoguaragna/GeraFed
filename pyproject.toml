@@ -46,6 +46,7 @@ alpha_dir = 0.1
 agg = "full" # 'disc', 'full'
 model = "both" # 'alvo', 'gen', 'both'
 fid = true 
+teste = true
 xgb_params.objective = "binary:logistic"
 xgb_params.eta = 0.1 # Learning rate
 xgb_params.max-depth = 8

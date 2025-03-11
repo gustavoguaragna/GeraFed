@@ -104,7 +104,8 @@ class GeraFed(Strategy):
         client_counter: Counter,
         agg: str = "full",
         model: str = "both",
-        fid: bool = False
+        fid: bool = False,
+        teste: bool = False
     ) -> None:
         super().__init__()
 
@@ -138,6 +139,7 @@ class GeraFed(Strategy):
         self.agg = agg
         self.model = model
         self.fid = fid
+        self.teste = teste
 
     def __repr__(self) -> str:
         """Compute a string representation of the strategy."""
@@ -227,7 +229,10 @@ class GeraFed(Strategy):
                 import torchvision.datasets as datasets
                 start_time = time.time()
                 cgan = CGAN()
-                fids = calculate_fid(instance="server", model_gen=cgan, param_model=self.parameters_gen, dims=64)
+                if not self.teste:
+                    fids = calculate_fid(instance="server", model_gen=cgan, param_model=self.parameters_gen)
+                else:
+                    fids = calculate_fid(instance="server", model_gen=cgan, param_model=self.parameters_gen, dims=64, samples=30)
                 end_time = time.time()
                 open("FID.txt", "a").write(f"Rodada {server_round}, FIDS: {fids}, Tempo: {end_time - start_time}\n")
                 

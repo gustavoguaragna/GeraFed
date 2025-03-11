@@ -51,7 +51,8 @@ class FlowerClient(NumPyClient):
                 num_partitions: int,
                 niid: bool,
                 alpha_dir: float,
-                batch_size: int):
+                batch_size: int,
+                teste: bool):
         self.cid=cid
         self.net_alvo = net_alvo
         self.net_gen = net_gen
@@ -75,6 +76,7 @@ class FlowerClient(NumPyClient):
         self.niid = niid
         self.alpha_dir = alpha_dir
         self.batch_size = batch_size
+        self.teste = teste
 
     def fit(self, parameters, config):
         if config["modelo"] == "alvo":
@@ -95,7 +97,10 @@ class FlowerClient(NumPyClient):
             if self.agg == "full":
                 if config["round"] >= 3 and config["fids"]:
                 #if True:
-                    fids_client = calculate_fid(instance="client", model_gen=self.net_gen, dims=64)
+                    if not self.teste:
+                        fids_client = calculate_fid(instance="client", model_gen=self.net_gen)
+                    else:
+                        fids_client = calculate_fid(instance="client", model_gen=self.net_gen, dims=64, samples=30)
                     classes_train = np.where(np.array(fids_client) < json.loads(config["fids"]))[0]
                     print(f"classes_train: {classes_train}")
                     if classes_train.any() and len(classes_train) < 10:
@@ -248,6 +253,7 @@ def client_fn(context: Context):
     niid = context.run_config["niid"]
     alpha_dir = context.run_config["alpha_dir"]
     batch_size = context.run_config["tam_batch"]
+    teste = context.run_config["teste"]
     # pretrained_cgan = CGAN()
     # pretrained_cgan.load_state_dict(torch.load("model_round_10_mnist.pt"))
     trainloader, valloader = load_data(partition_id=partition_id,
@@ -255,6 +261,7 @@ def client_fn(context: Context):
                                        niid=niid,
                                        alpha_dir=alpha_dir,
                                        batch_size=batch_size,
+                                       teste=teste
                                       )
     local_epochs_alvo = context.run_config["epocas_alvo"]
     local_epochs_gen = context.run_config["epocas_gen"]
@@ -282,7 +289,8 @@ def client_fn(context: Context):
                         num_partitions=num_partitions,
                         niid=niid,
                         alpha_dir=alpha_dir,
-                        batch_size=batch_size).to_client()
+                        batch_size=batch_size,
+                        teste=teste).to_client()
 
 
 # Flower ClientApp

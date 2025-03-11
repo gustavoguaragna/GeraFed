@@ -31,6 +31,7 @@ def server_fn(context: Context):
     agg = context.run_config["agg"]
     model = context.run_config["model"]
     fid = context.run_config["fid"]
+    teste = context.run_config["teste"]
 
     # Initialize model parameters
     ndarrays_alvo = get_weights(Net())
@@ -55,7 +56,8 @@ def server_fn(context: Context):
         client_counter=client_counter,
         agg=agg,
         model=model,
-        fid=fid
+        fid=fid,
+        teste=teste
     )
     config = ServerConfig(num_rounds=num_rounds)
 

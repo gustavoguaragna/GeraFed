@@ -223,7 +223,8 @@ def load_data(partition_id: int,
               batch_size: int, 
               cgan=None, 
               examples_per_class=5000,
-              filter_classes=None):
+              filter_classes=None,
+              teste: bool = False):
     
     """Carrega MNIST com splits de treino e teste separados. Se examples_per_class > 0, inclui dados gerados."""
    
@@ -258,6 +259,9 @@ def load_data(partition_id: int,
         train_partition = gen_img_part[partition_id]
     else:
         train_partition = fds.load_partition(partition_id, split="train")
+
+    if teste:
+        train_partition = train_partition[:6000]
 
     if filter_classes is not None:
         train_partition = train_partition.filter(lambda x: x["label"] in filter_classes)
@@ -841,7 +845,7 @@ def select_samples_per_class(dataset, num_samples):
 
     return class_samples
 
-def calculate_fid(instance: str, model_gen: CGAN, dims: int = 2048, param_model=None):
+def calculate_fid(instance: str, model_gen: CGAN, dims: int = 2048, param_model=None, samples: int = 1000):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[dims]
     model = InceptionV3([block_idx]).to(device)
@@ -849,7 +853,7 @@ def calculate_fid(instance: str, model_gen: CGAN, dims: int = 2048, param_model=
     if instance == "server":
         ndarrays = parameters_to_ndarrays(param_model)
         set_weights(model_gen, ndarrays)
-    generated_dataset = GeneratedDataset(generator=model_gen, num_samples=800, latent_dim=100, num_classes=10, device=device)
+    generated_dataset = GeneratedDataset(generator=model_gen, num_samples=samples, latent_dim=100, num_classes=10, device=device)
     gen_dataset = generated_dataset.images
     for c in gen_dataset.keys():
         gen_dataset[c] = (gen_dataset[c] + 1) / 2 #intervalo entre 0 e 1
@@ -900,7 +904,7 @@ def calculate_fid(instance: str, model_gen: CGAN, dims: int = 2048, param_model=
 
     transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor(), torchvision.transforms.Normalize((0.5,), (0.5,))])
     testset = torchvision.datasets.MNIST(root='./data', train=False, download=False, transform=transform)
-    img_reais = select_samples_per_class(testset, 800)
+    img_reais = select_samples_per_class(testset, num_samples=samples)
     dataloaders = [torch.utils.data.DataLoader(img_reais[c], batch_size=50, num_workers=num_workers, shuffle=False) for c in range(10)]
     mus_real = []
     sigmas_real = []
