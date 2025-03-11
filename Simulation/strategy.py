@@ -227,7 +227,7 @@ class GeraFed(Strategy):
                 import torchvision.datasets as datasets
                 start_time = time.time()
                 cgan = CGAN()
-                fids = calculate_fid(instance="server", model_gen=cgan, param_model=self.parameters_gen)
+                fids = calculate_fid(instance="server", model_gen=cgan, param_model=self.parameters_gen, dims=64)
                 end_time = time.time()
                 open("FID.txt", "a").write(f"Rodada {server_round}, FIDS: {fids}, Tempo: {end_time - start_time}\n")
                 

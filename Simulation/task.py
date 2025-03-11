@@ -849,7 +849,7 @@ def calculate_fid(instance: str, model_gen: CGAN, dims: int = 2048, param_model=
     if instance == "server":
         ndarrays = parameters_to_ndarrays(param_model)
         set_weights(model_gen, ndarrays)
-    generated_dataset = GeneratedDataset(generator=model_gen, num_samples=2050, latent_dim=100, num_classes=10, device=device)
+    generated_dataset = GeneratedDataset(generator=model_gen, num_samples=800, latent_dim=100, num_classes=10, device=device)
     gen_dataset = generated_dataset.images
     for c in gen_dataset.keys():
         gen_dataset[c] = (gen_dataset[c] + 1) / 2 #intervalo entre 0 e 1
@@ -870,7 +870,7 @@ def calculate_fid(instance: str, model_gen: CGAN, dims: int = 2048, param_model=
       print("DEVICE CUDA")
       num_workers = 0
 
-    dataloaders = [torch.utils.data.DataLoader(gen_dataset[c], batch_size=50, num_workers=num_workers, shuffle=False) for c in range(10)]
+    dataloaders = [torch.utils.data.DataLoader(gen_dataset[c], batch_size=64, num_workers=num_workers, shuffle=False) for c in range(10)]
 
     mus_gen = []
     sigmas_gen = []
