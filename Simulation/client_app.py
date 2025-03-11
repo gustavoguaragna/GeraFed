@@ -97,13 +97,17 @@ class FlowerClient(NumPyClient):
                 if True:
                     fids_client = calculate_fid(instance="client", model_gen=self.net_gen)
                     classes_train = np.where(np.array(fids_client) < json.loads(config["fids"]))[0]
-                    self.trainloader, _ = load_data(partition_id=self.cid,
-                                       num_partitions=self.num_partitions,
-                                       niid=self.niid,
-                                       alpha_dir=self.alpha_dir,
-                                       batch_size=self.batch_size,
-                                       filter_classes=classes_train
-                                      )
+                    print(f"classes_train: {classes_train}")
+                    if classes_train.any():
+                      self.trainloader, _ = load_data(partition_id=self.cid,
+                                        num_partitions=self.num_partitions,
+                                        niid=self.niid,
+                                        alpha_dir=self.alpha_dir,
+                                        batch_size=self.batch_size,
+                                        filter_classes=classes_train
+                                        )
+                    else:
+                      print(f"cliente {self.cid} nao vai treinar pois fids sao piores")
                 set_weights(self.net_gen, parameters)
                 #Gera imagens do modelo agregado do round anterior
                 figura = generate_plot(net=self.net_gen, device=self.device, round_number=config["round"])

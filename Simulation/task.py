@@ -863,6 +863,12 @@ def calculate_fid(instance: str, model_gen: CGAN, dims: int = 2048, param_model=
         # of CPUs).
         num_cpus = os.cpu_count()
     num_workers = min(8, num_cpus)
+    num_workers = 0
+    print(f"DEVICE: {device}")
+    print(f"DEVICE=cuda? {device=='cuda'}")
+    if device == "cuda":
+      print("DEVICE CUDA")
+      num_workers = 0
 
     dataloaders = [torch.utils.data.DataLoader(gen_dataset[c], batch_size=50, num_workers=num_workers, shuffle=False) for c in range(10)]
 
