@@ -261,7 +261,8 @@ def load_data(partition_id: int,
         train_partition = fds.load_partition(partition_id, split="train")
 
     if teste:
-        train_partition = train_partition[:6000]
+        num_samples = int(len(train_partition)/10)
+        train_partition = train_partition.select(range(num_samples))
 
     if filter_classes is not None:
         train_partition = train_partition.filter(lambda x: x["label"] in filter_classes)
