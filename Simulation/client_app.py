@@ -95,7 +95,7 @@ class FlowerClient(NumPyClient):
             )
         elif config["modelo"] == "gen":
             if self.agg == "full":
-                if config["round"] >= 3 and config["fids"]:
+                if config["round"] >= 3 and json.loads(config["fids"]):
                 #if True:
                     if not self.teste:
                         fids_client = calculate_fid(instance="client", model_gen=self.net_gen)
@@ -117,7 +117,7 @@ class FlowerClient(NumPyClient):
                 #Gera imagens do modelo agregado do round anterior
                 figura = generate_plot(net=self.net_gen, device=self.device, round_number=config["round"])
                 figura.savefig(f"mnist_CGAN_r{config['round']-1}_{self.local_epochs_gen}e_{self.batch_size}b_100z_4c_{self.lr_gen}lr_niid_01dir.png")
-                train_loss = train_gen(
+                train_gen(
                 net=self.net_gen,
                 trainloader=self.trainloader,
                 epochs=self.local_epochs_gen,
@@ -131,7 +131,7 @@ class FlowerClient(NumPyClient):
                 return (
                 get_weights(self.net_gen),
                 len(self.trainloader.dataset),
-                {"train_loss": train_loss, "modelo": "gen"},
+                {"modelo": "gen"},
             )
 
             elif self.agg == "disc":
@@ -169,7 +169,7 @@ class FlowerClient(NumPyClient):
                     figura = generate_plot(net=self.net_gen, device=self.device, round_number=config["round"])
                     figura.savefig(f"mnist_CGAN_r{config['round']-1}_{self.local_epochs_gen}e_{self.batch_size}b_100z_4c_{self.lr_gen}lr_niid_01dir.png")
 
-                train_loss = train_gen(
+                train_gen(
                     net=self.net_gen,
                     trainloader=self.trainloader,
                     epochs=self.local_epochs_gen,
@@ -190,12 +190,29 @@ class FlowerClient(NumPyClient):
                 torch.save(self.net_gen.state_dict(), model_path)
 
                 figura = generate_plot(net=self.net_gen, device=self.device, round_number=config["round"], client_id=self.cid)
-                figura.savefig(f"mnist_CGAN_r{config['round']}_{self.local_epochs_gen}e_{self.batch_size}b_100z_10c_{self.lr_gen}lr_niid_01dir_cliente{self.cid}.png")
+                figura.savefig(f"mnist_CGAN_r{config['round']}_{self.local_epochs_gen}e_{self.batch_size}b_100z_4c_{self.lr_gen}lr_niid_01dir_cliente{self.cid}.png")
                 return (
                     get_weights_gen(self.net_gen),
                     len(self.trainloader.dataset),
-                    {"train_loss": train_loss, "modelo": "gen"},
+                    {"modelo": "gen"},
                 )
+            elif self.agg == "f2a":
+                set_weights(self.net_gen, parameters)
+                train_gen(
+                net=self.net_gen,
+                trainloader=self.trainloader,
+                epochs=self.local_epochs_gen,
+                lr=self.lr_gen,
+                device=self.device,
+                dataset=self.dataset,
+                latent_dim=self.latent_dim,
+                f2a=True
+            )
+                return (
+                get_weights(self.net_gen),
+                len(self.trainloader.dataset),
+                {"modelo": "gen"},
+            )
 
     def evaluate(self, parameters, config):
         if self.model == "gen":
