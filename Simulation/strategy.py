@@ -142,6 +142,7 @@ class GeraFed(Strategy):
         self.fid = fid
         self.teste = teste
         self.lr_gen = lr_gen
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def __repr__(self) -> str:
         """Compute a string representation of the strategy."""
@@ -389,11 +390,12 @@ class GeraFed(Strategy):
                 lr=self.lr_gen,
                 device=self.device,
                 latent_dim=self.latent_dim,
+                batch_size=128
                 )
                 model_path = f"modelo_gen_round_{server_round}_mnist.pt"
                 torch.save(model.state_dict(), model_path)
                 print(f"Modelo gen salvo em {model_path}")
-                figura = generate_plot(net=model, device=self.device, round_number=server_round)
+                figura = generate_plot(net=model, device=self.device, round_number=server_round, server=True)
                 figura.savefig(f"mnist_CGAN_r{server_round}_{2}e_{128}b_100z_4c_{self.lr_gen}lr_niid_01dir_f2a.png")
 
                 ndarrays = get_weights(model)

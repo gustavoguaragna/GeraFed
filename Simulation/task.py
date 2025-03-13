@@ -1012,8 +1012,12 @@ def calculate_fid(instance: str, model_gen: CGAN, dims: int = 2048, param_model=
     
     return fids
 
-def generate_plot(net, device, round_number, client_id = None, examples_per_class = 5, classes = 10, latent_dim = 100):
+def generate_plot(net, device, round_number, client_id = None, examples_per_class: int=5, classes: int=10, latent_dim: int=100, server: bool=False):
     """Gera plot de imagens de cada classe"""
+    if server:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
 
     net.to(device) 
     net.eval()
