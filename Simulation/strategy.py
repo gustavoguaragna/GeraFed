@@ -245,6 +245,23 @@ class GeraFed(Strategy):
             print("MODEL GEN")
             conjunto_alvo = []
             conjunto_gen = clients
+            # Calcula FID
+            if self.fid:
+                from Simulation.task import InceptionV3, GeneratedDataset, ImagePathDataset, select_samples_per_class, calculate_fid
+                import os
+                from scipy import linalg
+                import time
+                from tqdm import tqdm
+                import torchvision.transforms as transforms
+                import torchvision.datasets as datasets
+                start_time = time.time()
+                cgan = CGAN()
+                if not self.teste:
+                    fids = calculate_fid(instance="server", model_gen=cgan, param_model=self.parameters_gen)
+                else:
+                    fids = calculate_fid(instance="server", model_gen=cgan, param_model=self.parameters_gen, dims=64, samples=30)
+                end_time = time.time()
+                open("FID.txt", "a").write(f"Rodada {server_round}, FIDS: {fids}, Tempo: {end_time - start_time}\n")
         else:
             print(f"Modelo {self.model} não reconhecido. O treinamento será feito para ambos os modelos.")
             sorted_clients = sorted(clients, key=lambda c: self.client_counter[c])

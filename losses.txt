@@ -240,3 +240,14 @@ Rodada 1, Perda: 3.1673974535267826, Acuracia: 0.1093
 Rodada 2, Perda: 3.8636658799116774, Acuracia: 0.2478
 Rodada 3, Perda: 2.434768627403648, Acuracia: 0.2734
 Rodada 4, Perda: 3.224221156660918, Acuracia: 0.3438
+Rodada 1, Perda: 2.905444766305814, Acuracia: 0.2194
+Rodada 2, Perda: 2.5108596519300135, Acuracia: 0.3306
+Rodada 3, Perda: 2.031782766056668, Acuracia: 0.537
+Rodada 4, Perda: 2.2354534492371188, Acuracia: 0.5053
+Rodada 1, Perda: 2.041827186657365, Acuracia: 0.48
+Rodada 2, Perda: 1.3790406721412756, Acuracia: 0.639
+Rodada 1, Perda: 3.8162011310553097, Acuracia: 0.4772
+Rodada 2, Perda: 0.3984941582011569, Acuracia: 0.8708
+Rodada 3, Perda: 0.4175370293432123, Acuracia: 0.9002
+Rodada 4, Perda: 0.3846823257056011, Acuracia: 0.9031
+Rodada 5, Perda: 0.13526668297245528, Acuracia: 0.9639
