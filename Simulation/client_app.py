@@ -98,7 +98,7 @@ class FlowerClient(NumPyClient):
                 if config["round"] >= 3 and json.loads(config["fids"]):
                 #if True:
                     if not self.teste:
-                        fids_client = calculate_fid(instance="client", model_gen=self.net_gen)
+                        fids_client = calculate_fid(instance="client", model_gen=self.net_gen, dims=192 , samples=300)
                     else:
                         fids_client = calculate_fid(instance="client", model_gen=self.net_gen, dims=64, samples=30)
                     classes_train = np.where(np.array(fids_client) < json.loads(config["fids"]))[0]
