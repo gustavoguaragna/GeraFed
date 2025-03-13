@@ -306,7 +306,7 @@ def train_alvo(net, trainloader, epochs, lr, device):
     avg_trainloss = running_loss / (len(trainloader) * epochs)
     return avg_trainloss
 
-def train_gen(net, trainloader, epochs, lr, device, dataset="mnist", latent_dim=100):
+def train_gen(net, trainloader, epochs, lr, device, dataset="mnist", latent_dim=100, f2a: bool = False):
     """Train the network on the training set."""
     if dataset == "mnist":
       imagem = "image"
@@ -328,36 +328,72 @@ def train_gen(net, trainloader, epochs, lr, device, dataset="mnist", latent_dim=
             real_ident = torch.full((batch_size, 1), 1., device=device)
             fake_ident = torch.full((batch_size, 1), 0., device=device)
 
-            # Train G
-            net.zero_grad()
-            z_noise = torch.randn(batch_size, latent_dim, device=device)
-            x_fake_labels = torch.randint(0, 10, (batch_size,), device=device)
-            x_fake = net(z_noise, x_fake_labels)
-            y_fake_g = net(x_fake, x_fake_labels)
-            g_loss = net.loss(y_fake_g, real_ident)
-            g_loss.backward()
-            optim_G.step()
+            if not f2a: 
+                # Train G
+                net.zero_grad()
+                z_noise = torch.randn(batch_size, latent_dim, device=device)
+                x_fake_labels = torch.randint(0, 10, (batch_size,), device=device)
+                x_fake = net(z_noise, x_fake_labels)
+                y_fake_g = net(x_fake, x_fake_labels)
+                g_loss = net.loss(y_fake_g, real_ident)
+                g_loss.backward()
+                optim_G.step()
 
-            # Train D
-            net.zero_grad()
-            y_real = net(images, labels)
-            d_real_loss = net.loss(y_real, real_ident)
-            y_fake_d = net(x_fake.detach(), x_fake_labels)
-            d_fake_loss = net.loss(y_fake_d, fake_ident)
-            d_loss = (d_real_loss + d_fake_loss) / 2
-            d_loss.backward()
-            optim_D.step()
+                # Train D
+                net.zero_grad()
+                y_real = net(images, labels)
+                d_real_loss = net.loss(y_real, real_ident)
+                y_fake_d = net(x_fake.detach(), x_fake_labels)
+                d_fake_loss = net.loss(y_fake_d, fake_ident)
+                d_loss = (d_real_loss + d_fake_loss) / 2
+                d_loss.backward()
+                optim_D.step()
 
-            g_losses.append(g_loss.item())
-            d_losses.append(d_loss.item())
+                g_losses.append(g_loss.item())
+                d_losses.append(d_loss.item())
 
-            if batch_idx % 100 == 0 and batch_idx > 0:
-                print('Epoch {} [{}/{}] loss_D_treino: {:.4f} loss_G_treino: {:.4f}'.format(
+                if batch_idx % 100 == 0 and batch_idx > 0:
+                    print('Epoch {} [{}/{}] loss_D_treino: {:.4f} loss_G_treino: {:.4f}'.format(
+                                epoch, batch_idx, len(trainloader),
+                                d_loss.mean().item(),
+                                g_loss.mean().item())) 
+
+            else:
+                # Train D
+                net.zero_grad()
+                y_real = net(images, labels)
+                d_real_loss = net.loss(y_real, real_ident)
+                z_noise = torch.randn(batch_size, latent_dim, device=device)
+                x_fake_labels = torch.randint(0, 10, (batch_size,), device=device)
+                x_fake = net(z_noise, x_fake_labels)
+                y_fake_d = net(x_fake.detach(), x_fake_labels)
+                d_fake_loss = net.loss(y_fake_d, fake_ident)
+                d_loss = (d_real_loss + d_fake_loss) / 2
+                d_loss.backward()
+                optim_D.step()
+
+                d_losses.append(d_loss.item())
+
+                if batch_idx % 100 == 0 and batch_idx > 0:
+                    print('Epoch {} [{}/{}] loss_D_treino: {:.4f}'.format(
                             epoch, batch_idx, len(trainloader),
-                            d_loss.mean().item(),
-                            g_loss.mean().item()))
-    return np.mean(g_losses)   
-
+                            d_loss.mean().item())) 
+                
+def train_G(net: CGAN, device: str, lr: float, epochs: int, batch_size: int, latent_dim: int):
+    net.to(device)  # move model to GPU if available
+    optim_G = torch.optim.Adam(net.generator.parameters(), lr=lr, betas=(0.5, 0.999))
+    
+    for epoch in range(epochs):
+        # Train G
+        net.zero_grad()
+        z_noise = torch.randn(batch_size, latent_dim, device=device)
+        x_fake_labels = torch.randint(0, 10, (batch_size,), device=device)
+        x_fake = net(z_noise, x_fake_labels)
+        y_fake_g = net(x_fake, x_fake_labels)
+        real_ident = torch.full((batch_size, 1), 1., device=device)
+        g_loss = net.loss(y_fake_g, real_ident)
+        g_loss.backward()
+        optim_G.step()
 
 def test(net, testloader, device, model):
     """Validate the model on the test set."""
@@ -976,8 +1012,12 @@ def calculate_fid(instance: str, model_gen: CGAN, dims: int = 2048, param_model=
     
     return fids
 
-def generate_plot(net, device, round_number, client_id = None, examples_per_class = 5, classes = 10, latent_dim = 100):
+def generate_plot(net, device, round_number, client_id = None, examples_per_class: int=5, classes: int=10, latent_dim: int=100, server: bool=False):
     """Gera plot de imagens de cada classe"""
+    if server:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
 
     net.to(device) 
     net.eval()
