@@ -21,7 +21,6 @@ from scipy import linalg
 import time
 from tqdm import tqdm
 from flwr.common import parameters_to_ndarrays
-import matplotlib.pyplot as plt
 
 os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
@@ -1017,6 +1016,8 @@ def generate_plot(net, device, round_number, client_id = None, examples_per_clas
     if server:
         import matplotlib
         matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    else:
         import matplotlib.pyplot as plt
 
     net.to(device) 
