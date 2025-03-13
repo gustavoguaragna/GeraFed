@@ -173,7 +173,4 @@ Rodada 19, Perda: 0.2363822644088524, Acuracia: 0.9629
 Rodada 20, Perda: 0.46414265231152246, Acuracia: 0.9116
 Rodada 21, Perda: 0.19512615187788215, Acuracia: 0.9683
 Rodada 22, Perda: 0.4936977131826103, Acuracia: 0.9255
-Rodada 1, Perda: 3.1673974535267826, Acuracia: 0.1093
-Rodada 2, Perda: 3.784465700198131, Acuracia: 0.2709
-Rodada 3, Perda: 2.2395623626223036, Acuracia: 0.2846
-Rodada 4, Perda: 3.278781306212115, Acuracia: 0.3383
+Treinando uma geradora niid 0.1 no servidor com 2 epocas e 5 epocas da discriminadora local nao deu certo. Usando 1 epoca em cada nao treinou tambem.
