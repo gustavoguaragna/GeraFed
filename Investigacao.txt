@@ -6,4 +6,5 @@ numeros passam a ser gerados com muita mais qualidade logo na rodada 5 do CGAN_t
 qualidade não é tao boa quanto. (obs: a nomeacao das imagens estao um pouco inconsistentes, as do CGAN_torch estao com round 
 + 10, enquanto as do gerafed estao dizendo niid, enquanto na verdade sao iid)
 
-Apenas comecei a investigar, vou comecar a primeira chamada da funcao load_data no client_fn
+vou rodar para ver se a divisao dos dados batem em cada abordagem, se for parecida nao deveria ser justificativa para a 
+diferença de treinamento.
