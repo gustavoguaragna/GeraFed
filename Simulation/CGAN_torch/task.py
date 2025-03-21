@@ -208,7 +208,9 @@ def load_data(partition_id: int,
     # Only initialize FederatedDataset once
     global fds
     if fds is None:
+        print("Carregamento dos Dados")
         if niid:
+            print("Dados não IID")
             partitioner = DirichletPartitioner(
             num_partitions=num_partitions,
             partition_by="label",
@@ -217,6 +219,7 @@ def load_data(partition_id: int,
             self_balancing=False
         )
         else:
+            print("Dados IID")
             partitioner = IidPartitioner(num_partitions=num_partitions)
 
         if dataset == "mnist":

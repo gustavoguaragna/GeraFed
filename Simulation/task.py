@@ -13,6 +13,16 @@ import numpy as np
 from torchvision.transforms.functional import to_pil_image
 from datasets import Dataset, Features, ClassLabel, Image
 import random
+import torchvision
+from torch.utils.model_zoo import load_url as load_state_dict_from_url
+from PIL import Image as IMG
+import os
+from scipy import linalg
+import time
+from tqdm import tqdm
+from flwr.common import parameters_to_ndarrays
+
+os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
 SEED = 42
 random.seed(SEED)
@@ -104,6 +114,9 @@ class CGAN(nn.Module):
                     nn.init.constant_(m.bias, 0.0)
 
     def forward(self, input, labels):
+        device = input.device  # Ensure all tensors are on the same device
+        labels = labels.to(device)  # Move labels to the same device as input
+        
         if input.dim() == 2:
             z = torch.cat((self.label_embedding(labels), input), -1)
             x = self.generator(z)
@@ -208,14 +221,18 @@ def load_data(partition_id: int,
               alpha_dir: float, 
               batch_size: int, 
               cgan=None, 
-              examples_per_class=5000):
+              examples_per_class=5000,
+              filter_classes=None,
+              teste: bool = False):
     
     """Carrega MNIST com splits de treino e teste separados. Se examples_per_class > 0, inclui dados gerados."""
    
     global fds
 
     if fds is None:
+        print("Carregamento dos Dados")
         if niid:
+            print("Dados não IID")
             partitioner = DirichletPartitioner(
                 num_partitions=num_partitions,
                 partition_by="label",
@@ -224,6 +241,7 @@ def load_data(partition_id: int,
                 self_balancing=False
             )
         else:
+            print("Dados IID")
             partitioner = IidPartitioner(num_partitions=num_partitions)
 
         fds = FederatedDataset(
@@ -238,12 +256,28 @@ def load_data(partition_id: int,
 
     if cgan is not None and examples_per_class > 0:
         if gen_img_part is None:
-            print("ENTRA GEN_IMG_PART NONE")
+            print("Gerando dados para treino")
             generated_images = generate_images(cgan, examples_per_class)
             gen_img_part = split_balanced(gen_dataset_hf=generated_images, num_clientes=num_partitions)
         train_partition = gen_img_part[partition_id]
     else:
         train_partition = fds.load_partition(partition_id, split="train")
+
+    from collections import Counter
+    labels = train_partition["label"]
+    class_distribution = Counter(labels)
+    print(f"CID {partition_id}: {class_distribution}")
+        
+
+    if teste:
+        print("reduzindo dataset para modo teste")
+        num_samples = int(len(train_partition)/10)
+        train_partition = train_partition.select(range(num_samples))
+
+    if filter_classes is not None:
+        print("filtrando classes no dataset")
+        train_partition = train_partition.filter(lambda x: x["label"] in filter_classes)
+        print(f"selecionadas classes: {filter_classes}")
     
     pytorch_transforms = Compose([
         ToTensor(),
@@ -283,7 +317,7 @@ def train_alvo(net, trainloader, epochs, lr, device):
     avg_trainloss = running_loss / (len(trainloader) * epochs)
     return avg_trainloss
 
-def train_gen(net, trainloader, epochs, lr, device, dataset="mnist", latent_dim=100):
+def train_gen(net, trainloader, epochs, lr, device, dataset="mnist", latent_dim=100, f2a: bool = False):
     """Train the network on the training set."""
     if dataset == "mnist":
       imagem = "image"
@@ -305,36 +339,72 @@ def train_gen(net, trainloader, epochs, lr, device, dataset="mnist", latent_dim=
             real_ident = torch.full((batch_size, 1), 1., device=device)
             fake_ident = torch.full((batch_size, 1), 0., device=device)
 
-            # Train G
-            net.zero_grad()
-            z_noise = torch.randn(batch_size, latent_dim, device=device)
-            x_fake_labels = torch.randint(0, 10, (batch_size,), device=device)
-            x_fake = net(z_noise, x_fake_labels)
-            y_fake_g = net(x_fake, x_fake_labels)
-            g_loss = net.loss(y_fake_g, real_ident)
-            g_loss.backward()
-            optim_G.step()
+            if not f2a: 
+                # Train G
+                net.zero_grad()
+                z_noise = torch.randn(batch_size, latent_dim, device=device)
+                x_fake_labels = torch.randint(0, 10, (batch_size,), device=device)
+                x_fake = net(z_noise, x_fake_labels)
+                y_fake_g = net(x_fake, x_fake_labels)
+                g_loss = net.loss(y_fake_g, real_ident)
+                g_loss.backward()
+                optim_G.step()
 
-            # Train D
-            net.zero_grad()
-            y_real = net(images, labels)
-            d_real_loss = net.loss(y_real, real_ident)
-            y_fake_d = net(x_fake.detach(), x_fake_labels)
-            d_fake_loss = net.loss(y_fake_d, fake_ident)
-            d_loss = (d_real_loss + d_fake_loss) / 2
-            d_loss.backward()
-            optim_D.step()
+                # Train D
+                net.zero_grad()
+                y_real = net(images, labels)
+                d_real_loss = net.loss(y_real, real_ident)
+                y_fake_d = net(x_fake.detach(), x_fake_labels)
+                d_fake_loss = net.loss(y_fake_d, fake_ident)
+                d_loss = (d_real_loss + d_fake_loss) / 2
+                d_loss.backward()
+                optim_D.step()
 
-            g_losses.append(g_loss.item())
-            d_losses.append(d_loss.item())
+                g_losses.append(g_loss.item())
+                d_losses.append(d_loss.item())
 
-            if batch_idx % 100 == 0 and batch_idx > 0:
-                print('Epoch {} [{}/{}] loss_D_treino: {:.4f} loss_G_treino: {:.4f}'.format(
+                if batch_idx % 100 == 0 and batch_idx > 0:
+                    print('Epoch {} [{}/{}] loss_D_treino: {:.4f} loss_G_treino: {:.4f}'.format(
+                                epoch, batch_idx, len(trainloader),
+                                d_loss.mean().item(),
+                                g_loss.mean().item())) 
+
+            else:
+                # Train D
+                net.zero_grad()
+                y_real = net(images, labels)
+                d_real_loss = net.loss(y_real, real_ident)
+                z_noise = torch.randn(batch_size, latent_dim, device=device)
+                x_fake_labels = torch.randint(0, 10, (batch_size,), device=device)
+                x_fake = net(z_noise, x_fake_labels)
+                y_fake_d = net(x_fake.detach(), x_fake_labels)
+                d_fake_loss = net.loss(y_fake_d, fake_ident)
+                d_loss = (d_real_loss + d_fake_loss) / 2
+                d_loss.backward()
+                optim_D.step()
+
+                d_losses.append(d_loss.item())
+
+                if batch_idx % 100 == 0 and batch_idx > 0:
+                    print('Epoch {} [{}/{}] loss_D_treino: {:.4f}'.format(
                             epoch, batch_idx, len(trainloader),
-                            d_loss.mean().item(),
-                            g_loss.mean().item()))
-    return np.mean(g_losses)   
-
+                            d_loss.mean().item())) 
+                
+def train_G(net: CGAN, device: str, lr: float, epochs: int, batch_size: int, latent_dim: int):
+    net.to(device)  # move model to GPU if available
+    optim_G = torch.optim.Adam(net.generator.parameters(), lr=lr, betas=(0.5, 0.999))
+    
+    for epoch in range(epochs):
+        # Train G
+        net.zero_grad()
+        z_noise = torch.randn(batch_size, latent_dim, device=device)
+        x_fake_labels = torch.randint(0, 10, (batch_size,), device=device)
+        x_fake = net(z_noise, x_fake_labels)
+        y_fake_g = net(x_fake, x_fake_labels)
+        real_ident = torch.full((batch_size, 1), 1., device=device)
+        g_loss = net.loss(y_fake_g, real_ident)
+        g_loss.backward()
+        optim_G.step()
 
 def test(net, testloader, device, model):
     """Validate the model on the test set."""
@@ -396,6 +466,612 @@ def get_weights_gen(net):
 
 
 def set_weights(net, parameters):
+    device = next(net.parameters()).device
     params_dict = zip(net.state_dict().keys(), parameters)
-    state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
+    state_dict = OrderedDict({k: torch.tensor(v).to(device) for k, v in params_dict})
     net.load_state_dict(state_dict, strict=True)
+
+# FID
+
+def _inception_v3(*args, **kwargs):
+    """Wraps `torchvision.models.inception_v3`"""
+    try:
+        version = tuple(map(int, torchvision.__version__.split(".")[:2]))
+    except ValueError:
+        # Just a caution against weird version strings
+        version = (0,)
+
+    # Skips default weight inititialization if supported by torchvision
+    # version. See https://github.com/mseitzer/pytorch-fid/issues/28.
+    if version >= (0, 6):
+        kwargs["init_weights"] = False
+
+    # Backwards compatibility: `weights` argument was handled by `pretrained`
+    # argument prior to version 0.13.
+    if version < (0, 13) and "weights" in kwargs:
+        if kwargs["weights"] == "DEFAULT":
+            kwargs["pretrained"] = True
+        elif kwargs["weights"] is None:
+            kwargs["pretrained"] = False
+        else:
+            raise ValueError(
+                "weights=={} not supported in torchvision {}".format(
+                    kwargs["weights"], torchvision.__version__
+                )
+            )
+        del kwargs["weights"]
+
+    return torchvision.models.inception_v3(*args, **kwargs)
+
+
+def fid_inception_v3():
+    """Build pretrained Inception model for FID computation
+
+    The Inception model for FID computation uses a different set of weights
+    and has a slightly different structure than torchvision's Inception.
+
+    This method first constructs torchvision's Inception and then patches the
+    necessary parts that are different in the FID Inception model.
+    """
+    inception = _inception_v3(num_classes=1008, aux_logits=False, weights=None)
+    inception.Mixed_5b = FIDInceptionA(192, pool_features=32)
+    inception.Mixed_5c = FIDInceptionA(256, pool_features=64)
+    inception.Mixed_5d = FIDInceptionA(288, pool_features=64)
+    inception.Mixed_6b = FIDInceptionC(768, channels_7x7=128)
+    inception.Mixed_6c = FIDInceptionC(768, channels_7x7=160)
+    inception.Mixed_6d = FIDInceptionC(768, channels_7x7=160)
+    inception.Mixed_6e = FIDInceptionC(768, channels_7x7=192)
+    inception.Mixed_7b = FIDInceptionE_1(1280)
+    inception.Mixed_7c = FIDInceptionE_2(2048)
+
+    state_dict = load_state_dict_from_url("https://github.com/mseitzer/pytorch-fid/releases/download/fid_weights/pt_inception-2015-12-05-6726825d.pth", progress=True)
+    inception.load_state_dict(state_dict)
+    return inception
+
+
+class FIDInceptionA(torchvision.models.inception.InceptionA):
+    """InceptionA block patched for FID computation"""
+
+    def __init__(self, in_channels, pool_features):
+        super(FIDInceptionA, self).__init__(in_channels, pool_features)
+
+    def forward(self, x):
+        branch1x1 = self.branch1x1(x)
+
+        branch5x5 = self.branch5x5_1(x)
+        branch5x5 = self.branch5x5_2(branch5x5)
+
+        branch3x3dbl = self.branch3x3dbl_1(x)
+        branch3x3dbl = self.branch3x3dbl_2(branch3x3dbl)
+        branch3x3dbl = self.branch3x3dbl_3(branch3x3dbl)
+
+        # Patch: Tensorflow's average pool does not use the padded zero's in
+        # its average calculation
+        branch_pool = F.avg_pool2d(
+            x, kernel_size=3, stride=1, padding=1, count_include_pad=False
+        )
+        branch_pool = self.branch_pool(branch_pool)
+
+        outputs = [branch1x1, branch5x5, branch3x3dbl, branch_pool]
+        return torch.cat(outputs, 1)
+
+
+class FIDInceptionC(torchvision.models.inception.InceptionC):
+    """InceptionC block patched for FID computation"""
+
+    def __init__(self, in_channels, channels_7x7):
+        super(FIDInceptionC, self).__init__(in_channels, channels_7x7)
+
+    def forward(self, x):
+        branch1x1 = self.branch1x1(x)
+
+        branch7x7 = self.branch7x7_1(x)
+        branch7x7 = self.branch7x7_2(branch7x7)
+        branch7x7 = self.branch7x7_3(branch7x7)
+
+        branch7x7dbl = self.branch7x7dbl_1(x)
+        branch7x7dbl = self.branch7x7dbl_2(branch7x7dbl)
+        branch7x7dbl = self.branch7x7dbl_3(branch7x7dbl)
+        branch7x7dbl = self.branch7x7dbl_4(branch7x7dbl)
+        branch7x7dbl = self.branch7x7dbl_5(branch7x7dbl)
+
+        # Patch: Tensorflow's average pool does not use the padded zero's in
+        # its average calculation
+        branch_pool = F.avg_pool2d(
+            x, kernel_size=3, stride=1, padding=1, count_include_pad=False
+        )
+        branch_pool = self.branch_pool(branch_pool)
+
+        outputs = [branch1x1, branch7x7, branch7x7dbl, branch_pool]
+        return torch.cat(outputs, 1)
+
+
+class FIDInceptionE_1(torchvision.models.inception.InceptionE):
+    """First InceptionE block patched for FID computation"""
+
+    def __init__(self, in_channels):
+        super(FIDInceptionE_1, self).__init__(in_channels)
+
+    def forward(self, x):
+        branch1x1 = self.branch1x1(x)
+
+        branch3x3 = self.branch3x3_1(x)
+        branch3x3 = [
+            self.branch3x3_2a(branch3x3),
+            self.branch3x3_2b(branch3x3),
+        ]
+        branch3x3 = torch.cat(branch3x3, 1)
+
+        branch3x3dbl = self.branch3x3dbl_1(x)
+        branch3x3dbl = self.branch3x3dbl_2(branch3x3dbl)
+        branch3x3dbl = [
+            self.branch3x3dbl_3a(branch3x3dbl),
+            self.branch3x3dbl_3b(branch3x3dbl),
+        ]
+        branch3x3dbl = torch.cat(branch3x3dbl, 1)
+
+        # Patch: Tensorflow's average pool does not use the padded zero's in
+        # its average calculation
+        branch_pool = F.avg_pool2d(
+            x, kernel_size=3, stride=1, padding=1, count_include_pad=False
+        )
+        branch_pool = self.branch_pool(branch_pool)
+
+        outputs = [branch1x1, branch3x3, branch3x3dbl, branch_pool]
+        return torch.cat(outputs, 1)
+
+
+class FIDInceptionE_2(torchvision.models.inception.InceptionE):
+    """Second InceptionE block patched for FID computation"""
+
+    def __init__(self, in_channels):
+        super(FIDInceptionE_2, self).__init__(in_channels)
+
+    def forward(self, x):
+        branch1x1 = self.branch1x1(x)
+
+        branch3x3 = self.branch3x3_1(x)
+        branch3x3 = [
+            self.branch3x3_2a(branch3x3),
+            self.branch3x3_2b(branch3x3),
+        ]
+        branch3x3 = torch.cat(branch3x3, 1)
+
+        branch3x3dbl = self.branch3x3dbl_1(x)
+        branch3x3dbl = self.branch3x3dbl_2(branch3x3dbl)
+        branch3x3dbl = [
+            self.branch3x3dbl_3a(branch3x3dbl),
+            self.branch3x3dbl_3b(branch3x3dbl),
+        ]
+        branch3x3dbl = torch.cat(branch3x3dbl, 1)
+
+        # Patch: The FID Inception model uses max pooling instead of average
+        # pooling. This is likely an error in this specific Inception
+        # implementation, as other Inception models use average pooling here
+        # (which matches the description in the paper).
+        branch_pool = F.max_pool2d(x, kernel_size=3, stride=1, padding=1)
+        branch_pool = self.branch_pool(branch_pool)
+
+        outputs = [branch1x1, branch3x3, branch3x3dbl, branch_pool]
+        return torch.cat(outputs, 1)
+
+
+class InceptionV3(nn.Module):
+    """Pretrained InceptionV3 network returning feature maps"""
+
+    # Index of default block of inception to return,
+    # corresponds to output of final average pooling
+    DEFAULT_BLOCK_INDEX = 3
+
+    # Maps feature dimensionality to their output blocks indices
+    BLOCK_INDEX_BY_DIM = {
+        64: 0,  # First max pooling features
+        192: 1,  # Second max pooling featurs
+        768: 2,  # Pre-aux classifier features
+        2048: 3,  # Final average pooling features
+    }
+
+    def __init__(
+        self,
+        output_blocks=(DEFAULT_BLOCK_INDEX,),
+        resize_input=True,
+        normalize_input=True,
+        requires_grad=False,
+        use_fid_inception=True,
+    ):
+        """Build pretrained InceptionV3
+
+        Parameters
+        ----------
+        output_blocks : list of int
+            Indices of blocks to return features of. Possible values are:
+                - 0: corresponds to output of first max pooling
+                - 1: corresponds to output of second max pooling
+                - 2: corresponds to output which is fed to aux classifier
+                - 3: corresponds to output of final average pooling
+        resize_input : bool
+            If true, bilinearly resizes input to width and height 299 before
+            feeding input to model. As the network without fully connected
+            layers is fully convolutional, it should be able to handle inputs
+            of arbitrary size, so resizing might not be strictly needed
+        normalize_input : bool
+            If true, scales the input from range (0, 1) to the range the
+            pretrained Inception network expects, namely (-1, 1)
+        requires_grad : bool
+            If true, parameters of the model require gradients. Possibly useful
+            for finetuning the network
+        use_fid_inception : bool
+            If true, uses the pretrained Inception model used in Tensorflow's
+            FID implementation. If false, uses the pretrained Inception model
+            available in torchvision. The FID Inception model has different
+            weights and a slightly different structure from torchvision's
+            Inception model. If you want to compute FID scores, you are
+            strongly advised to set this parameter to true to get comparable
+            results.
+        """
+        super(InceptionV3, self).__init__()
+
+        self.resize_input = resize_input
+        self.normalize_input = normalize_input
+        self.output_blocks = sorted(output_blocks)
+        self.last_needed_block = max(output_blocks)
+
+        assert self.last_needed_block <= 3, "Last possible output block index is 3"
+
+        self.blocks = nn.ModuleList()
+
+        if use_fid_inception:
+            inception = fid_inception_v3()
+        else:
+            inception = _inception_v3(weights="DEFAULT")
+
+        # Block 0: input to maxpool1
+        block0 = [
+            inception.Conv2d_1a_3x3,
+            inception.Conv2d_2a_3x3,
+            inception.Conv2d_2b_3x3,
+            nn.MaxPool2d(kernel_size=3, stride=2),
+        ]
+        self.blocks.append(nn.Sequential(*block0))
+
+        # Block 1: maxpool1 to maxpool2
+        if self.last_needed_block >= 1:
+            block1 = [
+                inception.Conv2d_3b_1x1,
+                inception.Conv2d_4a_3x3,
+                nn.MaxPool2d(kernel_size=3, stride=2),
+            ]
+            self.blocks.append(nn.Sequential(*block1))
+
+        # Block 2: maxpool2 to aux classifier
+        if self.last_needed_block >= 2:
+            block2 = [
+                inception.Mixed_5b,
+                inception.Mixed_5c,
+                inception.Mixed_5d,
+                inception.Mixed_6a,
+                inception.Mixed_6b,
+                inception.Mixed_6c,
+                inception.Mixed_6d,
+                inception.Mixed_6e,
+            ]
+            self.blocks.append(nn.Sequential(*block2))
+
+        # Block 3: aux classifier to final avgpool
+        if self.last_needed_block >= 3:
+            block3 = [
+                inception.Mixed_7a,
+                inception.Mixed_7b,
+                inception.Mixed_7c,
+                nn.AdaptiveAvgPool2d(output_size=(1, 1)),
+            ]
+            self.blocks.append(nn.Sequential(*block3))
+
+        for param in self.parameters():
+            param.requires_grad = requires_grad
+
+    def forward(self, inp):
+        """Get Inception feature maps
+
+        Parameters
+        ----------
+        inp : torch.autograd.Variable
+            Input tensor of shape Bx3xHxW. Values are expected to be in
+            range (0, 1)
+
+        Returns
+        -------
+        List of torch.autograd.Variable, corresponding to the selected output
+        block, sorted ascending by index
+        """
+        outp = []
+        x = inp
+
+        if self.resize_input:
+            x = F.interpolate(x, size=(299, 299), mode="bilinear", align_corners=False)
+
+        if self.normalize_input:
+            x = 2 * x - 1  # Scale from range (0, 1) to range (-1, 1)
+
+        for idx, block in enumerate(self.blocks):
+            x = block(x)
+            if idx in self.output_blocks:
+                outp.append(x)
+
+            if idx == self.last_needed_block:
+                break
+
+        return outp
+
+class GeneratedDataset(Dataset):
+    def __init__(self, generator, num_samples, latent_dim, num_classes, device):
+        self.generator = generator
+        self.num_samples = num_samples
+        self.latent_dim = latent_dim
+        self.num_classes = num_classes
+        self.device = device
+        self.model = type(self.generator).__name__
+        self.images = self.generate_data()
+        self.classes = [i for i in range(self.num_classes)]
+
+
+    def generate_data(self):
+        gen_imgs = {}
+        self.generator.to(self.device)
+        self.generator.eval()
+        labels = {c: torch.tensor([c for i in range(self.num_samples)], device=self.device) for c in range(self.num_classes)}
+        for c, label in labels.items():
+          if self.model == 'Generator':
+              labels_one_hot = F.one_hot(label, self.num_classes).float().to(self.device) #
+          z = torch.randn(self.num_samples, self.latent_dim, device=self.device)
+          with torch.no_grad():
+              if self.model == 'Generator':
+                  gen_imgs_class = self.generator(torch.cat([z, labels_one_hot], dim=1))
+              elif self.model == 'CGAN':
+                  gen_imgs_class = self.generator(z, label)
+          gen_imgs[c] = gen_imgs_class
+
+        return gen_imgs
+
+    def __len__(self):
+        return self.num_samples * self.num_classes
+
+    def __getitem__(self, idx):
+        # Mapear o índice global para (classe, índice interno)
+        class_idx = idx // self.num_samples
+        sample_idx = idx % self.num_samples
+        # Retorna apenas a imagem (sem o rótulo)
+        return self.images[class_idx][sample_idx]
+    
+class ImagePathDataset(torch.utils.data.Dataset):
+    def __init__(self, files, transforms=None):
+        self.files = files
+        self.transforms = transforms
+
+    def __len__(self):
+        return len(self.files)
+
+    def __getitem__(self, i):
+        path = self.files[i]
+        img = IMG.open(path).convert("RGB")
+        if self.transforms is not None:
+            img = self.transforms(img)
+        return img
+    
+def select_samples_per_class(dataset, num_samples):
+    """
+    Selects a specified number of samples per class from the dataset and returns them as tensors.
+
+    Parameters:
+    dataset (torch.utils.data.Dataset): The dataset to select samples from.
+    num_samples (int): The number of samples to select per class.
+
+    Returns:
+    dict: A dictionary where each key corresponds to a class and the value is a tensor of shape [num_samples, 1, 28, 28].
+    """
+    class_samples = {i: [] for i in range(len(dataset.classes))}
+    class_counts = {i: 0 for i in range(len(dataset.classes))}
+
+    for img, label in dataset:
+        if class_counts[label] < num_samples:
+            class_samples[label].append(img)
+            class_counts[label] += 1
+        if all(count >= num_samples for count in class_counts.values()):
+            break
+    else:
+        print("Warning: Not all classes have the requested number of samples.")
+
+    # Convert lists of tensors to a single tensor per class
+    for label in class_samples:
+        if class_samples[label]:  # Check if the list is not empty
+            class_samples[label] = torch.stack(class_samples[label], dim=0)
+            class_samples[label] = (class_samples[label] + 1) / 2
+            class_samples[label] = class_samples[label].repeat(1, 3, 1, 1)
+        else:
+            # Handle empty classes if necessary; here we leave an empty tensor
+            class_samples[label] = torch.Tensor()
+
+    return class_samples
+
+def calculate_fid(instance: str, model_gen: CGAN, dims: int = 2048, param_model=None, samples: int = 1000):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[dims]
+    model = InceptionV3([block_idx]).to(device)
+    model.eval()
+    if instance == "server":
+        ndarrays = parameters_to_ndarrays(param_model)
+        set_weights(model_gen, ndarrays)
+    generated_dataset = GeneratedDataset(generator=model_gen, num_samples=samples, latent_dim=100, num_classes=10, device=device)
+    gen_dataset = generated_dataset.images
+    for c in gen_dataset.keys():
+        gen_dataset[c] = (gen_dataset[c] + 1) / 2 #intervalo entre 0 e 1
+        gen_dataset[c] = gen_dataset[c].repeat(1, 3, 1, 1) # 3 canais como na rede inception
+
+    try:
+        num_cpus = len(os.sched_getaffinity(0))
+    except AttributeError:
+        # os.sched_getaffinity is not available under Windows, use
+        # os.cpu_count instead (which may not return the *available* number
+        # of CPUs).
+        num_cpus = os.cpu_count()
+    num_workers = min(8, num_cpus)
+    num_workers = 0
+    print(f"DEVICE: {device}")
+    print(f"DEVICE=cuda? {device=='cuda'}")
+    if device == "cuda":
+      print("DEVICE CUDA")
+      num_workers = 0
+
+    dataloaders = [torch.utils.data.DataLoader(gen_dataset[c], batch_size=64, num_workers=num_workers, shuffle=False) for c in range(10)]
+
+    mus_gen = []
+    sigmas_gen = []
+
+    for c in range(10):
+        pred_arr = np.empty((len(gen_dataset[c]), dims))
+        start_idx = 0
+        for batch in tqdm(dataloaders[c]):
+                batch = batch.to(device)
+
+                with torch.no_grad():
+                    pred = model(batch)[0]
+
+                # If model output is not scalar, apply global spatial average pooling.
+                # This happens if you choose a dimensionality not equal 2048.
+                if pred.size(2) != 1 or pred.size(3) != 1:
+                    pred = torch.nn.functional.adaptive_avg_pool2d(pred, output_size=(1, 1))
+
+                pred = pred.squeeze(3).squeeze(2).cpu().numpy()
+
+                pred_arr[start_idx : start_idx + pred.shape[0]] = pred
+
+                start_idx += pred.shape[0]
+
+        mus_gen.append(np.mean(pred_arr, axis=0))
+        sigmas_gen.append(np.cov(pred_arr, rowvar=False))
+
+    transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor(), torchvision.transforms.Normalize((0.5,), (0.5,))])
+    testset = torchvision.datasets.MNIST(root='./data', train=False, download=False, transform=transform)
+    img_reais = select_samples_per_class(testset, num_samples=samples)
+    dataloaders = [torch.utils.data.DataLoader(img_reais[c], batch_size=50, num_workers=num_workers, shuffle=False) for c in range(10)]
+    mus_real = []
+    sigmas_real = []
+    
+    for c in range(10):
+        model = InceptionV3([block_idx]).to(device)
+        model.eval()
+        pred_arr = np.empty((len(img_reais[c]), dims))
+        start_idx = 0
+        for batch in tqdm(dataloaders[c]):
+                batch = batch.to(device)
+
+                with torch.no_grad():
+                    pred = model(batch)[0]
+
+                # If model output is not scalar, apply global spatial average pooling.
+                # This happens if you choose a dimensionality not equal 2048.
+                if pred.size(2) != 1 or pred.size(3) != 1:
+                    pred = torch.nn.functional.adaptive_avg_pool2d(pred, output_size=(1, 1))
+
+                pred = pred.squeeze(3).squeeze(2).cpu().numpy()
+
+                pred_arr[start_idx : start_idx + pred.shape[0]] = pred
+
+                start_idx += pred.shape[0]  # Corrected the operator to +=
+        mus_real.append(np.mean(pred_arr, axis=0))
+        sigmas_real.append(np.cov(pred_arr, rowvar=False))
+
+    mus_gen = [np.atleast_1d(mu_gen) for mu_gen in mus_gen]
+    mus_real = [np.atleast_1d(mu_real) for mu_real in mus_real]
+
+    sigmas_gen = [np.atleast_2d(sigma_gen) for sigma_gen in sigmas_gen]
+    sigmas_real = [np.atleast_2d(sigma_real) for sigma_real in sigmas_real]
+
+    for mu_gen, mu_real, sigma_gen, sigma_real in zip(mus_gen, mus_real, sigmas_gen, sigmas_real):
+        assert (
+            mu_gen.shape == mu_real.shape
+        ), "Training and test mean vectors have different lengths"
+        assert (
+            sigma_gen.shape == sigma_real.shape
+        ), "Training and test covariances have different dimensions"
+
+    diffs = [mu_gen - mu_real for mu_gen, mu_real in zip(mus_gen, mus_real)]
+
+    # Product might be almost singular
+    covmeans = [linalg.sqrtm(sigmas_gen.dot(sigmas_real), disp=False)[0] for sigmas_gen, sigmas_real in zip(sigmas_gen, sigmas_real)]
+    for covmean, sigma_gen, sigma_real in zip(covmeans, sigmas_gen, sigmas_real):
+        if not np.isfinite(covmean).all():
+            msg = (
+                "fid calculation produces singular product; "
+                "adding %s to diagonal of cov estimates"
+            ) % 1e-6
+            print(msg)
+            offset = np.eye(sigma_gen.shape[0]) * 1e-6
+            covmean = linalg.sqrtm((sigma_gen + offset).dot(sigma_real + offset))
+
+    # Numerical error might give slight imaginary component
+    for i, covmean in enumerate(covmeans):
+        if np.iscomplexobj(covmean):
+            if not np.allclose(np.diagonal(covmean).imag, 0, atol=1e-3):
+                m = np.max(np.abs(covmean.imag))
+                raise ValueError("Imaginary component {}".format(m))
+            covmeans[i] = covmean.real
+
+    tr_covmeans = [np.trace(covmean) for covmean in covmeans]
+
+    fids = [diff.dot(diff) + np.trace(sigma_gen) + np.trace(sigma_real) - 2 * tr_covmean for diff, sigma_gen, sigma_real, tr_covmean in zip(diffs, sigmas_gen, sigmas_real, tr_covmeans)]
+    
+    return fids
+
+def generate_plot(net, device, round_number, client_id = None, examples_per_class: int=5, classes: int=10, latent_dim: int=100, server: bool=False):
+    """Gera plot de imagens de cada classe"""
+    if server:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    else:
+        import matplotlib.pyplot as plt
+
+    net.to(device) 
+    net.eval()
+    batch_size = examples_per_class * classes
+
+    latent_vectors = torch.randn(batch_size, latent_dim, device=device)
+    labels = torch.tensor([i for i in range(classes) for _ in range(examples_per_class)], device=device)
+
+    with torch.no_grad():
+        generated_images = net(latent_vectors, labels).cpu()
+
+    # Criar uma figura com 10 linhas e 5 colunas de subplots
+    fig, axes = plt.subplots(classes, examples_per_class, figsize=(5, 9))
+
+    # Adiciona título no topo da figura
+    if client_id:
+        fig.text(0.5, 0.98, f"Round: {round_number} | Client: {client_id}", ha="center", fontsize=12)
+    else:
+        fig.text(0.5, 0.98, f"Round: {round_number-1}", ha="center", fontsize=12)
+
+    # Exibir as imagens nos subplots
+    for i, ax in enumerate(axes.flat):
+        ax.imshow(generated_images[i, 0, :, :], cmap='gray')
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+    # Ajustar o layout antes de calcular as posições
+    plt.tight_layout(rect=[0.05, 0, 1, 0.96])
+
+    # Reduzir espaço entre colunas
+    # plt.subplots_adjust(wspace=0.05)
+
+    # Adicionar os rótulos das classes corretamente alinhados
+    fig.canvas.draw()  # Atualiza a renderização para obter posições corretas
+    for row in range(classes):
+        # Obter posição do subplot em coordenadas da figura
+        bbox = axes[row, 0].get_window_extent(fig.canvas.get_renderer())
+        pos = fig.transFigure.inverted().transform([(bbox.x0, bbox.y0), (bbox.x1, bbox.y1)])
+        center_y = (pos[0, 1] + pos[1, 1]) / 2  # Centro exato da linha
+
+        # Adicionar o rótulo
+        fig.text(0.04, center_y, str(row), va='center', fontsize=12, color='black')
+    
+    return fig

@@ -1,0 +1,10 @@
+Esse documento tem como objetivo investigar situacoes.
+
+A atual situacao que busco investiga é porque o treinamento da gan usando CGAN_torch é bem superior ao usando o padrao gerafed 
+do Simulation. Isso pode ser visto nas Imagens treinadas por cada chamada, salvo no LOQ. Pela imagens, podemos ver que os 
+numeros passam a ser gerados com muita mais qualidade logo na rodada 5 do CGAN_torch, enquanto na rodada 50 do gerafed, a 
+qualidade não é tao boa quanto. (obs: a nomeacao das imagens estao um pouco inconsistentes, as do CGAN_torch estao com round 
++ 10, enquanto as do gerafed estao dizendo niid, enquanto na verdade sao iid)
+
+vou rodar para ver se a divisao dos dados batem em cada abordagem, se for parecida nao deveria ser justificativa para a 
+diferença de treinamento.

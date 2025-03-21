@@ -4,10 +4,22 @@ import torch
 from collections import OrderedDict
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import Context, ParametersRecord, array_from_numpy
-from Simulation.task import Net, CGAN, get_weights, get_weights_gen, load_data, set_weights, test, train_alvo, train_gen
-
+from Simulation.task import (
+    Net, 
+    CGAN, 
+    get_weights, 
+    get_weights_gen, 
+    load_data, 
+    set_weights, 
+    test, 
+    train_alvo, 
+    train_gen, 
+    calculate_fid, 
+    generate_plot
+)
 import random
 import numpy as np
+import json
 
 SEED = 42
 random.seed(SEED)
@@ -35,7 +47,12 @@ class FlowerClient(NumPyClient):
                 latent_dim: int, 
                 context: Context,
                 agg: str,
-                model: str):
+                model: str,
+                num_partitions: int,
+                niid: bool,
+                alpha_dir: float,
+                batch_size: int,
+                teste: bool):
         self.cid=cid
         self.net_alvo = net_alvo
         self.net_gen = net_gen
@@ -55,7 +72,11 @@ class FlowerClient(NumPyClient):
         ) 
         self.agg = agg
         self.model = model
-
+        self.num_partitions = num_partitions
+        self.niid = niid
+        self.alpha_dir = alpha_dir
+        self.batch_size = batch_size
+        self.teste = teste
 
     def fit(self, parameters, config):
         if config["modelo"] == "alvo":
@@ -74,8 +95,29 @@ class FlowerClient(NumPyClient):
             )
         elif config["modelo"] == "gen":
             if self.agg == "full":
+                if config["round"] >= 3 and json.loads(config["fids"]):
+                #if True:
+                    if not self.teste:
+                        fids_client = calculate_fid(instance="client", model_gen=self.net_gen, dims=192 , samples=300)
+                    else:
+                        fids_client = calculate_fid(instance="client", model_gen=self.net_gen, dims=64, samples=30)
+                    classes_train = np.where(np.array(fids_client) < json.loads(config["fids"]))[0]
+                    print(f"classes_train: {classes_train}")
+                    if classes_train.any() and len(classes_train) < 10:
+                      self.trainloader, _ = load_data(partition_id=self.cid,
+                                        num_partitions=self.num_partitions,
+                                        niid=self.niid,
+                                        alpha_dir=self.alpha_dir,
+                                        batch_size=self.batch_size,
+                                        filter_classes=classes_train
+                                        )
+                    else:
+                      print(f"cliente {self.cid} nao vai treinar pois fids sao piores")
                 set_weights(self.net_gen, parameters)
-                train_loss = train_gen(
+                #Gera imagens do modelo agregado do round anterior
+                figura = generate_plot(net=self.net_gen, device=self.device, round_number=config["round"])
+                figura.savefig(f"mnist_CGAN_r{config['round']-1}_{self.local_epochs_gen}e_{self.batch_size}b_100z_4c_{self.lr_gen}lr_{'niid' if self.niid else 'iid'}_{self.alpha_dir if self.niid else ''}.png")
+                train_gen(
                 net=self.net_gen,
                 trainloader=self.trainloader,
                 epochs=self.local_epochs_gen,
@@ -84,10 +126,12 @@ class FlowerClient(NumPyClient):
                 dataset=self.dataset,
                 latent_dim=self.latent_dim
             )
+                figura = generate_plot(net=self.net_gen, device=self.device, round_number=config["round"]+10, client_id=self.cid)
+                figura.savefig(f"mnist_CGAN_r{config['round']}_{self.local_epochs_gen}e_{self.batch_size}b_100z_4c_{self.lr_gen}lr_{'niid' if self.niid else 'iid'}_{self.alpha_dir if self.niid else ''}_cliente{self.cid}.png")
                 return (
                 get_weights(self.net_gen),
                 len(self.trainloader.dataset),
-                {"train_loss": train_loss, "modelo": "gen"},
+                {"modelo": "gen"},
             )
 
             elif self.agg == "disc":
@@ -122,7 +166,10 @@ class FlowerClient(NumPyClient):
 
                     self.net_gen.load_state_dict(new_state_dict)
 
-                train_loss = train_gen(
+                    figura = generate_plot(net=self.net_gen, device=self.device, round_number=config["round"])
+                    figura.savefig(f"mnist_CGAN_r{config['round']-1}_{self.local_epochs_gen}e_{self.batch_size}b_100z_4c_{self.lr_gen}lr_{'niid' if self.niid else 'iid'}_{self.alpha_dir if self.niid else ''}.png")
+
+                train_gen(
                     net=self.net_gen,
                     trainloader=self.trainloader,
                     epochs=self.local_epochs_gen,
@@ -141,11 +188,31 @@ class FlowerClient(NumPyClient):
 
                 model_path = f"modelo_gen_round_{config['round']}_client_{self.cid}.pt"
                 torch.save(self.net_gen.state_dict(), model_path)
+
+                figura = generate_plot(net=self.net_gen, device=self.device, round_number=config["round"], client_id=self.cid)
+                figura.savefig(f"mnist_CGAN_r{config['round']}_{self.local_epochs_gen}e_{self.batch_size}b_100z_4c_{self.lr_gen}lr_{'niid' if self.niid else 'iid'}_{self.alpha_dir if self.niid else ''}_cliente{self.cid}.png")
                 return (
                     get_weights_gen(self.net_gen),
                     len(self.trainloader.dataset),
-                    {"train_loss": train_loss, "modelo": "gen"},
+                    {"modelo": "gen"},
                 )
+            elif self.agg == "f2a":
+                set_weights(self.net_gen, parameters)
+                train_gen(
+                net=self.net_gen,
+                trainloader=self.trainloader,
+                epochs=self.local_epochs_gen,
+                lr=self.lr_gen,
+                device=self.device,
+                dataset=self.dataset,
+                latent_dim=self.latent_dim,
+                f2a=True
+            )
+                return (
+                get_weights(self.net_gen),
+                len(self.trainloader.dataset),
+                {"modelo": "gen"},
+            )
 
     def evaluate(self, parameters, config):
         if self.model == "gen":
@@ -203,14 +270,15 @@ def client_fn(context: Context):
     niid = context.run_config["niid"]
     alpha_dir = context.run_config["alpha_dir"]
     batch_size = context.run_config["tam_batch"]
-    pretrained_cgan = CGAN()
-    pretrained_cgan.load_state_dict(torch.load("Imagens Testes/FULL_FEDAVG/epochs10/model_round_10_mnist.pt"))
+    teste = context.run_config["teste"]
+    # pretrained_cgan = CGAN()
+    # pretrained_cgan.load_state_dict(torch.load("model_round_10_mnist.pt"))
     trainloader, valloader = load_data(partition_id=partition_id,
                                        num_partitions=num_partitions,
                                        niid=niid,
                                        alpha_dir=alpha_dir,
                                        batch_size=batch_size,
-                                       cgan=pretrained_cgan
+                                       teste=teste
                                       )
     local_epochs_alvo = context.run_config["epocas_alvo"]
     local_epochs_gen = context.run_config["epocas_gen"]
@@ -234,7 +302,12 @@ def client_fn(context: Context):
                         latent_dim=latent_dim,
                         context=context,
                         agg=agg,
-                        model=model).to_client()
+                        model=model,
+                        num_partitions=num_partitions,
+                        niid=niid,
+                        alpha_dir=alpha_dir,
+                        batch_size=batch_size,
+                        teste=teste).to_client()
 
 
 # Flower ClientApp

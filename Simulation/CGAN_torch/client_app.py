@@ -57,7 +57,7 @@ class CGANClient(NumPyClient):
             # Gera imagens do modelo agregado do round anterior
             if self.cid == 0:
                 figura = generate_images(net=self.net, device=self.device, round_number=config["server_round"])
-                figura.savefig(f"mnist_CGAN_r{config['server_round']-1}_{self.local_epochs}e_{self.batch_size}b_100z_10c_{self.lr}lr_niid_01dir.png")
+                figura.savefig(f"mnist_CGAN_r{config['server_round']-1+10}_{self.local_epochs}e_{self.batch_size}b_100z_4c_{self.lr}lr_niid_01dir.png")
             train_loss = train(
             net=self.net,
             trainloader=self.trainloader,
@@ -67,8 +67,8 @@ class CGANClient(NumPyClient):
             dataset=self.dataset,
             latent_dim=self.latent_dim
         )
-            figura = generate_images(net=self.net, device=self.device, round_number=config["server_round"], client_id=self.cid)
-            figura.savefig(f"mnist_CGAN_r{config['server_round']}_{self.local_epochs}e_{self.batch_size}b_100z_10c_{self.lr}lr_niid_01dir_cliente{self.cid}.png")
+            figura = generate_images(net=self.net, device=self.device, round_number=config["server_round"]+10, client_id=self.cid)
+            figura.savefig(f"mnist_CGAN_r{config['server_round']+10}_{self.local_epochs}e_{self.batch_size}b_100z_4c_{self.lr}lr_niid_01dir_cliente{self.cid}.png")
             return (
             get_weights(self.net),
             len(self.trainloader.dataset),
@@ -108,7 +108,7 @@ class CGANClient(NumPyClient):
                 self.net.load_state_dict(new_state_dict)
             
             figura = generate_images(net=self.net, device=self.device, round_number=config["server_round"])
-            figura.savefig(f"mnist_CGAN_r{config['server_round']-1}_{self.local_epochs}e_{self.batch_size}b_100z_10c_{self.lr}lr_niid_01dir.png")
+            figura.savefig(f"mnist_CGAN_r{config['server_round']-1}_{self.local_epochs}e_{self.batch_size}b_100z_4c_{self.lr}lr_niid_01dir.png")
 
             train_loss = train(
                 net=self.net,

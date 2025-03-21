@@ -94,7 +94,7 @@ def server_fn(context: Context) -> ServerAppComponents:
     agg = context.run_config["agg"]
 
     # Define o caminho do checkpoint inicial (opcional)
-    initial_model_path = f"model_round_0_{dataset}.pt"  # Ajuste conforme necessário
+    initial_model_path = f"modelnaoexiste.pt"  # Ajuste conforme necessário
 
     if os.path.exists(initial_model_path):
         # Carrega o modelo existente
