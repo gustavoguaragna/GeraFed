@@ -19,7 +19,7 @@ testset = datasets.MNIST(root='./data', train=False, download=True, transform=tr
 trainset_reduzido = torch.utils.data.random_split(trainset, [1000, len(trainset) - 1000])[0]
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model="wgan"
+model="cgan"
 EPOCHS = 20
 NUM_CLASSES = 10
 NUM_CHANNELS = 1
