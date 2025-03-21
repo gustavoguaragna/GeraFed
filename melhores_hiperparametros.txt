@@ -1,0 +1,15 @@
+🔹 Melhores Hiperparâmetros Encontrados:
+batch_size: 422
+latent_dim: 798
+learning_rate: 0.02116625260360864
+beta1: 0.827056933654176
+beta2: 0.9977172464404562
+gp_scale: 46
+
+🔹 Importância dos Hiperparâmetros:
+batch_size: 0.4522
+learning_rate: 0.2575
+beta1: 0.1717
+latent_dim: 0.1162
+beta2: 0.0017
+gp_scale: 0.0007
