@@ -4,7 +4,6 @@ import torch
 from Simulation.CGAN_torch.task import CGAN, get_weights, get_weights_gen, load_data, set_weights, test, train, generate_images
 from collections import OrderedDict
 from flwr.client import ClientApp, NumPyClient
-from flwr.common import Context
 from flwr.common import Context, ParametersRecord, array_from_numpy
 
 import random
@@ -40,7 +39,6 @@ class CGANClient(NumPyClient):
         self.local_epochs = local_epochs
         self.lr = learning_rate
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        print(f"DEVICE CLIENT: {self.device}")
         # cudnn.benchmark = True
         self.dataset = dataset
         self.agg = agg

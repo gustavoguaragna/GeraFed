@@ -7,4 +7,4 @@ qualidade não é tao boa quanto. (obs: a nomeacao das imagens estao um pouco in
 + 10, enquanto as do gerafed estao dizendo niid, enquanto na verdade sao iid)
 
 vou rodar para ver se a divisao dos dados batem em cada abordagem, se for parecida nao deveria ser justificativa para a 
-diferença de treinamento.
+diferença de treinamento. (mesma distribuicao, nao é aqui o problema)
