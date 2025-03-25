@@ -174,3 +174,34 @@ Rodada 20, Perda: 0.46414265231152246, Acuracia: 0.9116
 Rodada 21, Perda: 0.19512615187788215, Acuracia: 0.9683
 Rodada 22, Perda: 0.4936977131826103, Acuracia: 0.9255
 Treinando uma geradora niid 0.1 no servidor com 2 epocas e 5 epocas da discriminadora local nao deu certo. Usando 1 epoca em cada nao treinou tambem.
+NIID, 0.1 alpha, somente CNN, 4 clientes, 10 epocas locais, 0.001 lr, 64 batch
+Rodada 1, Perda: 0.9557498184738646, Acuracia: 0.7855
+Rodada 2, Perda: 0.29557086081261846, Acuracia: 0.9007
+Rodada 3, Perda: 0.1881471885854651, Acuracia: 0.9402
+Rodada 4, Perda: 0.11119232249630107, Acuracia: 0.9682
+Rodada 5, Perda: 0.10453474875628521, Acuracia: 0.9728
+Rodada 6, Perda: 0.08200645893419185, Acuracia: 0.9774
+Rodada 7, Perda: 0.06517859668416048, Acuracia: 0.982
+Rodada 8, Perda: 0.06361036062094896, Acuracia: 0.9843
+Rodada 9, Perda: 0.08916239704822553, Acuracia: 0.9788
+Rodada 10, Perda: 0.06785734477592428, Acuracia: 0.9849
+Rodada 11, Perda: 0.06550815000052243, Acuracia: 0.9854
+Rodada 12, Perda: 0.07412094104046835, Acuracia: 0.9834
+Rodada 13, Perda: 0.07397424935801042, Acuracia: 0.984
+Rodada 14, Perda: 0.08471964387648374, Acuracia: 0.9819
+Rodada 15, Perda: 0.09002741222711211, Acuracia: 0.9808
+Rodada 16, Perda: 0.09629643059007165, Acuracia: 0.9802
+Rodada 17, Perda: 0.07995546840126277, Acuracia: 0.986
+Rodada 18, Perda: 0.1109895293546079, Acuracia: 0.98
+Rodada 19, Perda: 0.0969408683064149, Acuracia: 0.9817
+Rodada 20, Perda: 0.10082472829830075, Acuracia: 0.9812
+Rodada 21, Perda: 0.09855154499154815, Acuracia: 0.9838
+Rodada 22, Perda: 0.08932670323166772, Acuracia: 0.9835
+Rodada 23, Perda: 0.09431297790337582, Acuracia: 0.9823
+Rodada 24, Perda: 0.10474497532982098, Acuracia: 0.9838
+Rodada 25, Perda: 0.1301733021785477, Acuracia: 0.9774
+Rodada 26, Perda: 0.11314264717084266, Acuracia: 0.9838
+Rodada 27, Perda: 0.11463968853848512, Acuracia: 0.985
+Rodada 28, Perda: 0.09346289414283483, Acuracia: 0.9862
+Rodada 29, Perda: 0.10404761932458949, Acuracia: 0.9841
+Rodada 30, Perda: 0.11433584513017173, Acuracia: 0.9834
