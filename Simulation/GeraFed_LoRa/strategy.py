@@ -356,29 +356,6 @@ class GeraFed(Strategy):
                 model_path = f"modelo_gen_round_{server_round}_mnist.pt"
                 torch.save(model.state_dict(), model_path)
                 print(f"Modelo gen salvo em {model_path}")
-            elif self.agg == "f2a":
-                # Cria uma instância do modelo
-                model = CGAN(dataset=self.dataset,
-                            img_size=self.img_size,
-                            latent_dim=self.latent_dim)
-                # Define os pesos do modelo
-                set_weights(model, aggregated_ndarrays_gen)
-                train_G(
-                net=model,
-                epochs=2,
-                lr=self.lr_gen,
-                device=self.device,
-                latent_dim=self.latent_dim,
-                batch_size=128
-                )
-                model_path = f"modelo_gen_round_{server_round}_mnist.pt"
-                torch.save(model.state_dict(), model_path)
-                print(f"Modelo gen salvo em {model_path}")
-                figura = generate_plot(net=model, device=self.device, round_number=server_round, server=True)
-                figura.savefig(f"mnist_CGAN_r{server_round}_{2}e_{128}b_100z_4c_{self.lr_gen}lr_niid_01dir_f2a.png")
-
-                ndarrays = get_weights(model)
-                parameters_aggregated_gen = ndarrays_to_parameters(ndarrays)
             
             return parameters_aggregated_gen, metrics_aggregated
         
@@ -407,29 +384,6 @@ class GeraFed(Strategy):
                 model_path = f"modelo_gen_round_{server_round}_mnist.pt"
                 torch.save(model.state_dict(), model_path)
                 print(f"Modelo gen salvo em {model_path}")
-            elif self.agg == "f2a":
-                # Cria uma instância do modelo
-                model = CGAN(dataset=self.dataset,
-                            img_size=self.img_size,
-                            latent_dim=self.latent_dim)
-                # Define os pesos do modelo
-                set_weights(model, aggregated_ndarrays_gen)
-                train_G(
-                net=model,
-                epochs=2,
-                lr=self.lr_gen,
-                device=self.device,
-                latent_dim=self.latent_dim,
-                )
-                model_path = f"modelo_gen_round_{server_round}_mnist.pt"
-                torch.save(model.state_dict(), model_path)
-                print(f"Modelo gen salvo em {model_path}")
-                figura = generate_plot(net=model, device=self.device, round_number=server_round)
-                figura.savefig(f"mnist_CGAN_r{server_round}_{2}e_{128}b_100z_4c_{self.lr_gen}lr_niid_01dir_f2a.png")
-
-                ndarrays = get_weights(model)
-                parameters_aggregated_gen = ndarrays_to_parameters(ndarrays)
-
 
         return parameters_aggregated_alvo, metrics_aggregated
 
