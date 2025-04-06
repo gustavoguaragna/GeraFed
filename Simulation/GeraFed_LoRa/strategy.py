@@ -143,30 +143,22 @@ class GeraFed(Strategy):
         self.teste = teste
         self.lr_gen = lr_gen
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.loras = []
+        self.loras = {0: [], 1: [], 2: [], 3: []}
 
     def __repr__(self) -> str:
         """Compute a string representation of the strategy."""
         rep = f"GeraFed(accept_failures={self.accept_failures})"
         return rep
 
-
-
     def num_fit_clients(self, num_available_clients: int) -> tuple[int, int]:
         """Return the sample size and the required number of available clients."""
         num_clients = int(num_available_clients * self.fraction_fit_alvo)
         return max(num_clients, self.min_fit_clients), self.min_available_clients
 
-
-
-
     def num_evaluation_clients(self, num_available_clients: int) -> tuple[int, int]:
         """Use a fraction of available clients for evaluation."""
         num_clients = int(num_available_clients * self.fraction_evaluate_alvo)
         return max(num_clients, self.min_evaluate_clients), self.min_available_clients
-
-
-
 
     def initialize_parameters(
         self, client_manager: ClientManager
@@ -175,9 +167,6 @@ class GeraFed(Strategy):
         initial_parameters = self.initial_parameters_alvo
         self.initial_parameters_alvo = None  # Don't keep initial parameters in memory
         return initial_parameters
-
-
-
 
     def evaluate(
         self, server_round: int, parameters: Parameters
@@ -192,8 +181,6 @@ class GeraFed(Strategy):
             return None
         loss, metrics = eval_res
         return loss, metrics
-
-
 
 
     def configure_fit(
@@ -221,6 +208,7 @@ class GeraFed(Strategy):
                 conjunto_gen = clients
             else:
                 conjunto_alvo = clients
+                
 
         elif self.model == "alvo":
             print("MODEL ALVO")
@@ -253,8 +241,6 @@ class GeraFed(Strategy):
         return fit_instructions
 
 
-
-
     def configure_evaluate(
         self, server_round: int, parameters: Parameters, client_manager: ClientManager
     ) -> list[tuple[ClientProxy, EvaluateIns]]:
@@ -280,8 +266,6 @@ class GeraFed(Strategy):
 
         # Return client/config pairs
         return [(client, evaluate_ins) for client in clients]
-
-
 
 
     def aggregate_fit(
@@ -312,8 +296,8 @@ class GeraFed(Strategy):
                     parameters_aggregated_gen = ndarrays_to_parameters(aggregated_ndarrays_gen)
                     self.parameters_gen = parameters_aggregated_gen
                 else:
-                    for i in results_gen:
-                        self.loras.append(i[1].metrics["loras"])
+                    for i, res in enumerate(results_gen):
+                        self.loras[i].append(res[1].parameters)
         else:
             # Convert results
             weights_results = [
@@ -392,7 +376,6 @@ class GeraFed(Strategy):
                 print(f"Modelo gen salvo em {model_path}")
 
         return parameters_aggregated_alvo, metrics_aggregated
-
 
 
     def aggregate_evaluate(
