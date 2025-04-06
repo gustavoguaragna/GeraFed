@@ -19,6 +19,7 @@ from typing import Optional, List
 import matplotlib.pyplot as plt
 from collections import defaultdict
 import time
+from torch.nn.parameter import Parameter
 
 os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
@@ -561,9 +562,26 @@ def test(net, testloader, device, model):
 def get_weights(net):
     return [val.cpu().numpy() for _, val in net.state_dict().items()]
 
-def get_weights_gen(net):
-    return [val.cpu().numpy() for key, val in net.state_dict().items() if 'discriminator' in key or 'label' in key]
+def get_lora_weights_from_list(lora_params_list: list[tuple[Parameter, Parameter]]) -> list[np.ndarray]:
+    """
+    Extracts LoRA parameters (A and B matrices) from a list of tuples
+    into a single flat list of NumPy arrays.
 
+    Args:
+        lora_params_list: A list where each element is a tuple containing
+                          two torch.nn.parameter.Parameter objects
+                          (representing LoRA A and B matrices).
+
+    Returns:
+        A list of NumPy arrays containing the data from all parameters.
+    """
+    weights_list = []
+    for lora_tuple in lora_params_list:
+        # Process both parameters (A and B matrices) in the tuple
+        for param in lora_tuple:
+            # Detach from graph, move to CPU, convert to NumPy
+            weights_list.append(param.detach().cpu().numpy())
+    return weights_list
 
 def set_weights(net, parameters):
     device = next(net.parameters()).device
@@ -721,3 +739,16 @@ def prepare_model_for_lora(model):
         if isinstance(module, LoRALinear):
             module.lora_A.requires_grad = True
             module.lora_B.requires_grad = True
+        
+def get_lora_adapters(model):
+    lora_params = []
+    for module in model.modules():
+        if isinstance(module, LoRALinear):
+            lora_params.append((module.lora_A, module.lora_B))
+    return lora_params
+
+def set_lora_adapters(model, lora_params):
+    for module in model.modules():
+        if isinstance(module, LoRALinear):
+            module.lora_A, module.lora_B = lora_params.pop(0)
+    return model

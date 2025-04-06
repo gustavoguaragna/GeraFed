@@ -14,11 +14,14 @@ from Simulation.GeraFed_LoRa.task import (
     test, 
     train_alvo, 
     train_gen, 
-    calculate_fid, 
     generate_plot,
     LoRALinear,
     add_lora_to_model,
-    prepare_model_for_lora
+    prepare_model_for_lora,
+    get_lora_adapters,
+    set_lora_adapters,
+    get_lora_weights_from_list
+
 )
 import random
 import numpy as np
@@ -83,6 +86,12 @@ class FlowerClient(NumPyClient):
 
     def fit(self, parameters, config):
         if config["modelo"] == "alvo":
+
+            for k, v in config.items():
+                if k == "modelo":
+                    continue
+                
+                
             set_weights(self.net_alvo, parameters)
             train_loss = train_alvo(
                 net=self.net_alvo,
@@ -98,28 +107,17 @@ class FlowerClient(NumPyClient):
             )
         elif config["modelo"] == "gen":
             if self.agg == "full":
-                if config["round"] >= 3 and json.loads(config["fids"]):
-                #if True:
-                    if not self.teste:
-                        fids_client = calculate_fid(instance="client", model_gen=self.net_gen, dims=192 , samples=300)
-                    else:
-                        fids_client = calculate_fid(instance="client", model_gen=self.net_gen, dims=64, samples=30)
-                    classes_train = np.where(np.array(fids_client) < json.loads(config["fids"]))[0]
-                    print(f"classes_train: {classes_train}")
-                    if classes_train.any() and len(classes_train) < 10:
-                      self.trainloader, _ = load_data(partition_id=self.cid,
-                                        num_partitions=self.num_partitions,
-                                        niid=self.niid,
-                                        alpha_dir=self.alpha_dir,
-                                        batch_size=self.batch_size,
-                                        filter_classes=classes_train
-                                        )
-                    else:
-                      print(f"cliente {self.cid} nao vai treinar pois fids sao piores")
                 set_weights(self.net_gen, parameters)
+
                 #Gera imagens do modelo agregado do round anterior
                 figura = generate_plot(net=self.net_gen, device=self.device, round_number=config["round"])
                 figura.savefig(f"mnist_CGAN_r{config['round']-1}_{self.local_epochs_gen}e_{self.batch_size}b_100z_4c_{self.lr_gen}lr_{'niid' if self.niid else 'iid'}_{self.alpha_dir if self.niid else ''}.png")
+               
+                # Adiciona LoRA ao modelo
+                if config["round"] > 1:
+                    add_lora_to_model(self.net_gen)
+                    prepare_model_for_lora(self.net_gen)
+                
                 train_gen(
                 net=self.net_gen,
                 trainloader=self.trainloader,
@@ -129,93 +127,24 @@ class FlowerClient(NumPyClient):
                 dataset=self.dataset,
                 latent_dim=self.latent_dim
             )
+                
                 figura = generate_plot(net=self.net_gen, device=self.device, round_number=config["round"]+10, client_id=self.cid)
                 figura.savefig(f"mnist_CGAN_r{config['round']}_{self.local_epochs_gen}e_{self.batch_size}b_100z_4c_{self.lr_gen}lr_{'niid' if self.niid else 'iid'}_{self.alpha_dir if self.niid else ''}_cliente{self.cid}.png")
-                return (
-                get_weights(self.net_gen),
-                len(self.trainloader.dataset),
-                {"modelo": "gen"},
-            )
+                
+                if config["round"] > 1:
+                    lora = get_lora_adapters(self.net_gen)
 
-            elif self.agg == "disc":
-                # Supondo que net seja o modelo e parameters seja a lista de parâmetros fornecida
-                state_keys = [k for k in self.net_gen.state_dict().keys() if 'generator' not in k]
-            
-                # Criando o OrderedDict com as chaves filtradas e os parâmetros fornecidos
-                disc_dict = OrderedDict({k: torch.tensor(v) for k, v in zip(state_keys, parameters)})
-
-                state_dict = {}
-                # Extract record from context
-                if "net_parameters" in self.client_state.parameters_records:
-                    p_record = self.client_state.parameters_records["net_parameters"]
-
-                    # Deserialize arrays
-                    for k, v in p_record.items():
-                        state_dict[k] = torch.from_numpy(v.numpy())
-
-                    # Apply state dict to a new model instance
-                    model_ = CGAN()
-                    model_.load_state_dict(state_dict)
-
-                    new_state_dict = {}
-
-                    for name, param in self.net_gen.state_dict().items():
-                        if 'generator' in name:
-                            new_state_dict[name] = model_.state_dict()[name]
-                        elif 'discriminator' in name or 'label' in name:
-                            new_state_dict[name] = disc_dict[name]
-                        else:
-                            new_state_dict[name] = param
-
-                    self.net_gen.load_state_dict(new_state_dict)
-
-                    figura = generate_plot(net=self.net_gen, device=self.device, round_number=config["round"])
-                    figura.savefig(f"mnist_CGAN_r{config['round']-1}_{self.local_epochs_gen}e_{self.batch_size}b_100z_4c_{self.lr_gen}lr_{'niid' if self.niid else 'iid'}_{self.alpha_dir if self.niid else ''}.png")
-
-                train_gen(
-                    net=self.net_gen,
-                    trainloader=self.trainloader,
-                    epochs=self.local_epochs_gen,
-                    lr=self.lr_gen,
-                    device=self.device,
-                    dataset=self.dataset,
-                    latent_dim=self.latent_dim
-                )
-                # Save all elements of the state_dict into a single RecordSet
-                p_record = ParametersRecord()
-                for k, v in self.net_gen.state_dict().items():
-                    # Convert to NumPy, then to Array. Add to record
-                    p_record[k] = array_from_numpy(v.detach().cpu().numpy())
-                # Add to a context
-                self.client_state.parameters_records["net_parameters"] = p_record
-
-                model_path = f"modelo_gen_round_{config['round']}_client_{self.cid}.pt"
-                torch.save(self.net_gen.state_dict(), model_path)
-
-                figura = generate_plot(net=self.net_gen, device=self.device, round_number=config["round"], client_id=self.cid)
-                figura.savefig(f"mnist_CGAN_r{config['round']}_{self.local_epochs_gen}e_{self.batch_size}b_100z_4c_{self.lr_gen}lr_{'niid' if self.niid else 'iid'}_{self.alpha_dir if self.niid else ''}_cliente{self.cid}.png")
-                return (
-                    get_weights_gen(self.net_gen),
+                    return (
+                    get_lora_weights_from_list(lora),
                     len(self.trainloader.dataset),
                     {"modelo": "gen"},
                 )
-            elif self.agg == "f2a":
-                set_weights(self.net_gen, parameters)
-                train_gen(
-                net=self.net_gen,
-                trainloader=self.trainloader,
-                epochs=self.local_epochs_gen,
-                lr=self.lr_gen,
-                device=self.device,
-                dataset=self.dataset,
-                latent_dim=self.latent_dim,
-                f2a=True
-            )
                 return (
-                get_weights(self.net_gen),
-                len(self.trainloader.dataset),
-                {"modelo": "gen"},
-            )
+                    get_weights(self.net_gen),
+                    len(self.trainloader.dataset),
+                    {"modelo": "gen"},
+                )
+
 
     def evaluate(self, parameters, config):
         if self.model == "gen":

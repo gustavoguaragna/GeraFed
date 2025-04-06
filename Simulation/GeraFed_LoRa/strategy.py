@@ -143,6 +143,7 @@ class GeraFed(Strategy):
         self.teste = teste
         self.lr_gen = lr_gen
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.loras = []
 
     def __repr__(self) -> str:
         """Compute a string representation of the strategy."""
@@ -306,9 +307,13 @@ class GeraFed(Strategy):
                 parameters_aggregated_alvo = ndarrays_to_parameters(aggregated_ndarrays_alvo)
                 self.parameters_alvo = parameters_aggregated_alvo
             if results_gen:
-                aggregated_ndarrays_gen = aggregate_inplace(results_gen)
-                parameters_aggregated_gen = ndarrays_to_parameters(aggregated_ndarrays_gen)
-                self.parameters_gen = parameters_aggregated_gen
+                if server_round != 2:
+                    aggregated_ndarrays_gen = aggregate_inplace(results_gen)
+                    parameters_aggregated_gen = ndarrays_to_parameters(aggregated_ndarrays_gen)
+                    self.parameters_gen = parameters_aggregated_gen
+                else:
+                    for i in results_gen:
+                        self.loras.append(i[1].metrics["loras"])
         else:
             # Convert results
             weights_results = [
@@ -360,18 +365,19 @@ class GeraFed(Strategy):
             return parameters_aggregated_gen, metrics_aggregated
         
         else:
-            # Salva o modelo após a agregação
-            ndarrays = parameters_to_ndarrays(parameters_aggregated_alvo)
-            # Cria uma instância do modelo
-            model = Net()
-            # Define os pesos do modelo
-            set_weights(model, ndarrays)
-            # Salva o modelo no disco com o nome específico do dataset
-            model_path = f"modelo_alvo_round_{server_round}_mnist.pt"
-            torch.save(model.state_dict(), model_path)
-            print(f"Modelo alvo salvo em {model_path}")
+            if results_alvo:
+                # Salva o modelo após a agregação
+                ndarrays = parameters_to_ndarrays(parameters_aggregated_alvo)
+                # Cria uma instância do modelo
+                model = Net()
+                # Define os pesos do modelo
+                set_weights(model, ndarrays)
+                # Salva o modelo no disco com o nome específico do dataset
+                model_path = f"modelo_alvo_round_{server_round}_mnist.pt"
+                torch.save(model.state_dict(), model_path)
+                print(f"Modelo alvo salvo em {model_path}")
 
-            if self.agg == "full":
+            if self.agg == "full" and server_round == 1:
                 # Salva o modelo após a agregaçãO
                 ndarrays = parameters_to_ndarrays(parameters_aggregated_gen)
                 # Cria uma instância do modelo
