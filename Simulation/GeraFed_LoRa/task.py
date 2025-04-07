@@ -346,7 +346,7 @@ def load_data(partition_id: int,
     trainloader = DataLoader(train_partition, batch_size=batch_size, shuffle=True)
     testloader = DataLoader(test_partition, batch_size=batch_size)
 
-    return trainloader, testloader
+    return trainloader, testloader, train_partition
 
 
 def train_alvo(net, trainloader, epochs, lr, device):
