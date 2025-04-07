@@ -206,9 +206,12 @@ class GeraFed(Strategy):
             metade = len(clients) // 2
             if server_round < 3:
                 conjunto_gen = clients
+                config_gen = {"modelo": "gen", "round": server_round}
             else:
                 conjunto_alvo = clients
-                
+                config_alvo = {"modelo": "alvo"}
+                for i in conjunto_alvo:
+                    config_alvo[f"lora_{i}"] = self.loras[i]
 
         elif self.model == "alvo":
             print("MODEL ALVO")
@@ -226,8 +229,8 @@ class GeraFed(Strategy):
             conjunto_alvo = sorted_clients[metade:]
 
         fit_instructions = []
-        config_alvo = {"modelo": "alvo"}
-        config_gen = {"modelo": "gen", "round": server_round}
+       
+        
         
         fit_ins_alvo = FitIns(parameters=self.parameters_alvo, config=config_alvo)
         for c in conjunto_alvo:
