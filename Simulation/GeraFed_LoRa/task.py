@@ -346,7 +346,7 @@ def load_data(partition_id: int,
     trainloader = DataLoader(train_partition, batch_size=batch_size, shuffle=True)
     testloader = DataLoader(test_partition, batch_size=batch_size)
 
-    return trainloader, testloader, train_partition
+    return trainloader, testloader
 
 
 def train_alvo(net, trainloader, epochs, lr, device):
@@ -590,7 +590,7 @@ def set_weights(net, parameters):
     net.load_state_dict(state_dict, strict=True)
 
 class GeneratedDataset(Dataset):
-    def __init__(self, generator, num_samples, latent_dim, num_classes, device):
+    def __init__(self, generator, num_samples, device, latent_dim=100, num_classes=10):
         self.generator = generator
         self.num_samples = num_samples
         self.latent_dim = latent_dim
@@ -747,8 +747,19 @@ def get_lora_adapters(model):
             lora_params.append((module.lora_A, module.lora_B))
     return lora_params
 
-def set_lora_adapters(model, lora_params):
+def set_lora_adapters(model, lora_params, device):
+    params_tuples = []
+    if len(lora_params) % 2 != 0:
+        raise ValueError("lora_params must contain pairs of (A, B) matrices.")
+    for i in range(0, len(lora_params), 2):
+        np_a = lora_params[i]
+        np_b = lora_params[i + 1]
+        tensor_a = torch.tensor(np_a, dtype=torch.float32, device=device)
+        tensor_b = torch.tensor(np_b, dtype=torch.float32, device=device)
+        param_a = nn.Parameter(tensor_a, requires_grad=True)
+        param_b = nn.Parameter(tensor_b, requires_grad=True)
+        params_tuples.append((param_a, param_b))
     for module in model.modules():
         if isinstance(module, LoRALinear):
-            module.lora_A, module.lora_B = lora_params.pop(0)
+            module.lora_A, module.lora_B = params_tuples.pop(0)
     return model

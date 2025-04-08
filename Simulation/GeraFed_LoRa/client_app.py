@@ -3,7 +3,7 @@
 import torch
 from collections import OrderedDict
 from flwr.client import ClientApp, NumPyClient
-from flwr.common import Context, ParametersRecord, array_from_numpy
+from flwr.common import Context, ParametersRecord, array_from_numpy, parameters_to_ndarrays
 from Simulation.GeraFed_LoRa.task import (
     Net, 
     CGAN, 
@@ -20,7 +20,8 @@ from Simulation.GeraFed_LoRa.task import (
     prepare_model_for_lora,
     get_lora_adapters,
     set_lora_adapters,
-    get_lora_weights_from_list
+    get_lora_weights_from_list,
+    GeneratedDataset
 
 )
 import random
@@ -87,10 +88,24 @@ class FlowerClient(NumPyClient):
     def fit(self, parameters, config):
         if config["modelo"] == "alvo":
 
+            generated_datasets = []
             for k, v in config.items():
                 if k == "modelo":
                     continue
+                lora = parameters_to_ndarrays(v)
+                # Adiciona LoRA ao modelo
+                set_weights(self.net_gen, parameters_to_ndarrays(config["gen"]))
+                add_lora_to_model(self.net_gen)
+                set_lora_adapters(self.net_gen, lora, self.device)
+                generated_dataset = GeneratedDataset(generator=self.net_gen, num_samples=12000, device=self.device)
+                concat_dataset = torch.utils.data.ConcatDataset([self.trainloader.dataset, generated_dataset])
+                self.trainloader.dataset = concat_dataset
+                print(f"dataset: {self.trainloader.dataset}")
+
+
+
                 
+                 
                 
             set_weights(self.net_alvo, parameters)
             train_loss = train_alvo(

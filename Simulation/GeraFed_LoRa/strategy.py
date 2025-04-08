@@ -209,7 +209,7 @@ class GeraFed(Strategy):
                 config_gen = {"modelo": "gen", "round": server_round}
             else:
                 conjunto_alvo = clients
-                config_alvo = {"modelo": "alvo"}
+                config_alvo = {"modelo": "alvo", "gen": self.parameters_gen}
                 for i in conjunto_alvo:
                     config_alvo[f"lora_{i}"] = self.loras[i]
 
