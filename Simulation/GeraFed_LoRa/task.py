@@ -369,7 +369,7 @@ def train_alvo(net, trainloader, epochs, lr, device):
     avg_trainloss = running_loss / (len(trainloader) * epochs)
     return avg_trainloss
 
-def train_gen(net, trainloader, epochs, lr, device, cid, logfile, dataset="mnist", latent_dim=100):
+def train_gen(net, trainloader, epochs, lr, device, cid, logfile, round_number, dataset="mnist", latent_dim=100):
     """Train the network on the training set."""
     if dataset == "mnist":
       imagem = "image"
@@ -387,7 +387,7 @@ def train_gen(net, trainloader, epochs, lr, device, cid, logfile, dataset="mnist
     for epoch in range(epochs):
         G_loss = 0
         D_loss = 0
-        start_time = time().time()
+        start_time = time.time()
 
         for batch_idx, batch in enumerate(trainloader):
             images, labels = batch[imagem].to(device), batch["label"].to(device)
@@ -437,7 +437,7 @@ def train_gen(net, trainloader, epochs, lr, device, cid, logfile, dataset="mnist
         end_time = time.time()
 
         with open(logfile, "a") as f:
-            f.write(f"Cliente {cid+1}, Epoca {epoch+1}: G_loss={G_loss}, D_loss={D_loss}, Tempo={end_time - start_time}\n")
+            f.write(f"Rodada {round_number}, Cliente {cid}, Epoca {epoch+1}, G_loss {G_loss}, D_loss {D_loss}, Tempo {end_time - start_time}\n")
     
         generate_plot(net=net, device="cpu", round_number=epoch+1, latent_dim=latent_dim, client_id=cid+1)
         net.to(device)
@@ -650,7 +650,7 @@ def generate_plot(net, device, round_number, client_id = None, examples_per_clas
     if client_id:
         fig.text(0.5, 0.98, f"Round: {round_number} | Client: {client_id}", ha="center", fontsize=12)
     else:
-        fig.text(0.5, 0.98, f"Round: {round_number-1}", ha="center", fontsize=12)
+        fig.text(0.5, 0.98, f"Round: {round_number}", ha="center", fontsize=12)
 
     # Exibir as imagens nos subplots
     for i, ax in enumerate(axes.flat):
@@ -677,6 +677,7 @@ def generate_plot(net, device, round_number, client_id = None, examples_per_clas
 
     # Salvar a figura
     IN_COLAB = False
+    net_type = type(net).__name__
     try:
         # Tenta importar um módulo específico do Colab
         import google.colab
@@ -693,7 +694,7 @@ def generate_plot(net, device, round_number, client_id = None, examples_per_clas
             fig.savefig(f"mnist_{net_type}_r{round_number}_c{client_id}.png")
         else:
             fig.savefig(f"mnist_{net_type}_r{round_number}.png")
-    plt.close(fig)
+    plt.close(fig)  # Fecha a figura para liberar memória   
     return
 
 class LoRALinear(nn.Module):

@@ -22,7 +22,7 @@ from collections import Counter
 from flwr.server.strategy.aggregate import aggregate, aggregate_inplace, weighted_loss_avg
 import random
 
-from Simulation.GeraFed_LoRa.task import Net, CGAN, set_weights, train_G, get_weights, generate_plot
+from Simulation.GeraFed_LoRa.task import Net, CGAN, set_weights
 import torch
 import numpy as np
 import json
@@ -201,44 +201,24 @@ class GeraFed(Strategy):
             num_clients=sample_size, min_num_clients=min_num_clients
         )
 
-        if self.model == "both":
-            print("MODEL BOTH")
-            metade = len(clients) // 2
-            if server_round < 3:
-                conjunto_gen = clients
-                config_gen = {"modelo": "gen", "round": server_round}
-            else:
-                conjunto_alvo = clients
-                config_alvo = {"modelo": "alvo", "gen": self.parameters_gen}
-                for i in conjunto_alvo:
-                    config_alvo[f"lora_{i}"] = self.loras[i]
-
-        elif self.model == "alvo":
-            print("MODEL ALVO")
-            conjunto_alvo = clients
-            conjunto_gen = []
-        elif self.model == "gen":
-            print("MODEL GEN")
-            conjunto_alvo = []
-            conjunto_gen = clients
-        else:
-            print(f"Modelo {self.model} não reconhecido. O treinamento será feito para ambos os modelos.")
-            sorted_clients = sorted(clients, key=lambda c: self.client_counter[c])
-            metade = len(clients) // 2
-            conjunto_gen = sorted_clients[:metade]
-            conjunto_alvo = sorted_clients[metade:]
+        print("LoRa Train")
 
         fit_instructions = []
-       
-        
-        
-        fit_ins_alvo = FitIns(parameters=self.parameters_alvo, config=config_alvo)
-        for c in conjunto_alvo:
-            fit_instructions.append((c, fit_ins_alvo))
 
-        fit_ins_gen = FitIns(parameters=self.parameters_gen, config=config_gen)
-        for c in conjunto_gen:
-            fit_instructions.append((c, fit_ins_gen))
+        if server_round < 3:
+            conjunto_gen = clients
+            config_gen = {"modelo": "gen", "round": server_round}
+            fit_ins_gen = FitIns(parameters=self.parameters_gen, config=config_gen)
+            for c in conjunto_gen:
+                fit_instructions.append((c, fit_ins_gen))
+        else:
+            conjunto_alvo = clients
+            config_alvo = {"modelo": "alvo", "gen": self.parameters_gen}
+            for i in range(len(conjunto_alvo)):
+                config_alvo[f"lora_{i}"] = self.loras[i]
+            fit_ins_alvo = FitIns(parameters=self.parameters_alvo, config=config_alvo)
+            for c in conjunto_alvo:
+                fit_instructions.append((c, fit_ins_alvo))
 
         # Return client/config pairs
         return fit_instructions
@@ -253,7 +233,7 @@ class GeraFed(Strategy):
             return []
 
         # Parameters and config
-        config = {}
+        config = {"round": server_round}
         if self.on_evaluate_config_fn is not None:
             # Custom evaluation config function provided
             config = self.on_evaluate_config_fn(server_round)
@@ -282,8 +262,8 @@ class GeraFed(Strategy):
             return None, {}
         # Do not aggregate if there are failures and failures are not accepted
         if not self.accept_failures and failures:
+            print(f"failures: {failures}")
             return None, {}
-        
         results_alvo = [res for res in results if res[1].metrics["modelo"] == "alvo"]
         results_gen = [res for res in results if res[1].metrics["modelo"] == "gen"]
 
@@ -364,19 +344,21 @@ class GeraFed(Strategy):
                 torch.save(model.state_dict(), model_path)
                 print(f"Modelo alvo salvo em {model_path}")
 
-            if self.agg == "full" and server_round == 1:
-                # Salva o modelo após a agregaçãO
-                ndarrays = parameters_to_ndarrays(parameters_aggregated_gen)
-                # Cria uma instância do modelo
-                model = CGAN(dataset=self.dataset,
-                            img_size=self.img_size,
-                            latent_dim=self.latent_dim)
-                # Define os pesos do modelo
-                set_weights(model, ndarrays)
-                # Salva o modelo no disco com o nome específico do dataset
-                model_path = f"modelo_gen_round_{server_round}_mnist.pt"
-                torch.save(model.state_dict(), model_path)
-                print(f"Modelo gen salvo em {model_path}")
+            if self.agg == "full":
+                if server_round == 1:
+                    # Salva o modelo após a agregaçãO
+                    ndarrays = parameters_to_ndarrays(parameters_aggregated_gen)
+                    # Cria uma instância do modelo
+                    model = CGAN(dataset=self.dataset,
+                                img_size=self.img_size,
+                                latent_dim=self.latent_dim)
+                    # Define os pesos do modelo
+                    set_weights(model, ndarrays)
+                    # Salva o modelo no disco com o nome específico do dataset
+                    model_path = f"modelo_gen_round_{server_round}_mnist.pt"
+                    torch.save(model.state_dict(), model_path)
+                    print(f"Modelo gen salvo em {model_path}")
+                return self.parameters_gen, metrics_aggregated
 
         return parameters_aggregated_alvo, metrics_aggregated
 
@@ -401,7 +383,7 @@ class GeraFed(Strategy):
                 for _, evaluate_res in results
             ]
         )
-        if self.model != "gen":
+        if self.model != "gen" and server_round > 2 or self.model == "alvo":
             accuracies = [
                 evaluate_res.metrics["accuracy"] * evaluate_res.num_examples
                 for _, evaluate_res in results
