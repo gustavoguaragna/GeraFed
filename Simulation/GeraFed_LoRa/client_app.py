@@ -1,6 +1,7 @@
 """GeraFed: um framework para balancear dados heterogêneos em aprendizado federado."""
 
 import torch
+from flwr.common.typing import Parameters
 from collections import OrderedDict
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import Context, ParametersRecord, array_from_numpy, parameters_to_ndarrays
@@ -85,6 +86,7 @@ class FlowerClient(NumPyClient):
         self.teste = teste
 
     def fit(self, parameters, config):
+        print("HELLOOOUUUU")
         if config["modelo"] == "alvo":
 
             with open("teste.txt", "a") as f:
@@ -98,12 +100,14 @@ class FlowerClient(NumPyClient):
                 num_samples = 12000
 
             generated_datasets = []
+            reconstructed_params = Parameters(tensors=config["gen"], tensor_type="numpy.ndarray")
             for k, v in config.items():
                 if k == "modelo":
                     continue
-                lora = parameters_to_ndarrays(v)
+                reconstructed_params_lora = Parameters(tensors=v, tensor_type="numpy.ndarray")
+                lora = parameters_to_ndarrays(reconstructed_params_lora)
                 # Adiciona LoRA ao modelo
-                set_weights(self.net_gen, parameters_to_ndarrays(config["gen"]))
+                set_weights(self.net_gen, parameters_to_ndarrays(reconstructed_params))
                 add_lora_to_model(self.net_gen)
                 set_lora_adapters(self.net_gen, lora, self.device)
                 generated_dataset = GeneratedDataset(generator=self.net_gen, num_samples=num_samples, device=self.device)
