@@ -87,6 +87,11 @@ class FlowerClient(NumPyClient):
     def fit(self, parameters, config):
         if config["modelo"] == "alvo":
 
+            with open("teste.txt", "a") as f:
+              f.write("ENTROU ALVO")
+
+            print("ENTROU TREINAR ALVO")
+
             if self.teste:
                 num_samples = 1200
             else:
@@ -115,12 +120,15 @@ class FlowerClient(NumPyClient):
                 lr=self.lr_alvo,
                 device=self.device,
             )
+
+            print(f"saida parametros: {get_weights(self.net_alvo)}")
             return (
                 get_weights(self.net_alvo),
                 len(self.trainloader.dataset),
                 {"train_loss": train_loss, "modelo": "alvo"},
             )
         elif config["modelo"] == "gen":
+            print("ENTROU TREINAR GEN")
             if self.agg == "full":
                 set_weights(self.net_gen, parameters)
 
@@ -162,6 +170,8 @@ class FlowerClient(NumPyClient):
                     len(self.trainloader.dataset),
                     {"modelo": "gen"},
                 )
+        else:
+            print("ENTROU NADA")
 
 
     def evaluate(self, parameters, config):
