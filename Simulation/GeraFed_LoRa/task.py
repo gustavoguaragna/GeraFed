@@ -751,5 +751,6 @@ def get_lora_adapters(model):
 def set_lora_adapters(model, lora_params):
     for module in model.modules():
         if isinstance(module, LoRALinear):
+            print(f"LORA_PARAMS_LEN: {len(lora_params)}")
             module.lora_A, module.lora_B = lora_params.pop(0)
     return model

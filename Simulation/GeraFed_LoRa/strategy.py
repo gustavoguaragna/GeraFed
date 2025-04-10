@@ -210,16 +210,15 @@ class GeraFed(Strategy):
             for c in clients:
                 fit_instructions.append((c, fit_ins))
         else:
-            for idx, client in enumerate(clients):
-                config = {"modelo": "alvo"}
-                for j, tensor in enumerate(self.parameters_gen.tensors):
-                    config[f"gen_{j}"] = tensor
-                for k, v in self.loras.items():
-                    if k != idx:
-                        for i, tensor in enumerate(v.tensors):
-                            config[f"lora_{k}_{i}"] = tensor
-                fit_ins = FitIns(parameters=self.parameters_alvo, config=config)
-                fit_instructions.append((client, fit_ins))
+            config = {"modelo": "alvo"}
+            for j, tensor in enumerate(self.parameters_gen.tensors):
+                config[f"gen_{j}"] = tensor
+            for k, v in self.loras.items():
+                for i, tensor in enumerate(v.tensors):
+                    config[f"lora_{k}_{i}"] = tensor
+            fit_ins = FitIns(parameters=self.parameters_alvo, config=config)
+            for c in clients:
+                fit_instructions.append((c, fit_ins))
 
         # Return client/config pairs
         return fit_instructions
@@ -282,6 +281,7 @@ class GeraFed(Strategy):
                 else:
                     for i, res in enumerate(results_gen):
                         self.loras[i] = res[1].parameters
+                        print(f"LORA_DICT_TENSORS: {len(self.loras[i].tensors)}")
         else:
             # Convert results
             weights_results = [
