@@ -748,19 +748,8 @@ def get_lora_adapters(model):
             lora_params.append((module.lora_A, module.lora_B))
     return lora_params
 
-def set_lora_adapters(model, lora_params, device):
-    params_tuples = []
-    if len(lora_params) % 2 != 0:
-        raise ValueError("lora_params must contain pairs of (A, B) matrices.")
-    for i in range(0, len(lora_params), 2):
-        np_a = lora_params[i]
-        np_b = lora_params[i + 1]
-        tensor_a = torch.tensor(np_a, dtype=torch.float32, device=device)
-        tensor_b = torch.tensor(np_b, dtype=torch.float32, device=device)
-        param_a = nn.Parameter(tensor_a, requires_grad=True)
-        param_b = nn.Parameter(tensor_b, requires_grad=True)
-        params_tuples.append((param_a, param_b))
+def set_lora_adapters(model, lora_params):
     for module in model.modules():
         if isinstance(module, LoRALinear):
-            module.lora_A, module.lora_B = params_tuples.pop(0)
+            module.lora_A, module.lora_B = lora_params.pop(0)
     return model

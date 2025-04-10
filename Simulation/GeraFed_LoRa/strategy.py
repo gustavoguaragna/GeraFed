@@ -205,19 +205,21 @@ class GeraFed(Strategy):
 
         fit_instructions = []
         if server_round < 3:
-            conjunto_gen = clients
-            config_gen = {"modelo": "gen", "round": server_round}
-            fit_ins_gen = FitIns(parameters=self.parameters_gen, config=config_gen)
-            for c in conjunto_gen:
-                fit_instructions.append((c, fit_ins_gen))
+            config = {"modelo": "gen", "round": server_round}
+            fit_ins = FitIns(parameters=self.parameters_gen, config=config)
+            for c in clients:
+                fit_instructions.append((c, fit_ins))
         else:
-            conjunto_alvo = clients
-            config_alvo = {"modelo": "alvo", "gen": self.parameters_gen.tensors}
-            for i in range(len(conjunto_alvo)):
-                config_alvo[f"lora_{i}"] = self.loras[i].tensors
-            fit_ins_alvo = FitIns(parameters=self.parameters_alvo, config=config_alvo)
-            for c in conjunto_alvo:
-                fit_instructions.append((c, fit_ins_alvo))
+            for idx, client in enumerate(clients):
+                config = {"modelo": "alvo"}
+                for j, tensor in enumerate(self.parameters_gen.tensors):
+                    config[f"gen_{j}"] = tensor
+                for k, v in self.loras.items():
+                    if k != idx:
+                        for i, tensor in enumerate(v.tensors):
+                            config[f"lora_{k}_{i}"] = tensor
+                fit_ins = FitIns(parameters=self.parameters_alvo, config=config)
+                fit_instructions.append((client, fit_ins))
 
         # Return client/config pairs
         return fit_instructions
