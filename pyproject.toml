@@ -33,8 +33,8 @@ fraction_fit_gen = 1.0
 tam_ruido = 100
 tam_batch = 64
 tam_img = 28
-epocas_alvo = 2
-epocas_gen = 2
+epocas_alvo = 10
+epocas_gen = 50
 num_dadosssyn = 10
 learn_rate_alvo = 0.001
 learn_rate_gen = 0.0001
@@ -46,7 +46,7 @@ alpha_dir = 0.1
 agg = "full" # 'disc', 'full', 'f2a'
 model = "both" # 'alvo', 'gen', 'both'
 fid = false
-teste = true
+teste = false
 xgb_params.objective = "binary:logistic"
 xgb_params.eta = 0.1 # Learning rate
 xgb_params.max-depth = 8
@@ -62,5 +62,5 @@ default = "local-simulation"
 [tool.flwr.federations.local-simulation]
 options.num-supernodes = 4
 options.backend.client-resources.num-cpus = 1
-options.backend.client-resources.num-gpus = 0
+options.backend.client-resources.num-gpus = 0.25
 

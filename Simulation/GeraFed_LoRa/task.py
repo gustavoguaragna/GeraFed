@@ -438,8 +438,8 @@ def train_gen(net, trainloader, epochs, lr, device, cid, logfile, round_number, 
 
         with open(logfile, "a") as f:
             f.write(f"Rodada {round_number}, Cliente {cid}, Epoca {epoch+1}, G_loss {G_loss}, D_loss {D_loss}, Tempo {end_time - start_time}\n")
-    
-        generate_plot(net=net, device="cpu", round_number=epoch+1, latent_dim=latent_dim, client_id=cid+1)
+        if (epoch+1)%5==0:
+            generate_plot(net=net, device="cpu", epoch=epoch+1, round_number=round_number, latent_dim=latent_dim, client_id=cid+1)
         net.to(device)
 
                 
@@ -655,7 +655,7 @@ class GeneratedDataset(Dataset):
         }
     
 
-def generate_plot(net, device, round_number, client_id = None, examples_per_class: int=5, classes: int=10, latent_dim: int=100, server: bool=False):
+def generate_plot(net, device, epoch, round_number, client_id = None, examples_per_class: int=5, classes: int=10, latent_dim: int=100, server: bool=False):
     """Gera plot de imagens de cada classe"""
 
     net.to(device) 
@@ -673,7 +673,7 @@ def generate_plot(net, device, round_number, client_id = None, examples_per_clas
 
     # Adiciona título no topo da figura
     if client_id:
-        fig.text(0.5, 0.98, f"Round: {round_number} | Client: {client_id}", ha="center", fontsize=12)
+        fig.text(0.5, 0.98, f"Round-epoca: {round_number}-{epoch} | Client: {client_id}", ha="center", fontsize=12)
     else:
         fig.text(0.5, 0.98, f"Round: {round_number}", ha="center", fontsize=12)
 
@@ -716,7 +716,7 @@ def generate_plot(net, device, round_number, client_id = None, examples_per_clas
             fig.savefig(os.path.join(save_dir, f"mnist_{net_type}_r{round_number}.png"))
     else:
         if client_id:
-            fig.savefig(f"mnist_{net_type}_r{round_number}_c{client_id}.png")
+            fig.savefig(f"mnist_{net_type}_r{round_number}_e{epoch}_c{client_id}.png")
         else:
             fig.savefig(f"mnist_{net_type}_r{round_number}.png")
     plt.close(fig)  # Fecha a figura para liberar memória   
