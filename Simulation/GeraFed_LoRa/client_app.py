@@ -1,9 +1,11 @@
 """GeraFed: um framework para balancear dados heterogêneos em aprendizado federado."""
 
 import torch
+from flwr.common.typing import Parameters
 from collections import OrderedDict
 from flwr.client import ClientApp, NumPyClient
-from flwr.common import Context, ParametersRecord, array_from_numpy, parameters_to_ndarrays
+from torch.utils.data import DataLoader
+from flwr.common import Context, ParametersRecord, array_from_numpy, parameters_to_ndarrays, bytes_to_ndarray
 from Simulation.GeraFed_LoRa.task import (
     Net, 
     CGAN, 
@@ -87,9 +89,6 @@ class FlowerClient(NumPyClient):
     def fit(self, parameters, config):
         if config["modelo"] == "alvo":
 
-            with open("teste.txt", "a") as f:
-              f.write("ENTROU ALVO")
-
             print("ENTROU TREINAR ALVO")
 
             if self.teste:
@@ -98,18 +97,36 @@ class FlowerClient(NumPyClient):
                 num_samples = 12000
 
             generated_datasets = []
-            for k, v in config.items():
-                if k == "modelo":
-                    continue
-                lora = parameters_to_ndarrays(v)
-                # Adiciona LoRA ao modelo
-                set_weights(self.net_gen, parameters_to_ndarrays(config["gen"]))
-                add_lora_to_model(self.net_gen)
-                set_lora_adapters(self.net_gen, lora, self.device)
+
+            # Reconstruct generator parameters
+            gen_tensors = []
+            j = 0
+            while f"gen_{j}" in config:
+                gen_tensors.append(config[f"gen_{j}"])
+                j += 1
+            gen_params = Parameters(tensors=gen_tensors, tensor_type="numpy.ndarray")
+            set_weights(self.net_gen, parameters_to_ndarrays(gen_params))
+            add_lora_to_model(self.net_gen)
+            # Reconstruct LoRA parameters
+            for i in range(0, self.num_partitions):
+                lora_bytes = []
+                j = 0
+                while f"lora_{i}_{j}" in config:
+                    lora_bytes.append(config[f"lora_{i}_{j}"])
+                    j += 1
+                lora_ndarrays = [bytes_to_ndarray(tensor) for tensor in lora_bytes]
+                lora_tensors = [torch.from_numpy(ndarray).to(self.device) for ndarray in lora_ndarrays]
+                lora_params = []
+                for i in range(0, len(lora_tensors), 2):
+                    lora_A = lora_tensors[i]
+                    lora_B = lora_tensors[i + 1]
+                    lora_params.append((torch.nn.Parameter(lora_A), torch.nn.Parameter(lora_B)))
+
+                set_lora_adapters(self.net_gen, lora_params)
+
                 generated_dataset = GeneratedDataset(generator=self.net_gen, num_samples=num_samples, device=self.device)
                 concat_dataset = torch.utils.data.ConcatDataset([self.trainloader.dataset, generated_dataset])
-                self.trainloader.dataset = concat_dataset
-                print(f"dataset: {self.trainloader.dataset}")    
+                self.trainloader = DataLoader(concat_dataset, batch_size=self.batch_size, shuffle=True) 
                  
                 
             set_weights(self.net_alvo, parameters)
@@ -121,7 +138,6 @@ class FlowerClient(NumPyClient):
                 device=self.device,
             )
 
-            print(f"saida parametros: {get_weights(self.net_alvo)}")
             return (
                 get_weights(self.net_alvo),
                 len(self.trainloader.dataset),
@@ -170,8 +186,6 @@ class FlowerClient(NumPyClient):
                     len(self.trainloader.dataset),
                     {"modelo": "gen"},
                 )
-        else:
-            print("ENTROU NADA")
 
 
     def evaluate(self, parameters, config):

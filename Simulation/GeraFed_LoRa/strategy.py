@@ -143,7 +143,7 @@ class GeraFed(Strategy):
         self.teste = teste
         self.lr_gen = lr_gen
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.loras = {0: [], 1: [], 2: [], 3: []}
+        self.loras = {}
 
     def __repr__(self) -> str:
         """Compute a string representation of the strategy."""
@@ -204,21 +204,21 @@ class GeraFed(Strategy):
         print("LoRa Train")
 
         fit_instructions = []
-
         if server_round < 3:
-            conjunto_gen = clients
-            config_gen = {"modelo": "gen", "round": server_round}
-            fit_ins_gen = FitIns(parameters=self.parameters_gen, config=config_gen)
-            for c in conjunto_gen:
-                fit_instructions.append((c, fit_ins_gen))
+            config = {"modelo": "gen", "round": server_round}
+            fit_ins = FitIns(parameters=self.parameters_gen, config=config)
+            for c in clients:
+                fit_instructions.append((c, fit_ins))
         else:
-            conjunto_alvo = clients
-            config_alvo = {"modelo": "alvo", "gen": self.parameters_gen}
-            for i in range(len(conjunto_alvo)):
-                config_alvo[f"lora_{i}"] = self.loras[i]
-            fit_ins_alvo = FitIns(parameters=self.parameters_alvo, config=config_alvo)
-            for c in conjunto_alvo:
-                fit_instructions.append((c, fit_ins_alvo))
+            config = {"modelo": "alvo"}
+            for j, tensor in enumerate(self.parameters_gen.tensors):
+                config[f"gen_{j}"] = tensor
+            for k, v in self.loras.items():
+                for i, tensor in enumerate(v.tensors):
+                    config[f"lora_{k}_{i}"] = tensor
+            fit_ins = FitIns(parameters=self.parameters_alvo, config=config)
+            for c in clients:
+                fit_instructions.append((c, fit_ins))
 
         # Return client/config pairs
         return fit_instructions
@@ -262,7 +262,6 @@ class GeraFed(Strategy):
             return None, {}
         # Do not aggregate if there are failures and failures are not accepted
         if not self.accept_failures and failures:
-            print(f"failures: {failures}")
             return None, {}
         results_alvo = [res for res in results if res[1].metrics["modelo"] == "alvo"]
         results_gen = [res for res in results if res[1].metrics["modelo"] == "gen"]
@@ -280,7 +279,7 @@ class GeraFed(Strategy):
                     self.parameters_gen = parameters_aggregated_gen
                 else:
                     for i, res in enumerate(results_gen):
-                        self.loras[i].append(res[1].parameters)
+                        self.loras[i] = res[1].parameters
         else:
             # Convert results
             weights_results = [
@@ -344,7 +343,7 @@ class GeraFed(Strategy):
                 torch.save(model.state_dict(), model_path)
                 print(f"Modelo alvo salvo em {model_path}")
 
-            if self.agg == "full":
+            if results_gen:
                 if server_round == 1:
                     # Salva o modelo após a agregaçãO
                     ndarrays = parameters_to_ndarrays(parameters_aggregated_gen)
