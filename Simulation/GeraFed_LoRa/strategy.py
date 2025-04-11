@@ -262,7 +262,6 @@ class GeraFed(Strategy):
             return None, {}
         # Do not aggregate if there are failures and failures are not accepted
         if not self.accept_failures and failures:
-            print(f"failures: {failures}")
             return None, {}
         results_alvo = [res for res in results if res[1].metrics["modelo"] == "alvo"]
         results_gen = [res for res in results if res[1].metrics["modelo"] == "gen"]
@@ -281,7 +280,6 @@ class GeraFed(Strategy):
                 else:
                     for i, res in enumerate(results_gen):
                         self.loras[i] = res[1].parameters
-                        print(f"LORA_DICT_TENSORS: {len(self.loras[i].tensors)}")
         else:
             # Convert results
             weights_results = [
@@ -345,7 +343,7 @@ class GeraFed(Strategy):
                 torch.save(model.state_dict(), model_path)
                 print(f"Modelo alvo salvo em {model_path}")
 
-            if self.agg == "full":
+            if results_gen:
                 if server_round == 1:
                     # Salva o modelo após a agregaçãO
                     ndarrays = parameters_to_ndarrays(parameters_aggregated_gen)

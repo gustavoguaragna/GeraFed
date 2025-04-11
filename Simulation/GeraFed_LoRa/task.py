@@ -538,13 +538,13 @@ def test(net, testloader, device, model):
                 metrics = results["class_metrics"][f"class_{cls}"]
                 
                 # Format accuracy (handle "N/A" case)
-                accuracy = (f"{metrics['accuracy']:.4f}" 
+                accuracy_str = (f"{metrics['accuracy']:.4f}" 
                         if isinstance(metrics['accuracy'], float) 
                         else "  N/A  ")
                 
                 f.write("{:<10} {:<10} {:<10} {:<10}\n".format(
                     f"Class {cls}",
-                    accuracy,
+                    accuracy_str,
                     metrics['samples'],
                     metrics['predictions']
                 ))
@@ -590,44 +590,69 @@ def set_weights(net, parameters):
     net.load_state_dict(state_dict, strict=True)
 
 class GeneratedDataset(Dataset):
-    def __init__(self, generator, num_samples, device, latent_dim=100, num_classes=10):
+    def __init__(self, 
+                 generator,
+                 num_samples, 
+                 latent_dim=100, 
+                 num_classes=10, 
+                 device="cpu", 
+                 image_col_name="image",
+                 label_col_name="label"):
         self.generator = generator
         self.num_samples = num_samples
         self.latent_dim = latent_dim
         self.num_classes = num_classes
         self.device = device
         self.model = type(self.generator).__name__
-        self.images = self.generate_data()
+        self.image_col_name = image_col_name
+        self.label_col_name = label_col_name
+        self.images, self.labels = self.generate_data()
         self.classes = [i for i in range(self.num_classes)]
 
 
     def generate_data(self):
-        gen_imgs = {}
-        self.generator.to(self.device)
         self.generator.eval()
-        labels = {c: torch.tensor([c for i in range(self.num_samples)], device=self.device) for c in range(self.num_classes)}
-        for c, label in labels.items():
-          if self.model == 'Generator':
-              labels_one_hot = F.one_hot(label, self.num_classes).float().to(self.device) #
-          z = torch.randn(self.num_samples, self.latent_dim, device=self.device)
-          with torch.no_grad():
-              if self.model == 'Generator':
-                  gen_imgs_class = self.generator(torch.cat([z, labels_one_hot], dim=1))
-              elif self.model == 'CGAN':
-                  gen_imgs_class = self.generator(z, label)
-          gen_imgs[c] = gen_imgs_class
+        self.generator.to(self.device)
 
-        return gen_imgs
+        labels = torch.tensor([i for i in range(self.num_classes) for _ in range(self.num_samples // self.num_classes)], device=self.device)
+        # Ensure correct number of samples if num_samples is not divisible by num_classes
+        if len(labels) < self.num_samples:
+            extra_labels = torch.randint(0, self.num_classes, (self.num_samples - len(labels),), device=self.device, dtype=torch.long)
+            labels = torch.cat([labels, extra_labels])
+        elif len(labels) > self.num_samples:
+             labels = labels[:self.num_samples]
+
+        z = torch.randn(self.num_samples, self.latent_dim, device=self.device)
+       
+        generated_images_list = []
+        batch_size = 1024
+
+        with torch.no_grad():
+            for i in range(0, self.num_samples, batch_size):
+                z_batch = z[i:i+batch_size]
+                labels_batch = labels[i:i+batch_size]
+
+                if self.model == 'Generator':
+                    labels_one_hot_batch = F.one_hot(labels_batch, self.num_classes).float()
+                    gen_imgs = self.generator(torch.cat([z_batch, labels_one_hot_batch], dim=1))
+                elif self.model == 'CGAN' or self.model=="F2U_GAN":
+                    gen_imgs = self.generator(z_batch, labels_batch)
+                
+                generated_images_list.append(gen_imgs.cpu())
+        
+        self.generator.cpu()
+        all_gen_imgs = torch.cat(generated_images_list, dim=0)
+
+        return all_gen_imgs, labels.cpu()
 
     def __len__(self):
-        return self.num_samples * self.num_classes
+        return self.num_samples
 
     def __getitem__(self, idx):
-        # Mapear o índice global para (classe, índice interno)
-        class_idx = idx // self.num_samples
-        sample_idx = idx % self.num_samples
-        # Retorna apenas a imagem (sem o rótulo)
-        return self.images[class_idx][sample_idx]
+        return {
+            self.image_col_name: self.images[idx],
+            self.label_col_name: int(self.labels[idx])
+        }
     
 
 def generate_plot(net, device, round_number, client_id = None, examples_per_class: int=5, classes: int=10, latent_dim: int=100, server: bool=False):
@@ -751,6 +776,5 @@ def get_lora_adapters(model):
 def set_lora_adapters(model, lora_params):
     for module in model.modules():
         if isinstance(module, LoRALinear):
-            print(f"LORA_PARAMS_LEN: {len(lora_params)}")
             module.lora_A, module.lora_B = lora_params.pop(0)
     return model

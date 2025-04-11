@@ -99,7 +99,6 @@ class FlowerClient(NumPyClient):
             generated_datasets = []
 
             # Reconstruct generator parameters
-            print(f"CLIENT {self.cid}, CONFIG {config.keys()}")
             gen_tensors = []
             j = 0
             while f"gen_{j}" in config:
@@ -115,24 +114,19 @@ class FlowerClient(NumPyClient):
                 while f"lora_{i}_{j}" in config:
                     lora_bytes.append(config[f"lora_{i}_{j}"])
                     j += 1
-                print(f"CLIENTE {self.cid} LORA_BYTES {len(lora_bytes)}")
                 lora_ndarrays = [bytes_to_ndarray(tensor) for tensor in lora_bytes]
-                print(f"CLIENTE {self.cid} LORA_ARRAYS {len(lora_ndarrays)}")
                 lora_tensors = [torch.from_numpy(ndarray).to(self.device) for ndarray in lora_ndarrays]
-                print(f"CLIENTE {self.cid} LORA_TENSORS {len(lora_tensors)}")
                 lora_params = []
                 for i in range(0, len(lora_tensors), 2):
                     lora_A = lora_tensors[i]
                     lora_B = lora_tensors[i + 1]
                     lora_params.append((torch.nn.Parameter(lora_A), torch.nn.Parameter(lora_B)))
 
-                print(f"LORA_PARAM: {len(lora_params)}, CID: {self.cid}")
                 set_lora_adapters(self.net_gen, lora_params)
 
                 generated_dataset = GeneratedDataset(generator=self.net_gen, num_samples=num_samples, device=self.device)
                 concat_dataset = torch.utils.data.ConcatDataset([self.trainloader.dataset, generated_dataset])
-                self.trainloader = DataLoader(concat_dataset, batch_size=self.batch_size, shuffle=True)
-                print(f"dataset: {len(self.trainloader.dataset)}")    
+                self.trainloader = DataLoader(concat_dataset, batch_size=self.batch_size, shuffle=True) 
                  
                 
             set_weights(self.net_alvo, parameters)
@@ -144,7 +138,6 @@ class FlowerClient(NumPyClient):
                 device=self.device,
             )
 
-            print(f"saida parametros: {get_weights(self.net_alvo)}")
             return (
                 get_weights(self.net_alvo),
                 len(self.trainloader.dataset),
@@ -182,8 +175,6 @@ class FlowerClient(NumPyClient):
                 
                 if config["round"] > 1:
                     lora = get_lora_adapters(self.net_gen)
-                    print(f"LORA_TUPLE: {len(lora)}")
-                    print(f"LORA_ARRAY: {len(get_lora_weights_from_list(lora))}")
 
                     return (
                     get_lora_weights_from_list(lora),
@@ -195,8 +186,6 @@ class FlowerClient(NumPyClient):
                     len(self.trainloader.dataset),
                     {"modelo": "gen"},
                 )
-        else:
-            print("ENTROU NADA")
 
 
     def evaluate(self, parameters, config):
