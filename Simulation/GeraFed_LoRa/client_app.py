@@ -27,7 +27,7 @@ from Simulation.GeraFed_LoRa.task import (
 )
 import random
 import numpy as np
-import json
+import pickle
 
 SEED = 42
 random.seed(SEED)
@@ -47,6 +47,7 @@ class FlowerClient(NumPyClient):
                 net_gen, 
                 trainloader, 
                 valloader,
+                labels,
                 local_epochs_alvo: int, 
                 local_epochs_gen: int, 
                 dataset: str, 
@@ -66,6 +67,7 @@ class FlowerClient(NumPyClient):
         self.net_gen = net_gen
         self.trainloader = trainloader
         self.valloader = valloader
+        self.labels = labels
         self.local_epochs_alvo = local_epochs_alvo
         self.local_epochs_gen = local_epochs_gen
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -96,33 +98,33 @@ class FlowerClient(NumPyClient):
             else:
                 num_samples = 12000
 
-            generated_datasets = []
-
             # Reconstruct generator parameters
-            gen_tensors = []
-            j = 0
-            while f"gen_{j}" in config:
-                gen_tensors.append(config[f"gen_{j}"])
-                j += 1
-            gen_params = Parameters(tensors=gen_tensors, tensor_type="numpy.ndarray")
+            gen_params = pickle.loads(config["gen"])
+            # gen_tensors = []
+            # j = 0
+            # while f"gen_{j}" in config:
+            #     gen_tensors.append(config[f"gen_{j}"])
+            #     j += 1
+            # gen_params = Parameters(tensors=gen_tensors, tensor_type="numpy.ndarray")
             set_weights(self.net_gen, parameters_to_ndarrays(gen_params))
             add_lora_to_model(self.net_gen)
             # Reconstruct LoRA parameters
-            for i in range(0, self.num_partitions):
-                lora_bytes = []
-                j = 0
-                while f"lora_{i}_{j}" in config:
-                    lora_bytes.append(config[f"lora_{i}_{j}"])
-                    j += 1
-                lora_ndarrays = [bytes_to_ndarray(tensor) for tensor in lora_bytes]
-                lora_tensors = [torch.from_numpy(ndarray).to(self.device) for ndarray in lora_ndarrays]
-                lora_params = []
-                for i in range(0, len(lora_tensors), 2):
-                    lora_A = lora_tensors[i]
-                    lora_B = lora_tensors[i + 1]
-                    lora_params.append((torch.nn.Parameter(lora_A), torch.nn.Parameter(lora_B)))
+            lora_dict = pickle.loads(config["loras"])
+            for k, v in lora_dict.items():
+            #     lora_bytes = []
+            #     j = 0
+            #     while f"lora_{i}_{j}" in config:
+            #         lora_bytes.append(config[f"lora_{i}_{j}"])
+            #         j += 1
+            #     lora_ndarrays = [bytes_to_ndarray(tensor) for tensor in lora_bytes]
+            #     lora_tensors = [torch.from_numpy(ndarray).to(self.device) for ndarray in lora_ndarrays]
+                lora_params = parameters_to_ndarrays(v[1][1])
+                # for i in range(0, len(lora_tensors), 2):
+                #     lora_A = lora_tensors[i]
+                #     lora_B = lora_tensors[i + 1]
+                #     lora_params.append((torch.nn.Parameter(lora_A), torch.nn.Parameter(lora_B)))
 
-                set_lora_adapters(self.net_gen, lora_params)
+                set_lora_adapters(self.net_gen, lora_params, self.device)
 
                 generated_dataset = GeneratedDataset(generator=self.net_gen, num_samples=num_samples, device=self.device)
                 concat_dataset = torch.utils.data.ConcatDataset([self.trainloader.dataset, generated_dataset])
@@ -175,11 +177,12 @@ class FlowerClient(NumPyClient):
                 
                 if config["round"] > 1:
                     lora = get_lora_adapters(self.net_gen)
-
+                    dataset = self.trainloader.dataset
                     return (
                     get_lora_weights_from_list(lora),
-                    len(self.trainloader.dataset),
-                    {"modelo": "gen"},
+                    len(dataset),
+                    {"modelo": "gen", 
+                     f"classes": pickle.dumps(self.labels)},
                 )
                 return (
                     get_weights(self.net_gen),
@@ -212,7 +215,7 @@ def client_fn(context: Context):
     partitioner = context.run_config["partitioner"]
     # pretrained_cgan = CGAN()
     # pretrained_cgan.load_state_dict(torch.load("model_round_10_mnist.pt"))
-    trainloader, valloader = load_data(partition_id=partition_id,
+    trainloader, valloader, labels = load_data(partition_id=partition_id,
                                        num_partitions=num_partitions,
                                        alpha_dir=alpha_dir,
                                        batch_size=batch_size,
@@ -234,6 +237,7 @@ def client_fn(context: Context):
                         net_gen=net_gen, 
                         trainloader=trainloader, 
                         valloader=valloader, 
+                        labels=labels,
                         local_epochs_alvo=local_epochs_alvo, 
                         local_epochs_gen=local_epochs_gen,
                         dataset=dataset,

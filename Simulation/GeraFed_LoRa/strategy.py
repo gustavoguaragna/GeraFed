@@ -25,7 +25,7 @@ import random
 from Simulation.GeraFed_LoRa.task import Net, CGAN, set_weights
 import torch
 import numpy as np
-import json
+import pickle
 
 WARNING_MIN_AVAILABLE_CLIENTS_TOO_LOW = """
     Setting `min_available_clients` lower than `min_fit_clients` or
@@ -210,15 +210,18 @@ class GeraFed(Strategy):
             for c in clients:
                 fit_instructions.append((c, fit_ins))
         else:
-            config = {"modelo": "alvo"}
-            for j, tensor in enumerate(self.parameters_gen.tensors):
-                config[f"gen_{j}"] = tensor
-            for k, v in self.loras.items():
-                for i, tensor in enumerate(v.tensors):
-                    config[f"lora_{k}_{i}"] = tensor
+            config = {"modelo": "alvo", 
+                      "gen": pickle.dumps(self.parameters_gen), 
+                      "loras": pickle.dumps(self.loras)}
+            # for j, tensor in enumerate(self.parameters_gen.tensors):
+            #     config[f"gen_{j}"] = tensor
+            # for k, v in self.loras.items():
+            #     for i, tensor in enumerate(v.tensors):
+            #         config[f"lora_{k}_{i}"] = tensor
             fit_ins = FitIns(parameters=self.parameters_alvo, config=config)
             for c in clients:
                 fit_instructions.append((c, fit_ins))
+
 
         # Return client/config pairs
         return fit_instructions
@@ -279,7 +282,7 @@ class GeraFed(Strategy):
                     self.parameters_gen = parameters_aggregated_gen
                 else:
                     for i, res in enumerate(results_gen):
-                        self.loras[i] = res[1].parameters
+                        self.loras[i] = (i, (res[1].metrics[f"classes"], res[1].parameters))
         else:
             # Convert results
             weights_results = [
@@ -357,8 +360,10 @@ class GeraFed(Strategy):
                     model_path = f"modelo_gen_round_{server_round}_mnist.pt"
                     torch.save(model.state_dict(), model_path)
                     print(f"Modelo gen salvo em {model_path}")
+                print("VAI RETORNAR GEN")
                 return self.parameters_gen, metrics_aggregated
 
+        print("VAI RETORNAR ALVO")
         return parameters_aggregated_alvo, metrics_aggregated
 
 
