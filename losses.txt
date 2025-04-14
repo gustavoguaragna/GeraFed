@@ -208,3 +208,4 @@ Rodada 30, Perda: 0.11433584513017173, Acuracia: 0.9834
 Rodada 3, Perda: 2.129404616204037, Acuracia: 0.336
 Rodada 3, Perda: 2.9755330222427467, Acuracia: 0.1116
 Rodada 3, Perda: 6.003266884263154, Acuracia: 0.0962
+Rodada 3, Perda: 3.246404101134865, Acuracia: 0.2486

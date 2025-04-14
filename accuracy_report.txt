@@ -77,3 +77,67 @@ Class 9    0.0000     1009       0
 Overall Accuracy:    0.0962
 Total Samples:       10000
 Total Predictions:   10000---------------------------------------------
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.6316     980        1009      
+Class 1    0.0996     1135       343       
+Class 2    0.0417     1032       170       
+Class 3    0.6772     1010       1417      
+Class 4    0.0122     982        193       
+Class 5    0.1861     892        1766      
+Class 6    0.0532     958        327       
+Class 7    0.4037     1028       1070      
+Class 8    0.3901     974        3588      
+Class 9    0.0030     1009       117       
+
+Overall Accuracy:    0.2486
+Total Samples:       10000
+Total Predictions:   10000---------------------------------------------
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.6316     980        1009      
+Class 1    0.0996     1135       343       
+Class 2    0.0417     1032       170       
+Class 3    0.6772     1010       1417      
+Class 4    0.0122     982        193       
+Class 5    0.1861     892        1766      
+Class 6    0.0532     958        327       
+Class 7    0.4037     1028       1070      
+Class 8    0.3901     974        3588      
+Class 9    0.0030     1009       117       
+
+Overall Accuracy:    0.2486
+Total Samples:       10000
+Total Predictions:   10000---------------------------------------------
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.6316     980        1009      
+Class 1    0.0996     1135       343       
+Class 2    0.0417     1032       170       
+Class 3    0.6772     1010       1417      
+Class 4    0.0122     982        193       
+Class 5    0.1861     892        1766      
+Class 6    0.0532     958        327       
+Class 7    0.4037     1028       1070      
+Class 8    0.3901     974        3588      
+Class 9    0.0030     1009       117       
+
+Overall Accuracy:    0.2486
+Total Samples:       10000
+Total Predictions:   10000---------------------------------------------
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.6316     980        1009      
+Class 1    0.0996     1135       343       
+Class 2    0.0417     1032       170       
+Class 3    0.6772     1010       1417      
+Class 4    0.0122     982        193       
+Class 5    0.1861     892        1766      
+Class 6    0.0532     958        327       
+Class 7    0.4037     1028       1070      
+Class 8    0.3901     974        3588      
+Class 9    0.0030     1009       117       
+
+Overall Accuracy:    0.2486
+Total Samples:       10000
+Total Predictions:   10000---------------------------------------------
