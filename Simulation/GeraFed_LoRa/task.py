@@ -21,6 +21,7 @@ from collections import defaultdict
 import time
 from torch.nn.parameter import Parameter
 
+
 os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
 SEED = 42
@@ -591,70 +592,170 @@ def set_weights(net, parameters):
     state_dict = OrderedDict({k: torch.tensor(v).to(device) for k, v in params_dict})
     net.load_state_dict(state_dict, strict=True)
 
-class GeneratedDataset(Dataset):
-    def __init__(self, 
+class GeneratedDataset(torch.utils.data.Dataset):
+    def __init__(self,
                  generator,
-                 num_samples, 
-                 latent_dim=100, 
-                 num_classes=10, 
-                 device="cpu", 
+                 num_samples,
+                 latent_dim=100,
+                 num_classes=10, # Total classes the generator model knows
+                 desired_classes=None, # Optional: List of specific class indices to generate
+                 device="cpu",
                  image_col_name="image",
                  label_col_name="label"):
+        """
+        Generates a dataset using a conditional generative model, potentially
+        focusing on a subset of classes.
+
+        Args:
+            generator: The pre-trained generative model.
+            num_samples (int): Total number of images to generate across the desired classes.
+            latent_dim (int): Dimension of the latent space vector (z).
+            num_classes (int): The total number of classes the generator was trained on.
+                               This is crucial for correct label conditioning (e.g., one-hot dim).
+            desired_classes (list[int], optional): A list of integer class indices to generate.
+                                                  If None or empty, images for all classes
+                                                  (from 0 to num_classes-1) will be generated,
+                                                  distributed as evenly as possible.
+                                                  Defaults to None.
+            device (str): Device to run generation on ('cpu' or 'cuda').
+            image_col_name (str): Name for the image column in the output dictionary.
+            label_col_name (str): Name for the label column in the output dictionary.
+        """
         self.generator = generator
         self.num_samples = num_samples
         self.latent_dim = latent_dim
-        self.num_classes = num_classes
+        # Store the total number of classes the generator understands
+        self.total_num_classes = num_classes
         self.device = device
-        self.model = type(self.generator).__name__
+        self.model_type = type(self.generator).__name__ # Get generator class name
         self.image_col_name = image_col_name
         self.label_col_name = label_col_name
-        self.images, self.labels = self.generate_data()
-        self.classes = [i for i in range(self.num_classes)]
+
+        # Determine the actual classes to generate based on desired_classes
+        if desired_classes is not None and len(desired_classes) > 0:
+            # Validate that desired classes are within the generator's known range
+            if not all(0 <= c < self.total_num_classes for c in desired_classes):
+                raise ValueError(f"All desired classes must be integers between 0 and {self.total_num_classes - 1}")
+            # Use only the unique desired classes, sorted for consistency
+            self._actual_classes_to_generate = sorted(list(set(desired_classes)))
+        else:
+            # If no specific classes desired, generate all classes
+            self._actual_classes_to_generate = list(range(self.total_num_classes))
+
+        # The 'classes' attribute of the dataset reflects only those generated
+        self.classes = self._actual_classes_to_generate
+        self.num_generated_classes = len(self.classes) # Number of classes being generated
+
+        if self.num_generated_classes == 0 and self.num_samples > 0:
+             raise ValueError("Cannot generate samples with an empty list of desired classes.")
+        elif self.num_samples == 0:
+             print("Warning: num_samples is 0. Dataset will be empty.")
+             self.images = torch.empty(0) # Adjust shape if known
+             self.labels = torch.empty(0, dtype=torch.long)
+        else:
+             # Generate the data only if needed
+             self.images, self.labels = self.generate_data()
 
 
     def generate_data(self):
+        """Generates images and corresponding labels for the specified classes."""
         self.generator.eval()
         self.generator.to(self.device)
 
-        labels = torch.tensor([i for i in range(self.num_classes) for _ in range(self.num_samples // self.num_classes)], device=self.device)
-        # Ensure correct number of samples if num_samples is not divisible by num_classes
-        if len(labels) < self.num_samples:
-            extra_labels = torch.randint(0, self.num_classes, (self.num_samples - len(labels),), device=self.device, dtype=torch.long)
-            labels = torch.cat([labels, extra_labels])
-        elif len(labels) > self.num_samples:
-             labels = labels[:self.num_samples]
+        # --- Create Labels ---
+        generated_labels_list = []
+        if self.num_generated_classes > 0:
+            # Distribute samples as evenly as possible among the desired classes
+            samples_per_class = self.num_samples // self.num_generated_classes
+            for cls in self._actual_classes_to_generate:
+                generated_labels_list.extend([cls] * samples_per_class)
 
+            # Handle remaining samples if num_samples is not perfectly divisible
+            num_remaining = self.num_samples - len(generated_labels_list)
+            if num_remaining > 0:
+                # Add remaining samples by randomly choosing from the desired classes
+                remainder_labels = random.choices(self._actual_classes_to_generate, k=num_remaining)
+                generated_labels_list.extend(remainder_labels)
+
+            # Shuffle labels for better distribution in batches later
+            random.shuffle(generated_labels_list)
+
+        # Convert labels list to tensor
+        labels = torch.tensor(generated_labels_list, dtype=torch.long, device=self.device)
+
+        # Double check label count (should match num_samples due to logic above)
+        if len(labels) != self.num_samples:
+             # This indicates an unexpected issue, potentially if num_generated_classes was 0 initially
+             # but num_samples > 0. Raise error or adjust. Let's adjust defensively.
+             print(f"Warning: Label count mismatch. Expected {self.num_samples}, got {len(labels)}. Adjusting size.")
+             if len(labels) > self.num_samples:
+                 labels = labels[:self.num_samples]
+             else:
+                 # Pad if too few (less likely with current logic unless num_generated_classes=0)
+                 num_needed = self.num_samples - len(labels)
+                 if self.num_generated_classes > 0:
+                      padding = torch.tensor(random.choices(self._actual_classes_to_generate, k=num_needed), dtype=torch.long, device=self.device)
+                      labels = torch.cat((labels, padding))
+                 # If no classes to generate from, labels tensor might remain smaller
+
+        # --- Create Latent Noise ---
         z = torch.randn(self.num_samples, self.latent_dim, device=self.device)
-       
+
+        # --- Generate Images in Batches ---
         generated_images_list = []
-        batch_size = 1024
+        # Consider making batch_size configurable
+        batch_size = min(1024, self.num_samples) if self.num_samples > 0 else 1
 
         with torch.no_grad():
             for i in range(0, self.num_samples, batch_size):
-                z_batch = z[i:i+batch_size]
-                labels_batch = labels[i:i+batch_size]
+                z_batch = z[i : min(i + batch_size, self.num_samples)]
+                labels_batch = labels[i : min(i + batch_size, self.num_samples)]
 
-                if self.model == 'Generator':
-                    labels_one_hot_batch = F.one_hot(labels_batch, self.num_classes).float()
-                    gen_imgs = self.generator(torch.cat([z_batch, labels_one_hot_batch], dim=1))
-                elif self.model == 'CGAN' or self.model=="F2U_GAN":
+                # Skip if batch is empty (can happen if num_samples = 0)
+                if z_batch.shape[0] == 0:
+                    continue
+
+                # --- Condition the generator based on its type ---
+                if self.model_type == 'Generator': # Assumes input: concat(z, one_hot_label)
+                    # One-hot encode labels using the TOTAL number of classes the generator knows
+                    labels_one_hot_batch = F.one_hot(labels_batch, num_classes=self.total_num_classes).float()
+                    generator_input = torch.cat([z_batch, labels_one_hot_batch], dim=1)
+                    gen_imgs = self.generator(generator_input)
+                elif self.model_type == 'CGAN' or self.model_type == "F2U_GAN": # Assumes input: z, label_index
                     gen_imgs = self.generator(z_batch, labels_batch)
-                
-                generated_images_list.append(gen_imgs.cpu())
-        
-        self.generator.cpu()
-        all_gen_imgs = torch.cat(generated_images_list, dim=0)
+                else:
+                    # Handle other potential generator architectures or raise an error
+                    raise NotImplementedError(f"Generation logic not defined for model type: {self.model_type}")
 
-        return all_gen_imgs, labels.cpu()
+                generated_images_list.append(gen_imgs.cpu()) # Move generated images to CPU
+
+        self.generator.cpu() # Move generator back to CPU after generation
+
+        # Concatenate all generated image batches
+        if generated_images_list:
+            all_gen_imgs = torch.cat(generated_images_list, dim=0)
+        else:
+            # If no images were generated (e.g., num_samples = 0)
+            # Create an empty tensor. Shape needs care - determine from generator or use placeholder.
+            # Let's attempt a placeholder [0, C, H, W] - requires knowing C, H, W.
+            # For now, a simple empty tensor. User might need to handle this downstream.
+            print("Warning: No images generated. Returning empty tensor for images.")
+            all_gen_imgs = torch.empty(0)
+
+        return all_gen_imgs, labels.cpu() # Return images and labels (on CPU)
 
     def __len__(self):
-        return self.num_samples
+        # Return the actual number of samples generated
+        return self.images.shape[0]
 
     def __getitem__(self, idx):
+        if idx >= len(self):
+            raise IndexError("Dataset index out of range")
         return {
             self.image_col_name: self.images[idx],
-            self.label_col_name: int(self.labels[idx])
+            self.label_col_name: int(self.labels[idx]) # Return label as standard Python int
         }
+
     
 
 def generate_plot(net, device, round_number, epoch=None, client_id = None, examples_per_class: int=5, classes: int=10, latent_dim: int=100, server: bool=False):

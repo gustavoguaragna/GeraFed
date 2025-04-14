@@ -126,7 +126,9 @@ class FlowerClient(NumPyClient):
 
                 set_lora_adapters(self.net_gen, lora_params, self.device)
 
-                generated_dataset = GeneratedDataset(generator=self.net_gen, num_samples=num_samples, device=self.device)
+                classes = pickle.loads(v[1][0])
+
+                generated_dataset = GeneratedDataset(generator=self.net_gen, num_samples=num_samples, device=self.device, desired_classes=classes)
                 concat_dataset = torch.utils.data.ConcatDataset([self.trainloader.dataset, generated_dataset])
                 self.trainloader = DataLoader(concat_dataset, batch_size=self.batch_size, shuffle=True) 
                  
