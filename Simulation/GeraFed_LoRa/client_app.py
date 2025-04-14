@@ -111,6 +111,9 @@ class FlowerClient(NumPyClient):
             # Reconstruct LoRA parameters
             lora_dict = pickle.loads(config["loras"])
             for k, v in lora_dict.items():
+                classes = pickle.loads(v[1][0])
+                if all(elemento in self.labels for elemento in classes):
+                    continue
             #     lora_bytes = []
             #     j = 0
             #     while f"lora_{i}_{j}" in config:
@@ -125,8 +128,6 @@ class FlowerClient(NumPyClient):
                 #     lora_params.append((torch.nn.Parameter(lora_A), torch.nn.Parameter(lora_B)))
 
                 set_lora_adapters(self.net_gen, lora_params, self.device)
-
-                classes = pickle.loads(v[1][0])
 
                 generated_dataset = GeneratedDataset(generator=self.net_gen, num_samples=num_samples, device=self.device, desired_classes=classes)
                 concat_dataset = torch.utils.data.ConcatDataset([self.trainloader.dataset, generated_dataset])
