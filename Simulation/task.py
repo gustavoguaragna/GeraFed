@@ -1046,7 +1046,7 @@ def generate_plot(net, device, round_number, client_id = None, examples_per_clas
     fig, axes = plt.subplots(classes, examples_per_class, figsize=(5, 9))
 
     # Adiciona título no topo da figura
-    if client_id:
+    if isinstance(client_id, int):
         fig.text(0.5, 0.98, f"Round: {round_number} | Client: {client_id}", ha="center", fontsize=12)
     else:
         fig.text(0.5, 0.98, f"Round: {round_number-1}", ha="center", fontsize=12)
