@@ -17,7 +17,6 @@ import os
 from collections import defaultdict
 from typing import Optional, List
 import matplotlib.pyplot as plt
-from collections import defaultdict
 import time
 from torch.nn.parameter import Parameter
 

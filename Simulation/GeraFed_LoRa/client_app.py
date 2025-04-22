@@ -232,7 +232,7 @@ def client_fn(context: Context):
     latent_dim = context.run_config["tam_ruido"]
     agg = context.run_config["agg"]
     model = context.run_config["model"]
-    niid = True if partitioner == "Dir" or partitioner == "Class" else False
+    niid = False if partitioner == "IID" else True
 
     # Return Client instance
     return FlowerClient(cid=partition_id,

@@ -23,28 +23,25 @@ packages = ["."]
 publisher = "gustavoguaragna"
 
 [tool.flwr.app.components]
-serverapp = "Simulation.GeraFed_LoRa.server_app:app"
-clientapp = "Simulation.GeraFed_LoRa.client_app:app"
+serverapp = "Simulation.server_app:app"
+clientapp = "Simulation.client_app:app"
 
 [tool.flwr.app.config]
-num_rodadas = 3
+num_rodadas = 20
 fraction_fit_alvo = 1.0
 fraction_fit_gen = 1.0
 tam_ruido = 100
 tam_batch = 64
 tam_img = 28
 epocas_alvo = 5
-epocas_gen = 10
-num_dadosssyn = 10
+epocas_gen = 5
 learn_rate_alvo = 0.001
 learn_rate_gen = 0.0001
-modelo_alvo = "mlp"
-modelo_gen = "gan"
 dataset = "mnist"
 partitioner = "Class" # 'Dir', 'IID' (IID no else)
 alpha_dir = 0.1
-agg = "full" # 'disc', 'full', 'f2a'
-model = "both" # 'alvo', 'gen', 'both'
+agg = "disc" # 'disc', 'full', 'f2a'
+model = "gen" # 'alvo', 'gen', 'both'
 fid = false
 teste = false
 xgb_params.objective = "binary:logistic"
@@ -60,7 +57,7 @@ xgb_params.tree-method = "hist"
 default = "local-simulation"
 
 [tool.flwr.federations.local-simulation]
-options.num-supernodes = 4
+options.num-supernodes = 10
 options.backend.client-resources.num-cpus = 1
-options.backend.client-resources.num-gpus = 0.25
+options.backend.client-resources.num-gpus = 0.2
 

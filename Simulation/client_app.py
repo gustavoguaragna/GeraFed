@@ -267,7 +267,7 @@ def client_fn(context: Context):
     net_alvo = Net()
     partition_id = context.node_config["partition-id"]
     num_partitions = context.node_config["num-partitions"]
-    niid = context.run_config["niid"]
+    partitioner = context.run_config["partitioner"]
     alpha_dir = context.run_config["alpha_dir"]
     batch_size = context.run_config["tam_batch"]
     teste = context.run_config["teste"]
@@ -275,7 +275,7 @@ def client_fn(context: Context):
     # pretrained_cgan.load_state_dict(torch.load("model_round_10_mnist.pt"))
     trainloader, valloader = load_data(partition_id=partition_id,
                                        num_partitions=num_partitions,
-                                       niid=niid,
+                                       partitioner=partitioner,
                                        alpha_dir=alpha_dir,
                                        batch_size=batch_size,
                                        teste=teste
@@ -287,6 +287,7 @@ def client_fn(context: Context):
     latent_dim = context.run_config["tam_ruido"]
     agg = context.run_config["agg"]
     model = context.run_config["model"]
+    niid = False if partitioner == "IID" else True 
 
     # Return Client instance
     return FlowerClient(cid=partition_id,

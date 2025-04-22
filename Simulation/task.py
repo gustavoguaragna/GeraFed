@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from flwr_datasets import FederatedDataset
-from flwr_datasets.partitioner import IidPartitioner, DirichletPartitioner
+from flwr_datasets.partitioner import IidPartitioner, DirichletPartitioner, Partitioner
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose, Normalize, ToTensor
 import numpy as np
@@ -21,6 +21,8 @@ from scipy import linalg
 import time
 from tqdm import tqdm
 from flwr.common import parameters_to_ndarrays
+from collections import defaultdict
+from typing import Optional, List
 
 os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
@@ -212,18 +214,130 @@ def split_balanced(gen_dataset_hf, num_clientes):
     return client_datasets
 
 
+# Copyright 2023 Flower Labs GmbH. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+"""Class-based partitioner for Hugging Face Datasets."""
+
+ # Assuming this is in the package structure
+
+
+class ClassPartitioner(Partitioner):
+    """Partitions a dataset by class, ensuring each class appears in exactly one partition.
+
+    Attributes:
+        num_partitions (int): Total number of partitions to create
+        seed (int, optional): Random seed for reproducibility
+        label_column (str): Name of the column containing class labels
+    """
+
+    def __init__(
+        self,
+        num_partitions: int,
+        seed: Optional[int] = None,
+        label_column: str = "label"
+    ) -> None:
+        super().__init__()
+        self._num_partitions = num_partitions
+        self._seed = seed
+        self._label_column = label_column
+        self._partition_indices: Optional[List[List[int]]] = None
+
+    def _create_partitions(self) -> None:
+        """Create class-based partitions and store indices."""
+        # Extract labels from dataset
+        labels = self.dataset[self._label_column]
+
+        # Group indices by class
+        class_indices = defaultdict(list)
+        for idx, label in enumerate(labels):
+            class_indices[label].append(idx)
+
+        classes = list(class_indices.keys())
+        num_classes = len(classes)
+
+        # Validate number of partitions
+        if self._num_partitions > num_classes:
+            raise ValueError(
+                f"Cannot create {self._num_partitions} partitions with only {num_classes} classes. "
+                f"Reduce partitions to ≤ {num_classes}."
+            )
+
+        # Shuffle classes for random distribution
+        rng = random.Random(self._seed)
+        rng.shuffle(classes)
+
+        # Split classes into partitions
+        partition_classes = np.array_split(classes, self._num_partitions)
+
+        # Create index lists for each partition
+        self._partition_indices = []
+        for class_group in partition_classes:
+            indices = []
+            for cls in class_group:
+                indices.extend(class_indices[cls])
+            self._partition_indices.append(indices)
+
+    @property
+    def dataset(self) -> Dataset:
+        return super().dataset
+
+    @dataset.setter
+    def dataset(self, value: Dataset) -> None:
+        # Use parent setter for basic validation
+        super(ClassPartitioner, ClassPartitioner).dataset.fset(self, value)
+
+        # Create partitions once dataset is set
+        self._create_partitions()
+
+    def load_partition(self, partition_id: int) -> Dataset:
+        """Load a partition containing exclusive classes.
+
+        Args:
+            partition_id: The ID of the partition to load (0-based index)
+
+        Returns:
+            Dataset: Subset of the dataset containing only the specified partition's data
+        """
+        if not self.is_dataset_assigned():
+            raise RuntimeError("Dataset must be assigned before loading partitions")
+        if partition_id < 0 or partition_id >= self.num_partitions:
+            raise ValueError(f"Invalid partition ID: {partition_id}")
+
+        return self.dataset.select(self._partition_indices[partition_id])
+
+    @property
+    def num_partitions(self) -> int:
+        return self._num_partitions
+
+    def __repr__(self) -> str:
+        return (f"ClassPartitioner(num_partitions={self._num_partitions}, "
+                f"seed={self._seed}, label_column='{self._label_column}')")
+
+
 fds = None  # Cache FederatedDataset
 gen_img_part = None # Cache GeneratedDataset
 
 def load_data(partition_id: int, 
-              num_partitions: int, 
-              niid: bool, 
+              num_partitions: int,  
               alpha_dir: float, 
               batch_size: int, 
               cgan=None, 
               examples_per_class=5000,
               filter_classes=None,
-              teste: bool = False):
+              teste: bool = False,
+              partitioner: str = "IID"):
     
     """Carrega MNIST com splits de treino e teste separados. Se examples_per_class > 0, inclui dados gerados."""
    
@@ -231,8 +345,8 @@ def load_data(partition_id: int,
 
     if fds is None:
         print("Carregamento dos Dados")
-        if niid:
-            print("Dados não IID")
+        if partitioner == "Dir":
+            print("Dados por Dirichlet")
             partitioner = DirichletPartitioner(
                 num_partitions=num_partitions,
                 partition_by="label",
@@ -240,6 +354,9 @@ def load_data(partition_id: int,
                 min_partition_size=0,
                 self_balancing=False
             )
+        elif partitioner == "Class":
+            print("Dados por classe")
+            partitioner = ClassPartitioner(num_partitions=num_partitions, seed=42)
         else:
             print("Dados IID")
             partitioner = IidPartitioner(num_partitions=num_partitions)
