@@ -197,7 +197,37 @@ class FlowerClient(NumPyClient):
                     {"modelo": "gen"},
                 )
             elif self.agg == "f2a":
-                set_weights(self.net_gen, parameters)
+                # Supondo que net seja o modelo e parameters seja a lista de parâmetros fornecida
+                state_keys = [k for k in self.net_gen.state_dict().keys() if 'discriminator' not in k]
+            
+                # Criando o OrderedDict com as chaves filtradas e os parâmetros fornecidos
+                disc_dict = OrderedDict({k: torch.tensor(v) for k, v in zip(state_keys, parameters)})
+
+                state_dict = {}
+                # Extract record from context
+                if "net_parameters" in self.client_state.parameters_records:
+                    p_record = self.client_state.parameters_records["net_parameters"]
+
+                    # Deserialize arrays
+                    for k, v in p_record.items():
+                        state_dict[k] = torch.from_numpy(v.numpy())
+
+                    # Apply state dict to a new model instance
+                    model_ = CGAN()
+                    model_.load_state_dict(state_dict)
+
+                    new_state_dict = {}
+
+                    for name, param in self.net_gen.state_dict().items():
+                        if 'discriminator' in name:
+                            new_state_dict[name] = model_.state_dict()[name]
+                        elif 'generator' in name or 'label' in name:
+                            new_state_dict[name] = disc_dict[name]
+                        else:
+                            new_state_dict[name] = param
+
+                    self.net_gen.load_state_dict(new_state_dict)
+
                 train_gen(
                 net=self.net_gen,
                 trainloader=self.trainloader[config["round"] % len(self.trainloader)],
@@ -208,6 +238,16 @@ class FlowerClient(NumPyClient):
                 latent_dim=self.latent_dim,
                 f2a=True
             )
+                # Save all elements of the state_dict into a single RecordSet
+                p_record = ParametersRecord()
+                for k, v in self.net_gen.state_dict().items():
+                    # Convert to NumPy, then to Array. Add to record
+                    p_record[k] = array_from_numpy(v.detach().cpu().numpy())
+                # Add to a context
+                self.client_state.parameters_records["net_parameters"] = p_record
+
+                model_path = f"modelo_gen_round_{config['round']}_client_{self.cid}.pt"
+                
                 return (
                 get_weights(self.net_gen),
                 len(self.trainloader.dataset),

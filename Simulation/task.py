@@ -519,7 +519,7 @@ def train_gen(net, trainloader, epochs, lr, device, dataset="mnist", latent_dim=
                             epoch, batch_idx, len(trainloader),
                             d_loss.mean().item())) 
                 
-def train_G(net: CGAN, device: str, lr: float, epochs: int, batch_size: int, latent_dim: int):
+def train_G(net: CGAN, discs: list, device: str, lr: float, epochs: int, batch_size: int, latent_dim: int):
     net.to(device)  # move model to GPU if available
     optim_G = torch.optim.Adam(net.generator.parameters(), lr=lr, betas=(0.5, 0.999))
     
@@ -529,8 +529,11 @@ def train_G(net: CGAN, device: str, lr: float, epochs: int, batch_size: int, lat
         z_noise = torch.randn(batch_size, latent_dim, device=device)
         x_fake_labels = torch.randint(0, 10, (batch_size,), device=device)
         x_fake = net(z_noise, x_fake_labels)
-        y_fake_g = net(x_fake, x_fake_labels)
+        y_fake_gs = [disc(x_fake.detach(), x_fake_labels) for disc in discs]
+        y_fake_g_means = [torch.mean(y).item() for y in y_fake_gs]
+        Dmax = discs[y_fake_g_means.index(max(y_fake_g_means))]
         real_ident = torch.full((batch_size, 1), 1., device=device)
+        y_fake_g = Dmax(x_fake, x_fake_labels)
         g_loss = net.loss(y_fake_g, real_ident)
         g_loss.backward()
         optim_G.step()
