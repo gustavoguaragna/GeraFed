@@ -386,27 +386,28 @@ class GeraFed(Strategy):
             torch.save(model.state_dict(), model_path)
             print(f"Modelo alvo salvo em {model_path}")
         
-        elif self.model == "gen" and parameters_aggregated_gen is not None:
+        elif self.model == "gen":
             if self.agg == "full":
-                # Salva o modelo após a agregaçãO
-                # Cria uma instância do modelo
-                model = CGAN(dataset=self.dataset,
-                            img_size=self.img_size,
-                            latent_dim=self.latent_dim)
-                # Define os pesos do modelo
-                set_weights(model, aggregated_ndarrays_gen)
-                # Salva o modelo no disco com o nome específico do dataset
-                model_path = f"modelo_gen_round_{server_round}_mnist.pt"
-                torch.save(model.state_dict(), model_path)
-                print(f"Modelo gen salvo em {model_path}")
+                if parameters_aggregated_gen is not None:
+                    # Salva o modelo após a agregaçãO
+                    # Cria uma instância do modelo
+                    model = CGAN(dataset=self.dataset,
+                                img_size=self.img_size,
+                                latent_dim=self.latent_dim)
+                    # Define os pesos do modelo
+                    set_weights(model, aggregated_ndarrays_gen)
+                    # Salva o modelo no disco com o nome específico do dataset
+                    model_path = f"modelo_gen_round_{server_round}_mnist.pt"
+                    torch.save(model.state_dict(), model_path)
+                    print(f"Modelo gen salvo em {model_path}")
             elif self.agg == "f2a":
                 # Define os pesos do modelo
                 disc_ndarrays = [parameters_to_ndarrays(fit_res.parameters) for _, fit_res in results_gen]
-                discs = [CGAN() for _ in range(len(disc_ndarrays))]
+                discs = [CGAN().to(self.device) for _ in range(len(disc_ndarrays))]
                 for i, disc in enumerate(discs):
                     set_weights(disc, disc_ndarrays[i])
                 train_G(
-                gen=self.gen,
+                net=self.gen,
                 discs=discs,
                 epochs=20,
                 lr=self.lr_gen,

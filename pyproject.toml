@@ -27,7 +27,7 @@ serverapp = "Simulation.server_app:app"
 clientapp = "Simulation.client_app:app"
 
 [tool.flwr.app.config]
-num_rodadas = 20
+num_rodadas = 200
 fraction_fit_alvo = 1.0
 fraction_fit_gen = 1.0
 tam_ruido = 100
@@ -40,8 +40,8 @@ learn_rate_gen = 0.0001
 dataset = "mnist"
 partitioner = "Class" # 'Dir', 'IID' (IID no else)
 alpha_dir = 0.1
-agg = "disc" # 'disc', 'full', 'f2a'
-num_chunks = 1
+agg = "f2a" # 'disc', 'full', 'f2a'
+num_chunks = 20
 model = "gen" # 'alvo', 'gen', 'both'
 fid = false
 teste = false

@@ -228,16 +228,18 @@ class FlowerClient(NumPyClient):
 
                     self.net_gen.load_state_dict(new_state_dict)
 
+                chunk_idx = config["round"] % len(self.trainloader)
+
                 train_gen(
                 net=self.net_gen,
-                trainloader=self.trainloader[config["round"] % len(self.trainloader)],
+                trainloader=self.trainloader[chunk_idx],
                 epochs=self.local_epochs_gen,
                 lr=self.lr_gen,
                 device=self.device,
                 dataset=self.dataset,
                 latent_dim=self.latent_dim,
                 f2a=True
-            )
+                )
                 # Save all elements of the state_dict into a single RecordSet
                 p_record = ParametersRecord()
                 for k, v in self.net_gen.state_dict().items():
@@ -250,9 +252,9 @@ class FlowerClient(NumPyClient):
                 
                 return (
                 get_weights(self.net_gen),
-                len(self.trainloader.dataset),
+                len(self.trainloader[chunk_idx].dataset),
                 {"modelo": "gen"},
-            )
+                )
 
     def evaluate(self, parameters, config):
         if self.model == "gen":
