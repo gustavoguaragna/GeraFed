@@ -41,6 +41,7 @@ dataset = "mnist"
 partitioner = "Class" # 'Dir', 'IID' (IID no else)
 alpha_dir = 0.1
 agg = "disc" # 'disc', 'full', 'f2a'
+num_chunks = 1
 model = "gen" # 'alvo', 'gen', 'both'
 fid = false
 teste = false

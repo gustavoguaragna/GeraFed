@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from flwr_datasets import FederatedDataset
 from flwr_datasets.partitioner import IidPartitioner, DirichletPartitioner, Partitioner
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 from torchvision.transforms import Compose, Normalize, ToTensor
 import numpy as np
 from torchvision.transforms.functional import to_pil_image
@@ -23,6 +23,7 @@ from tqdm import tqdm
 from flwr.common import parameters_to_ndarrays
 from collections import defaultdict
 from typing import Optional, List
+import math
 
 os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
@@ -337,7 +338,8 @@ def load_data(partition_id: int,
               examples_per_class=5000,
               filter_classes=None,
               teste: bool = False,
-              partitioner: str = "IID"):
+              partitioner: str = "IID",
+              num_chunks: int = 1,):
     
     """Carrega MNIST com splits de treino e teste separados. Se examples_per_class > 0, inclui dados gerados."""
    
@@ -408,7 +410,17 @@ def load_data(partition_id: int,
     train_partition = train_partition.with_transform(apply_transforms)
     test_partition = test_partition.with_transform(apply_transforms)
     
-    trainloader = DataLoader(train_partition, batch_size=batch_size, shuffle=True)
+    if num_chunks > 1:
+        chunk_size = math.ceil(len(train_partition) / num_chunks)
+        chunks = []
+        for i in range(num_chunks):
+            start = i * chunk_size
+            end = min((i + 1) * chunk_size, len(train_partition))
+            chunks.append(Subset(train_partition, range(start, end)))
+        trainloader = [DataLoader(chunk, batch_size=batch_size, shuffle=True) for chunk in chunks]
+    else:
+        trainloader = DataLoader(train_partition, batch_size=batch_size, shuffle=True)
+
     testloader = DataLoader(test_partition, batch_size=batch_size)
 
     return trainloader, testloader
@@ -502,7 +514,7 @@ def train_gen(net, trainloader, epochs, lr, device, dataset="mnist", latent_dim=
 
                 d_losses.append(d_loss.item())
 
-                if batch_idx % 100 == 0 and batch_idx > 0:
+                if batch_idx % 10 == 0 and batch_idx > 0:
                     print('Epoch {} [{}/{}] loss_D_treino: {:.4f}'.format(
                             epoch, batch_idx, len(trainloader),
                             d_loss.mean().item())) 

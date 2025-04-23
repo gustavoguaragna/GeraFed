@@ -200,7 +200,7 @@ class FlowerClient(NumPyClient):
                 set_weights(self.net_gen, parameters)
                 train_gen(
                 net=self.net_gen,
-                trainloader=self.trainloader,
+                trainloader=self.trainloader[config["round"] % len(self.trainloader)],
                 epochs=self.local_epochs_gen,
                 lr=self.lr_gen,
                 device=self.device,
@@ -271,6 +271,7 @@ def client_fn(context: Context):
     alpha_dir = context.run_config["alpha_dir"]
     batch_size = context.run_config["tam_batch"]
     teste = context.run_config["teste"]
+    num_chunks = context.run_config["num_chunks"]
     # pretrained_cgan = CGAN()
     # pretrained_cgan.load_state_dict(torch.load("model_round_10_mnist.pt"))
     trainloader, valloader = load_data(partition_id=partition_id,
@@ -278,8 +279,8 @@ def client_fn(context: Context):
                                        partitioner=partitioner,
                                        alpha_dir=alpha_dir,
                                        batch_size=batch_size,
-                                       teste=teste
-                                      )
+                                       teste=teste,
+                                       num_chunks=num_chunks)
     local_epochs_alvo = context.run_config["epocas_alvo"]
     local_epochs_gen = context.run_config["epocas_gen"]
     lr_gen = context.run_config["learn_rate_gen"]
