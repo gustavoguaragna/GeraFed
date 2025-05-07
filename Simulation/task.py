@@ -417,7 +417,7 @@ def load_data(partition_id: int,
             start = i * chunk_size
             end = min((i + 1) * chunk_size, len(train_partition))
             chunks.append(Subset(train_partition, range(start, end)))
-        trainloader = [DataLoader(chunk, batch_size=batch_size, shuffle=True) for chunk in chunks]
+        trainloader = [DataLoader(chunk, batch_size=batch_size, shuffle=True) for chunk in chunks if len(chunk) > 0]
     else:
         trainloader = DataLoader(train_partition, batch_size=batch_size, shuffle=True)
 
