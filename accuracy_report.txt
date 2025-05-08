@@ -3081,7 +3081,9 @@ Class 9    0.7939     1009       2158
 
 Overall Accuracy:    0.6367
 Total Samples:       10000
-Total Predictions:   10000Class      Accuracy   Samples    Predictions
+Total Predictions:   10000
+
+Class      Accuracy   Samples    Predictions
 ---------------------------------------------
 Class 0    0.6480     980        774       
 Class 1    0.7313     1135       867       
