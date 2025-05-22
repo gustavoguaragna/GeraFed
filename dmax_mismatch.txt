@@ -1,2 +1,418 @@
 epoch label expected_index dmax_index
 
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
+
+Mismatch Percentage: 0.00%
