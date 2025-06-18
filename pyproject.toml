@@ -23,11 +23,11 @@ packages = ["."]
 publisher = "gustavoguaragna"
 
 [tool.flwr.app.components]
-serverapp = "Simulation.server_app:app"
-clientapp = "Simulation.client_app:app"
+serverapp = "Simulation.Multi_Models.server_app:app"
+clientapp = "Simulation.Multi_Models.client_app:app"
 
 [tool.flwr.app.config]
-num_rodadas = 2000
+num_rodadas = 4
 fraction_fit_alvo = 1.0
 fraction_fit_gen = 1.0
 tam_ruido = 100
@@ -40,11 +40,11 @@ learn_rate_gen = 0.0001
 dataset = "mnist"
 partitioner = "Class" # 'Dir', 'IID' (IID no else)
 alpha_dir = 0.1
-agg = "f2a" # 'disc', 'full', 'f2a'
+agg = "none" # 'disc', 'full', 'f2a', 'none'
 # num_chunks = 
-model = "gen" # 'alvo', 'gen', 'both'
+model = "both" # 'alvo', 'gen', 'both'
 fid = false
-teste = false
+teste = true
 xgb_params.objective = "binary:logistic"
 xgb_params.eta = 0.1 # Learning rate
 xgb_params.max-depth = 8
@@ -60,5 +60,5 @@ default = "local-simulation"
 [tool.flwr.federations.local-simulation]
 options.num-supernodes = 10
 options.backend.client-resources.num-cpus = 1
-options.backend.client-resources.num-gpus = 0.2
+options.backend.client-resources.num-gpus = 0
 
