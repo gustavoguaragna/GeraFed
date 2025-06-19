@@ -1,25 +1,21 @@
 """GeraFed: um framework para balancear dados heterogêneos em aprendizado federado."""
 
 import torch
-from collections import OrderedDict
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import Context, ParametersRecord, array_from_numpy
 from Simulation.task import (
     Net, 
     CGAN, 
     get_weights, 
-    get_weights_gen, 
     load_data, 
     set_weights, 
     test, 
     train_alvo, 
     train_gen, 
-    calculate_fid, 
     generate_plot
 )
 import random
 import numpy as np
-import json
 import pickle
 
 SEED = 42
@@ -47,23 +43,19 @@ class FlowerClient(NumPyClient):
                 lr_gen: float, 
                 latent_dim: int, 
                 context: Context,
-                agg: str,
-                model: str,
                 num_partitions: int,
                 niid: bool,
                 alpha_dir: float,
                 batch_size: int,
                 teste: bool):
         self.cid=cid
-        self.net_alvo = net_alvo
-        self.net_gen = net_gen
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.net_alvo = net_alvo.to(self.device)
+        self.net_gen = net_gen.to(self.device)
         self.trainloader = trainloader
         self.valloader = valloader
         self.local_epochs_alvo = local_epochs_alvo
         self.local_epochs_gen = local_epochs_gen
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.net_alvo.to(self.device)
-        self.net_gen.to(self.device)
         self.dataset = dataset
         self.lr_alvo = lr_alvo
         self.lr_gen = lr_gen
@@ -71,8 +63,6 @@ class FlowerClient(NumPyClient):
         self.client_state = (
             context.state
         ) 
-        self.agg = agg
-        self.model = model
         self.num_partitions = num_partitions
         self.niid = niid
         self.alpha_dir = alpha_dir
@@ -88,8 +78,6 @@ class FlowerClient(NumPyClient):
             lr=self.lr_alvo,
             device=self.device,
         )
-        
-        state_keys = [k for k in self.net_gen.state_dict().keys()]
 
         state_dict = {}
         # Extract record from context
@@ -133,51 +121,13 @@ class FlowerClient(NumPyClient):
         return (
             get_weights_gen(self.net_alvo),
             len(self.trainloader.dataset),
-            {"train_loss": train_loss, "gan": pickle.dumps(gen_params)},
+            {"train_loss": train_loss, "gan": pickle.dumps(gan_params)},
         )
 
     def evaluate(self, parameters, config):
-        if self.model == "gen":
-            """Evaluate the model on the data this client has."""
-            if self.agg == "full":
-                set_weights(self.net_gen, parameters)
-            elif self.agg == "disc":
-                # Supondo que net seja o modelo e parameters seja a lista de parâmetros fornecida
-                state_keys = [k for k in self.net_gen.state_dict().keys() if 'generator' not in k]
-            
-                # Criando o OrderedDict com as chaves filtradas e os parâmetros fornecidos
-                disc_dict = OrderedDict({k: torch.tensor(v) for k, v in zip(state_keys, parameters)})
-
-                state_dict = {}
-                # Extract record from context
-                if "net_parameters" in self.client_state.parameters_records:
-                    p_record = self.client_state.parameters_records["net_parameters"]
-
-                    # Deserialize arrays
-                    for k, v in p_record.items():
-                        state_dict[k] = torch.from_numpy(v.numpy())
-
-                    # Apply state dict to a new model instance
-                    model_ = CGAN()
-                    model_.load_state_dict(state_dict)
-
-                    new_state_dict = {}
-
-                    for name, param in self.net_gen.state_dict().items():
-                        if 'generator' in name:
-                            new_state_dict[name] = model_.state_dict()[name]
-                        elif 'discriminator' in name or 'label' in name:
-                            new_state_dict[name] = disc_dict[name]
-                        else:
-                            new_state_dict[name] = param
-
-                    self.net_gen.load_state_dict(new_state_dict)
-            g_loss, d_loss = test(self.net_gen, self.valloader, self.device, model=self.model)
-            return g_loss, len(self.valloader), {}
-        else:
-            set_weights(self.net_alvo, parameters)
-            loss, accuracy = test(self.net_alvo, self.valloader, self.device, model=self.model)
-            return loss, len(self.valloader.dataset), {"accuracy": accuracy}
+        set_weights(self.net_alvo, parameters)
+        loss, accuracy = test(self.net_alvo, self.valloader, self.device, model=self.model)
+        return loss, len(self.valloader.dataset), {"accuracy": accuracy}
 
 
 def client_fn(context: Context):
