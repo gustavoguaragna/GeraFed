@@ -7,17 +7,16 @@ import torch.nn as nn
 import torch.nn.functional as F
 from flwr_datasets import FederatedDataset
 from flwr_datasets.partitioner import IidPartitioner, DirichletPartitioner, Partitioner
-from torch.utils.data import DataLoader, Subset
+from torch.utils.data import DataLoader, ConcatDataset, TensorDataset
 from torchvision.transforms import Compose, Normalize, ToTensor
 import numpy as np
-from torchvision.transforms.functional import to_pil_image
-from datasets import Dataset, Features, ClassLabel, Image
+from typing import Optional
 import random
-from torch.utils.model_zoo import load_url
 import os
 from collections import defaultdict
 from typing import Optional, List
-import math
+from datasets import Dataset
+from torchvision.utils import save_image
 
 os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
@@ -55,21 +54,23 @@ class Net(nn.Module):
 
 # Define the GAN model
 class CGAN(nn.Module):
-    def __init__(self, cid, dataset="mnist", img_size=28, latent_dim=100):
+    def __init__(self, dataset="mnist", img_size=28, latent_dim=100, condition=False):
         super(CGAN, self).__init__()
         if dataset == "mnist":
             self.classes = 10
             self.channels = 1
+        self.condition = condition
         self.img_size = img_size
         self.latent_dim = latent_dim
         self.img_shape = (self.channels, self.img_size, self.img_size)
-        self.label_embedding = nn.Embedding(self.classes, self.classes)
+        self.label_embedding = nn.Embedding(self.classes, self.classes) if condition else None
         self.adv_loss = torch.nn.BCELoss()
-        self.cid = cid
+        self.input_shape_gen = self.latent_dim + self.label_embedding.embedding_dim if condition else self.latent_dim
+        self.input_shape_disc = int(np.prod(self.img_shape)) + self.classes if condition else int(np.prod(self.img_shape))
 
 
         self.generator = nn.Sequential(
-            *self._create_layer_gen(self.latent_dim + self.classes, 128, False),
+            *self._create_layer_gen(self.input_shape_gen, 128, False),
             *self._create_layer_gen(128, 256),
             *self._create_layer_gen(256, 512),
             *self._create_layer_gen(512, 1024),
@@ -78,7 +79,7 @@ class CGAN(nn.Module):
         )
 
         self.discriminator = nn.Sequential(
-            *self._create_layer_disc(self.classes + int(np.prod(self.img_shape)), 1024, False, True),
+            *self._create_layer_disc(self.input_shape_disc, 1024, False, True),
             *self._create_layer_disc(1024, 512, True, True),
             *self._create_layer_disc(512, 256, True, True),
             *self._create_layer_disc(256, 128, False, False),
@@ -111,103 +112,29 @@ class CGAN(nn.Module):
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0.0)
 
-    def forward(self, input, labels):
+    def forward(self, input, labels=None):
         device = input.device  # Ensure all tensors are on the same device
-        labels = labels.to(device)  # Move labels to the same device as input
+        if self.condition:
+            labels = labels.to(device)  # Move labels to the same device as input
         
         if input.dim() == 2:
-            z = torch.cat((self.label_embedding(labels), input), -1)
-            x = self.generator(z)
+            if self.condition:
+                z = torch.cat((self.label_embedding(labels), input), -1)
+                x = self.generator(z)
+            else:
+                x = self.generator(input)
             x = x.view(x.size(0), *self.img_shape) #Em
             return x 
+        
         elif input.dim() == 4:
-            x = torch.cat((input.view(input.size(0), -1), self.label_embedding(labels)), -1)
+            if self.condition:
+                x = torch.cat((input.view(input.size(0), -1), self.label_embedding(labels)), -1)
+            else:
+                x = input.view(input.size(0), -1)
             return self.discriminator(x)
 
     def loss(self, output, label):
         return self.adv_loss(output, label)
-
-def generate_images(cgan, examples_per_class):
-    cgan.eval()
-    device = next(cgan.parameters()).device
-    latent_dim = cgan.latent_dim
-    classes = cgan.classes
-    
-    # Cria um vetor de rótulos balanceado
-    labels = torch.tensor([i for i in range(classes) for _ in range(examples_per_class)], device=device)
-    # Número total de imagens geradas
-    num_samples = examples_per_class * classes
-    # Gera vetores latentes aleatórios
-    z = torch.randn(num_samples, latent_dim, device=device)
-
-    with torch.no_grad():
-        cgan.eval()
-        gen_imgs = cgan(z, labels)  # [N, C, H, W]
-
-    # Retorna como lista para aplicar transforms depois
-    # Convertendo para CPU para aplicar transforms com PIL, se necessário
-    gen_imgs_list = [img.cpu() for img in gen_imgs]
-    gen_labels_list = labels.cpu().tolist()
-
-    #converte para PIL
-    gen_imgs_pil = [to_pil_image((img * 0.5 + 0.5).clamp(0,1)) for img in gen_imgs_list]
-
-    #Monta dataset como do FederatedDataset
-    features = Features({
-    "image": Image(),
-    "label": ClassLabel(names=[str(i) for i in range(classes)])
-    })
-
-    # Cria um dicionário com os dados
-    gen_dict = {"image": gen_imgs_pil, "label": gen_labels_list}
-
-    # Cria o dataset Hugging Face
-    gen_dataset_hf = Dataset.from_dict(gen_dict, features=features)
-    return gen_dataset_hf
-
-def split_balanced(gen_dataset_hf, num_clientes):
-    # Identificar as classes
-    class_label = gen_dataset_hf.features["label"]
-    num_classes = class_label.num_classes
-    
-    # Cria um mapeamento classe -> índices
-    class_to_indices = {c: [] for c in range(num_classes)}
-    for i in range(len(gen_dataset_hf)):
-        lbl = gen_dataset_hf[i]["label"]
-        class_to_indices[lbl].append(i)
-    
-    # Verifica quantos exemplos por classe temos
-    examples_per_class = len(class_to_indices[0])
-    # Garantir que o número de exemplos por classe seja divisível por num_clientes 
-    # (ou lidar com o resto de alguma forma)
-    if examples_per_class % num_clientes != 0:
-        raise ValueError("O número de exemplos por classe não é divisível igualmente pelo número de clientes.")
-        
-    # Número de exemplos por classe por cliente
-    examples_per_class_per_client = examples_per_class // num_clientes
-
-    # Agora, distribui igualmente os índices para cada cliente
-    client_indices = [[] for _ in range(num_clientes)]
-    for c in range(num_classes):
-        # Índices dessa classe
-        idxs = class_to_indices[c]
-        # Divide em partes iguais
-        for i in range(num_clientes):
-            start = i * examples_per_class_per_client
-            end = (i+1) * examples_per_class_per_client
-            client_indices[i].extend(idxs[start:end])
-    
-    # Agora criamos um DatasetDict com um subset para cada cliente
-    # Cada cliente terá a mesma quantidade total de exemplos (classes * examples_per_class_per_client)
-    client_datasets = {}
-    for i in range(num_clientes):
-        # Ordena os índices do cliente (opcional, mas pode manter a ordem)
-        client_indices[i].sort()
-        # Seleciona os exemplos
-        client_subset = gen_dataset_hf.select(client_indices[i])
-        client_datasets[i] = client_subset
-    
-    return client_datasets
 
 
 # Copyright 2023 Flower Labs GmbH. All Rights Reserved.
@@ -320,6 +247,30 @@ class ClassPartitioner(Partitioner):
     def __repr__(self) -> str:
         return (f"ClassPartitioner(num_partitions={self._num_partitions}, "
                 f"seed={self._seed}, label_column='{self._label_column}')")
+    
+class DictWrapper(torch.utils.data.Dataset):
+    def __init__(self, tensor_dataset):
+        self.tensor_dataset = tensor_dataset
+
+    def __len__(self):
+        return len(self.tensor_dataset)
+
+    def __getitem__(self, idx):
+        img, label = self.tensor_dataset[idx]
+        # ensure tensors
+        if not isinstance(img, torch.Tensor):
+            img = torch.tensor(img)
+        if not isinstance(label, torch.Tensor):
+            label = torch.tensor(label, dtype=torch.long)
+        else:
+            label = label.clone().detach().long()
+        return {"image": img, "label": label}
+
+# Custom collate_fn to stack dict batches
+def _collate_dict(batch):
+    images = torch.stack([item['image'] for item in batch], dim=0)
+    labels = torch.stack([item['label'] for item in batch], dim=0)
+    return {'image': images, 'label': labels}
 
 
 fds = None  # Cache FederatedDataset
@@ -329,22 +280,22 @@ def load_data(partition_id: int,
               num_partitions: int,  
               alpha_dir: float, 
               batch_size: int, 
-              cgan=None, 
-              examples_per_class=5000,
-              filter_classes=None,
               teste: bool = False,
               partitioner: str = "IID",
-              num_chunks: int = 1,):
-    
-    """Carrega MNIST com splits de treino e teste separados. Se examples_per_class > 0, inclui dados gerados."""
+              syn_samples: int = 0,
+              gans: Optional[List[CGAN]] = None,
+              classifier: Optional[Net] = None,
+              conf_threshold: float = 0.1) -> tuple[DataLoader, DataLoader]:
+
+    """Carrega MNIST com splits de treino e teste separados. Se syn_samples > 0, inclui dados gerados."""
    
     global fds
 
     if fds is None:
-        print("Carregamento dos Dados")
+        print("Carregando os Dados")
         if partitioner == "Dir":
             print("Dados por Dirichlet")
-            partitioner = DirichletPartitioner(
+            partitioner = DirichletPartitioner( #type:ignore
                 num_partitions=num_partitions,
                 partition_by="label",
                 alpha=alpha_dir,
@@ -353,45 +304,26 @@ def load_data(partition_id: int,
             )
         elif partitioner == "Class":
             print("Dados por classe")
-            partitioner = ClassPartitioner(num_partitions=num_partitions, seed=42)
+            partitioner = ClassPartitioner(num_partitions=num_partitions, seed=42) #type:ignore
         else:
             print("Dados IID")
-            partitioner = IidPartitioner(num_partitions=num_partitions)
+            partitioner = IidPartitioner(num_partitions=num_partitions) #type:ignore
 
         fds = FederatedDataset(
             dataset="mnist",
-            partitioners={"train": partitioner}
+            partitioners={"train": partitioner} #type:ignore
         )
 
     # Carrega a partição de treino e teste separadamente
     test_partition = fds.load_split("test")
+    train_partition = fds.load_partition(partition_id, split="train")
 
-    global gen_img_part
-
-    if cgan is not None and examples_per_class > 0:
-        if gen_img_part is None:
-            print("Gerando dados para treino")
-            generated_images = generate_images(cgan, examples_per_class)
-            gen_img_part = split_balanced(gen_dataset_hf=generated_images, num_clientes=num_partitions)
-        train_partition = gen_img_part[partition_id]
-    else:
-        train_partition = fds.load_partition(partition_id, split="train")
-
-    from collections import Counter
-    labels = train_partition["label"]
-    class_distribution = Counter(labels)
-    print(f"CID {partition_id}: {class_distribution}")
-        
-
-    if teste:
-        print("reduzindo dataset para modo teste")
-        num_samples = int(len(train_partition)/10)
-        train_partition = train_partition.select(range(num_samples))
-
-    if filter_classes is not None:
-        print("filtrando classes no dataset")
-        train_partition = train_partition.filter(lambda x: x["label"] in filter_classes)
-        print(f"selecionadas classes: {filter_classes}")
+    if syn_samples == 10:
+        from collections import Counter
+        labels = train_partition["label"]
+        class_distribution = Counter(labels)
+        with open("class_distribution.txt", "a") as f:
+            f.write(f"CID {partition_id}: {class_distribution}\n")
     
     pytorch_transforms = Compose([
         ToTensor(),
@@ -404,21 +336,82 @@ def load_data(partition_id: int,
 
     train_partition = train_partition.with_transform(apply_transforms)
     test_partition = test_partition.with_transform(apply_transforms)
+
+    if teste:
+        print("reduzindo dataset para modo teste")
+        num_samples = int(len(train_partition)/10)
+        train_partition = train_partition.select(range(num_samples))
     
-    if num_chunks > 1:
-        chunk_size = math.ceil(len(train_partition) / num_chunks)
-        chunks = []
-        for i in range(num_chunks):
-            start = i * chunk_size
-            end = min((i + 1) * chunk_size, len(train_partition))
-            chunks.append(Subset(train_partition, range(start, end)))
-        trainloader = [DataLoader(chunk, batch_size=batch_size, shuffle=True) for chunk in chunks if len(chunk) > 0]
+    # Generate fake examples per class if requested
+    if syn_samples > 0 and gans and classifier:
+        # Divide samples equally among GANs
+        num_gans = len(gans)
+        samples_per_gan = syn_samples // num_gans
+        all_fake_imgs, all_fake_labels, all_fake_probs = [], [], []
+
+        classifier.eval()
+        for gan in gans:
+            gan.eval()
+            device = next(gan.parameters()).device
+            with torch.no_grad():
+                # Sample noise and generate
+                z = torch.randn(samples_per_gan, gan.latent_dim, device=device)
+                fake_imgs = gan(z)  # shape: (M, C, H, W)
+
+                # Classify in batches to avoid OOM
+                all_probs = []
+                batch_size_clf = 256
+                for i in range(0, fake_imgs.size(0), batch_size_clf):
+                    batch = fake_imgs[i:i + batch_size_clf].to(device)
+                    outputs = classifier(batch)
+                    all_probs.append(torch.softmax(outputs, dim=1))
+                probs = torch.cat(all_probs, dim=0)
+                maxp, preds = probs.max(1)
+
+                # Keep only confident predictions
+                mask = maxp > conf_threshold
+                filtered_imgs = fake_imgs[mask].cpu()
+                filtered_labels = preds[mask].cpu()
+                filtered_probs = maxp[mask].cpu()
+
+                all_fake_imgs.append(filtered_imgs)
+                all_fake_labels.append(filtered_labels)
+                all_fake_probs.append(filtered_probs)
+
+        if all_fake_imgs:
+            fake_imgs_tensor = torch.cat(all_fake_imgs, dim=0)
+            fake_labels_tensor = torch.cat(all_fake_labels, dim=0)
+            fake_probs_tensor = torch.cat(all_fake_probs, dim=0)
+
+            # Save 5 random samples
+            os.makedirs("syn_samples", exist_ok=True)
+            sample_idxs = random.sample(range(len(fake_imgs_tensor)), min(5, len(fake_imgs_tensor)))
+            for idx in sample_idxs:
+                img = fake_imgs_tensor[idx]
+                lbl = fake_labels_tensor[idx].item()
+                prob = fake_probs_tensor[idx].item()
+                filename = f"syn_samples/syn_img_c{partition_id}_lbl{lbl}_prob{prob:.2f}_r{syn_samples/10}.png"
+                save_image(img, filename)
+
+            fake_dataset = DictWrapper(TensorDataset(fake_imgs_tensor, fake_labels_tensor))
+            combined_dataset = ConcatDataset([train_partition, fake_dataset])
+        else:
+            combined_dataset = train_partition
     else:
-        trainloader = DataLoader(train_partition, batch_size=batch_size, shuffle=True)
+        combined_dataset = train_partition
+    
+    def _collate_dict(batch):
+        # batch: list of dicts {"image": tensor, "label": int or tensor}
+        images = torch.stack([item['image'] for item in batch], dim=0)
+        labels = torch.tensor([item['label'] for item in batch], dtype=torch.long)
+        return {'image': images, 'label': labels}
 
-    testloader = DataLoader(test_partition, batch_size=batch_size)
+    # Create DataLoaders
+    trainloader = DataLoader(combined_dataset, batch_size=batch_size, shuffle=True, collate_fn=_collate_dict)
+    trainloader_gen = DataLoader(train_partition, batch_size=batch_size, shuffle=True)
+    testloader  = DataLoader(test_partition,   batch_size=batch_size)
 
-    return trainloader, testloader
+    return trainloader, testloader, trainloader_gen
 
 
 def train_alvo(net, trainloader, epochs, lr, device):
@@ -466,18 +459,18 @@ def train_gen(net, trainloader, epochs, lr, device, dataset="mnist", latent_dim=
             # Train G
             net.zero_grad()
             z_noise = torch.randn(batch_size, latent_dim, device=device)
-            x_fake_labels = torch.randint(0, 10, (batch_size,), device=device)
-            x_fake = net(z_noise, x_fake_labels)
-            y_fake_g = net(x_fake, x_fake_labels)
+            #x_fake_labels = torch.randint(0, 10, (batch_size,), device=device)
+            x_fake = net(z_noise)
+            y_fake_g = net(x_fake)
             g_loss = net.loss(y_fake_g, real_ident)
             g_loss.backward()
             optim_G.step()
 
             # Train D
             net.zero_grad()
-            y_real = net(images, labels)
+            y_real = net(images)
             d_real_loss = net.loss(y_real, real_ident)
-            y_fake_d = net(x_fake.detach(), x_fake_labels)
+            y_fake_d = net(x_fake.detach())
             d_fake_loss = net.loss(y_fake_d, fake_ident)
             d_loss = (d_real_loss + d_fake_loss) / 2
             d_loss.backward()
@@ -493,7 +486,7 @@ def train_gen(net, trainloader, epochs, lr, device, dataset="mnist", latent_dim=
                             g_loss.mean().item())) 
 
 
-def test(net, testloader, device, model):
+def test(net, testloader, device, model=None):
     """Validate the model on the test set."""
     net.to(device)
     if model == "gen":

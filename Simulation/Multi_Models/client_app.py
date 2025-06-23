@@ -3,7 +3,7 @@
 import torch
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import Context, ParametersRecord, array_from_numpy
-from Simulation.task import (
+from Simulation.Multi_Models.task import (
     Net, 
     CGAN, 
     get_weights, 
@@ -34,8 +34,6 @@ class FlowerClient(NumPyClient):
                 cid: int, 
                 net_alvo,
                 net_gen, 
-                trainloader, 
-                valloader,
                 local_epochs_alvo: int, 
                 local_epochs_gen: int, 
                 dataset: str, 
@@ -47,13 +45,12 @@ class FlowerClient(NumPyClient):
                 niid: bool,
                 alpha_dir: float,
                 batch_size: int,
-                teste: bool):
+                teste: bool,
+                partitioner: str):
         self.cid=cid
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.net_alvo = net_alvo.to(self.device)
         self.net_gen = net_gen.to(self.device)
-        self.trainloader = trainloader
-        self.valloader = valloader
         self.local_epochs_alvo = local_epochs_alvo
         self.local_epochs_gen = local_epochs_gen
         self.dataset = dataset
@@ -68,12 +65,32 @@ class FlowerClient(NumPyClient):
         self.alpha_dir = alpha_dir
         self.batch_size = batch_size
         self.teste = teste
+        self.partitioner = partitioner
 
     def fit(self, parameters, config):
+
+        ### CONFERIR SE A CID MANTEM PARA NAO GERAR DADOS DO PROPRIO CLIENTE
+
+        gans_dict = pickle.loads(config["gans"])
+        gan_list = [CGAN() for k in gans_dict.keys() if k != self.cid]
+        for gan, v in zip(gan_list, gans_dict.values()):
+            # Deserialize the GAN parameters and set them to the CGAN instance
+            set_weights(gan, pickle.loads(v))
+
+        trainloader, _, trainloader_gen = load_data(partition_id=self.cid,
+                                       num_partitions=self.num_partitions,
+                                       partitioner=self.partitioner,
+                                       alpha_dir=self.alpha_dir,
+                                       batch_size=self.batch_size,
+                                       teste=self.teste,
+                                       syn_samples=config["round"]*10,
+                                       gans=gan_list,
+                                       classifier=self.net_alvo)
+
         set_weights(self.net_alvo, parameters)
         train_loss = train_alvo(
             net=self.net_alvo,
-            trainloader=self.trainloader,
+            trainloader=trainloader,
             epochs=self.local_epochs_alvo,
             lr=self.lr_alvo,
             device=self.device,
@@ -95,7 +112,7 @@ class FlowerClient(NumPyClient):
 
         train_gen(
             net=self.net_gen,
-            trainloader=self.trainloader,
+            trainloader=trainloader_gen,
             epochs=self.local_epochs_gen,
             lr=self.lr_gen,
             device=self.device,
@@ -119,55 +136,49 @@ class FlowerClient(NumPyClient):
         gan_params = get_weights(self.net_gen)
         
         return (
-            get_weights_gen(self.net_alvo),
-            len(self.trainloader.dataset),
-            {"train_loss": train_loss, "gan": pickle.dumps(gan_params)},
+            get_weights(self.net_alvo),
+            len(trainloader.dataset),
+            {"train_loss": train_loss, "gan": pickle.dumps(gan_params), "cid": self.cid},
         )
 
     def evaluate(self, parameters, config):
+        _, valloader, _ = load_data(partition_id=self.cid,
+                                       num_partitions=self.num_partitions,
+                                       partitioner=self.partitioner,
+                                       alpha_dir=self.alpha_dir,
+                                       batch_size=self.batch_size,
+                                       teste=self.teste) 
         set_weights(self.net_alvo, parameters)
-        loss, accuracy = test(self.net_alvo, self.valloader, self.device, model=self.model)
-        return loss, len(self.valloader.dataset), {"accuracy": accuracy}
+        loss, accuracy = test(self.net_alvo, valloader, self.device, model=self.net_alvo)
+        return loss, len(valloader.dataset), {"accuracy": accuracy}
 
 
 def client_fn(context: Context):
     # Load model and data
-    dataset = context.run_config["dataset"]
+    dataset = str(context.run_config["dataset"])
     img_size = context.run_config["tam_img"]
-    latent_dim = context.run_config["tam_ruido"]
-    net_gen = CGAN(dataset=dataset, img_size=img_size, latent_dim=latent_dim)
-    net_alvo = Net()
-    partition_id = context.node_config["partition-id"]
-    num_partitions = context.node_config["num-partitions"]
+    latent_dim = int(context.run_config["tam_ruido"])
     partitioner = context.run_config["partitioner"]
-    alpha_dir = context.run_config["alpha_dir"]
-    batch_size = context.run_config["tam_batch"]
-    teste = context.run_config["teste"]
-    num_chunks = context.run_config["num_chunks"]
+    alpha_dir = float(context.run_config["alpha_dir"])
+    batch_size = int(context.run_config["tam_batch"])
+    teste = bool(context.run_config["teste"])
+    partition_id = int(context.node_config["partition-id"])
+    num_partitions = int(context.node_config["num-partitions"])
+    net_gen = CGAN(dataset=dataset, img_size=img_size, latent_dim=latent_dim) #type: ignore
+    net_alvo = Net()
     # pretrained_cgan = CGAN()
     # pretrained_cgan.load_state_dict(torch.load("model_round_10_mnist.pt"))
-    trainloader, valloader = load_data(partition_id=partition_id,
-                                       num_partitions=num_partitions,
-                                       partitioner=partitioner,
-                                       alpha_dir=alpha_dir,
-                                       batch_size=batch_size,
-                                       teste=teste,
-                                       num_chunks=num_chunks)
-    local_epochs_alvo = context.run_config["epocas_alvo"]
-    local_epochs_gen = context.run_config["epocas_gen"]
-    lr_gen = context.run_config["learn_rate_gen"]
-    lr_alvo = context.run_config["learn_rate_alvo"]
-    latent_dim = context.run_config["tam_ruido"]
-    agg = context.run_config["agg"]
-    model = context.run_config["model"]
+    local_epochs_alvo = int(context.run_config["epocas_alvo"])
+    local_epochs_gen = int(context.run_config["epocas_gen"])
+    lr_gen = float(context.run_config["learn_rate_gen"])
+    lr_alvo = float(context.run_config["learn_rate_alvo"])
+    latent_dim = int(context.run_config["tam_ruido"])
     niid = False if partitioner == "IID" else True 
 
     # Return Client instance
     return FlowerClient(cid=partition_id,
                         net_alvo=net_alvo, 
                         net_gen=net_gen, 
-                        trainloader=trainloader, 
-                        valloader=valloader, 
                         local_epochs_alvo=local_epochs_alvo, 
                         local_epochs_gen=local_epochs_gen,
                         dataset=dataset,
@@ -175,13 +186,12 @@ def client_fn(context: Context):
                         lr_gen=lr_gen,
                         latent_dim=latent_dim,
                         context=context,
-                        agg=agg,
-                        model=model,
                         num_partitions=num_partitions,
                         niid=niid,
                         alpha_dir=alpha_dir,
                         batch_size=batch_size,
-                        teste=teste).to_client()
+                        teste=teste,
+                        partitioner=partitioner).to_client()
 
 
 # Flower ClientApp
