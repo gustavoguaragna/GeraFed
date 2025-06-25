@@ -27,14 +27,14 @@ serverapp = "Simulation.Multi_Models.server_app:app"
 clientapp = "Simulation.Multi_Models.client_app:app"
 
 [tool.flwr.app.config]
-num_rodadas = 4
+num_rodadas = 200
 fraction_fit_alvo = 1.0
 fraction_fit_gen = 1.0
 tam_ruido = 100
 tam_batch = 32
 tam_img = 28
 epocas_alvo = 5
-epocas_gen = 1
+epocas_gen = 10
 learn_rate_alvo = 0.001
 learn_rate_gen = 0.0001
 dataset = "mnist"
@@ -44,7 +44,7 @@ agg = "none" # 'disc', 'full', 'f2a', 'none'
 # num_chunks = 
 model = "both" # 'alvo', 'gen', 'both'
 fid = false
-teste = true
+teste = false
 xgb_params.objective = "binary:logistic"
 xgb_params.eta = 0.1 # Learning rate
 xgb_params.max-depth = 8
@@ -60,5 +60,5 @@ default = "local-simulation"
 [tool.flwr.federations.local-simulation]
 options.num-supernodes = 10
 options.backend.client-resources.num-cpus = 1
-options.backend.client-resources.num-gpus = 0
+options.backend.client-resources.num-gpus = 0.2
 

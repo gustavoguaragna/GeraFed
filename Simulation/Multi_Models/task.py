@@ -285,7 +285,7 @@ def load_data(partition_id: int,
               syn_samples: int = 0,
               gans: Optional[List[CGAN]] = None,
               classifier: Optional[Net] = None,
-              conf_threshold: float = 0.1) -> tuple[DataLoader, DataLoader]:
+              conf_threshold: float = 0.8) -> tuple[DataLoader, DataLoader]:
 
     """Carrega MNIST com splits de treino e teste separados. Se syn_samples > 0, inclui dados gerados."""
    
@@ -353,6 +353,7 @@ def load_data(partition_id: int,
         for gan in gans:
             gan.eval()
             device = next(gan.parameters()).device
+            classifier.to(device)
             with torch.no_grad():
                 # Sample noise and generate
                 z = torch.randn(samples_per_gan, gan.latent_dim, device=device)
