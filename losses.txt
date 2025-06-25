@@ -233,3 +233,25 @@ Rodada 24, Perda: 2.737684795269951, Acuracia: 0.18709999999999996
 Rodada 25, Perda: 2.943293528054088, Acuracia: 0.0958
 Rodada 26, Perda: 2.7376994134519053, Acuracia: 0.10100000000000002
 Rodada 27, Perda: 2.7179419209781925, Acuracia: 0.0958
+NIID por Classe, somente CNN, 10 clientes, 5 epocas locais, 0.001 lr, 32 batch
+Rodada 1, Perda: 2.7511708713568055, Acuracia: 0.1009
+Rodada 2, Perda: 2.3981620633183196, Acuracia: 0.1028
+Rodada 3, Perda: 2.4010718501033113, Acuracia: 0.1009
+Rodada 4, Perda: 2.368882571546414, Acuracia: 0.1028
+Rodada 5, Perda: 2.4749342085073556, Acuracia: 0.1132
+Rodada 6, Perda: 2.690323900490904, Acuracia: 0.1029
+Rodada 7, Perda: 3.073064772084879, Acuracia: 0.1009
+Rodada 8, Perda: 3.2867797159920102, Acuracia: 0.10100000000000002
+Rodada 9, Perda: 3.3660443385188183, Acuracia: 0.1094
+Rodada 10, Perda: 3.0412022351456915, Acuracia: 0.1113
+NIID por Classe, somente CNN, 5 clientes, 5 epocas locais, 0.001 lr, 32 batch
+Rodada 1, Perda: 2.106222840543753, Acuracia: 0.4124
+Rodada 2, Perda: 1.6080318712197934, Acuracia: 0.5591
+Rodada 3, Perda: 1.2436448268997022, Acuracia: 0.6522
+Rodada 4, Perda: 1.077375650596314, Acuracia: 0.6531
+Rodada 5, Perda: 1.0035643230992766, Acuracia: 0.6827
+Rodada 6, Perda: 1.0613315924287985, Acuracia: 0.6268
+Rodada 7, Perda: 1.116454267654175, Acuracia: 0.6278
+Rodada 8, Perda: 1.0075347751093369, Acuracia: 0.6537
+Rodada 9, Perda: 1.2155322874316012, Acuracia: 0.5686
+Rodada 10, Perda: 1.197660440644517, Acuracia: 0.6024
