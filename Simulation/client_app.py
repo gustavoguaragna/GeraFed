@@ -81,10 +81,11 @@ class FlowerClient(NumPyClient):
 
     def fit(self, parameters, config):
         if config["modelo"] == "alvo":
+            chunk_idx = config["round"] % len(self.trainloader)
             set_weights(self.net_alvo, parameters)
             train_loss = train_alvo(
                 net=self.net_alvo,
-                trainloader=self.trainloader,
+                trainloader=self.trainloader[chunk_idx],
                 epochs=self.local_epochs_alvo,
                 lr=self.lr_alvo,
                 device=self.device,
