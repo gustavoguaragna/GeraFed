@@ -131,6 +131,91 @@ class CGAN(nn.Module):
 
     def loss(self, output, label):
         return self.adv_loss(output, label)
+    
+class F2U_GAN(nn.Module):
+    def __init__(self, dataset="mnist", img_size=28, latent_dim=128, condition=True):
+        super(F2U_GAN, self).__init__()
+        if dataset == "mnist":
+            self.classes = 10
+            self.channels = 1
+        else:
+            raise NotImplementedError("Only MNIST is supported")
+
+        self.condition = condition
+        self.label_embedding = nn.Embedding(self.classes, self.classes) if condition else None
+        #self.label_embedding_disc = nn.Embedding(self.classes, self.img_size*self.img_size) if condition else None
+        self.img_size = img_size
+        self.latent_dim = latent_dim
+        self.img_shape = (self.channels, self.img_size, self.img_size)
+        self.input_shape_gen = self.latent_dim + self.label_embedding.embedding_dim if condition else self.latent_dim
+        self.input_shape_disc = self.channels + self.classes if condition else self.channels
+
+        self.adv_loss = torch.nn.BCEWithLogitsLoss()
+
+        # Generator (unchanged) To calculate output shape of convtranspose layers, we can use the formula:
+        # output_shape = (input_shape - 1) * stride - 2 * padding + kernel_size + output_padding (or dilation * (kernel_size - 1) + 1 inplace of kernel_size if using dilation)
+        self.generator = nn.Sequential(
+            nn.Linear(self.input_shape_gen, 256 * 7 * 7),
+            nn.ReLU(inplace=True),
+            nn.Unflatten(1, (256, 7, 7)),
+            nn.ConvTranspose2d(256, 128, kernel_size=4, stride=2, padding=1), # (256,7,7) -> (128,14,14)
+            nn.BatchNorm2d(128, momentum=0.1),
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(128, 64, kernel_size=4, stride=2, padding=1), # (128,14,14) -> (64,28,28)
+            nn.BatchNorm2d(64, momentum=0.1),
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(64, self.channels, kernel_size=3, stride=1, padding=1), # (64,28,28) -> (1,28,28)
+            nn.Tanh()
+        )
+
+        # Discriminator (corrected) To calculate output shape of conv layers, we can use the formula:
+        # output_shape = ⌊(input_shape - kernel_size + 2 * padding) / stride + 1⌋ (or (dilation * (kernel_size - 1) - 1) inplace of kernel_size if using dilation)
+        self.discriminator = nn.Sequential(
+        # Camada 1: (1,28,28) -> (32,13,13)
+        nn.utils.spectral_norm(nn.Conv2d(self.input_shape_disc, 32, kernel_size=3, stride=2, padding=0)),
+        nn.LeakyReLU(0.2, inplace=True),
+
+        # Camada 2: (32,14,14) -> (64,7,7)
+        nn.utils.spectral_norm(nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1)),
+        nn.LeakyReLU(0.2, inplace=True),
+
+        # Camada 3: (64,7,7) -> (128,3,3)
+        nn.utils.spectral_norm(nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=0)),
+        nn.LeakyReLU(0.2, inplace=True),
+
+        # Camada 4: (128,3,3) -> (256,1,1)
+        nn.utils.spectral_norm(nn.Conv2d(128, 256, kernel_size=3, stride=2, padding=0)),  # Padding 0 aqui!
+        nn.LeakyReLU(0.2, inplace=True),
+
+        # Achata e concatena com as labels
+        nn.Flatten(), # (256,1,1) -> (256*1*1,)
+        nn.utils.spectral_norm(nn.Linear(256 * 1 * 1, 1))  # 256 (features)
+        )
+
+    def forward(self, input, labels=None):
+        if input.dim() == 2:
+            # Generator forward pass (unchanged)
+            if self.condition:
+                embedded_labels = self.label_embedding(labels)
+                gen_input = torch.cat((input, embedded_labels), dim=1)
+                x = self.generator(gen_input)
+            else:
+                x = self.generator(input)
+            return x.view(-1, *self.img_shape)
+
+        elif input.dim() == 4:
+            # Discriminator forward pass
+            if self.condition:
+                embedded_labels = self.label_embedding(labels)
+                image_labels = embedded_labels.view(embedded_labels.size(0), self.label_embedding.embedding_dim, 1, 1).expand(-1, -1, self.img_size, self.img_size)
+                x = torch.cat((input, image_labels), dim=1)
+            else:
+                x = input
+            return self.discriminator(x)
+
+    def loss(self, output, label):
+        return self.adv_loss(output, label)
+
 
 def generate_images(cgan, examples_per_class):
     cgan.eval()
@@ -470,7 +555,7 @@ def train_gen(net, trainloader, epochs, lr, device, dataset="mnist", latent_dim=
 
             if not f2a: 
                 # Train G
-                net.zero_grad()
+                optim_G.zero_grad()
                 z_noise = torch.randn(batch_size, latent_dim, device=device)
                 x_fake_labels = torch.randint(0, 10, (batch_size,), device=device)
                 x_fake = net(z_noise, x_fake_labels)
@@ -480,7 +565,7 @@ def train_gen(net, trainloader, epochs, lr, device, dataset="mnist", latent_dim=
                 optim_G.step()
 
                 # Train D
-                net.zero_grad()
+                optim_D.zero_grad()
                 y_real = net(images, labels)
                 d_real_loss = net.loss(y_real, real_ident)
                 y_fake_d = net(x_fake.detach(), x_fake_labels)
@@ -500,12 +585,12 @@ def train_gen(net, trainloader, epochs, lr, device, dataset="mnist", latent_dim=
 
             else:
                 # Train D
-                net.zero_grad()
+                optim_D.zero_grad()
                 y_real = net(images, labels)
                 d_real_loss = net.loss(y_real, real_ident)
                 z_noise = torch.randn(batch_size, latent_dim, device=device)
                 x_fake_labels = torch.randint(0, 10, (batch_size,), device=device)
-                x_fake = net(z_noise, x_fake_labels)
+                x_fake = net(z_noise, x_fake_labels).detach()
                 y_fake_d = net(x_fake.detach(), x_fake_labels)
                 d_fake_loss = net.loss(y_fake_d, fake_ident)
                 d_loss = (d_real_loss + d_fake_loss) / 2

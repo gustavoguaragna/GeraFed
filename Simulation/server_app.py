@@ -30,6 +30,7 @@ def server_fn(context: Context):
     latent_dim = context.run_config["tam_ruido"]
     agg = context.run_config["agg"]
     model = context.run_config["model"]
+    gan_arq = context.run_config["gan_arq"]
     fid = context.run_config["fid"]
     teste = context.run_config["teste"]
 
@@ -56,6 +57,7 @@ def server_fn(context: Context):
         client_counter=client_counter,
         agg=agg,
         model=model,
+        gan_arq=gan_arq,
         fid=fid,
         teste=teste
     )

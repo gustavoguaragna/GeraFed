@@ -7,6 +7,7 @@ from flwr.common import Context, ParametersRecord, array_from_numpy
 from Simulation.task import (
     Net, 
     CGAN, 
+    F2U_GAN,
     get_weights, 
     get_weights_gen, 
     load_data, 
@@ -213,7 +214,7 @@ class FlowerClient(NumPyClient):
                         state_dict[k] = torch.from_numpy(v.numpy())
 
                     # Apply state dict to a new model instance
-                    model_ = CGAN()
+                    model_ = self.net_gen.__class__()
                     model_.load_state_dict(state_dict)
 
                     new_state_dict = {}
@@ -305,7 +306,12 @@ def client_fn(context: Context):
     dataset = context.run_config["dataset"]
     img_size = context.run_config["tam_img"]
     latent_dim = context.run_config["tam_ruido"]
-    net_gen = CGAN(dataset=dataset, img_size=img_size, latent_dim=latent_dim)
+    gan_arq = context.run_config["gan_arq"]
+    if gan_arq == "simple_cnn":
+        # Use a simple CNN architecture for the generator
+        net_gen = CGAN(dataset=dataset, img_size=img_size, latent_dim=latent_dim, gan_arq=gan_arq)
+    elif gan_arq == "f2u":
+        net_gen = F2U_GAN()
     net_alvo = Net()
     partition_id = context.node_config["partition-id"]
     num_partitions = context.node_config["num-partitions"]

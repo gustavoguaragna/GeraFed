@@ -22,7 +22,7 @@ from collections import Counter
 from flwr.server.strategy.aggregate import aggregate, aggregate_inplace, weighted_loss_avg
 import random
 
-from Simulation.task import Net, CGAN, set_weights, train_G, get_weights, generate_plot
+from Simulation.task import Net, CGAN, F2U_GAN, set_weights, train_G, get_weights, generate_plot
 import torch
 import numpy as np
 import json
@@ -104,6 +104,7 @@ class GeraFed(Strategy):
         client_counter: Counter,
         agg: str = "full",
         model: str = "both",
+        gan_arq: str = "simple_cnn",
         fid: bool = False,
         teste: bool = False,
         lr_gen: float = 0.0001,
@@ -139,14 +140,20 @@ class GeraFed(Strategy):
         self.client_counter = client_counter
         self.agg = agg
         self.model = model
+        self.gan_arq = gan_arq
         self.fid = fid
         self.teste = teste
         self.lr_gen = lr_gen
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.gen = CGAN(dataset=self.dataset,
+        if self.gan_arq == "simple_cnn":
+            self.gen = CGAN(dataset=self.dataset,
                             img_size=self.img_size,
                             latent_dim=self.latent_dim).to(self.device)
-
+        elif self.gan_arq == "f2u_gan":
+            self.gen = F2U_GAN(dataset=self.dataset,
+                            img_size=self.img_size,
+                            latent_dim=self.latent_dim).to(self.device)
+            
     def __repr__(self) -> str:
         """Compute a string representation of the strategy."""
         rep = f"GeraFed(accept_failures={self.accept_failures})"
@@ -403,7 +410,10 @@ class GeraFed(Strategy):
             elif self.agg == "f2a":
                 # Define os pesos do modelo
                 disc_ndarrays = [parameters_to_ndarrays(fit_res.parameters) for _, fit_res in results_gen]
-                discs = [CGAN().to(self.device) for _ in range(len(disc_ndarrays))]
+                if self.gan_arq == "simple_cnn":
+                    discs = [CGAN().to(self.device) for _ in range(len(disc_ndarrays))]
+                elif self.gan_arq == "f2u_gan":
+                    discs = [F2U_GAN().to(self.device) for _ in range(len(disc_ndarrays))]
                 for i, disc in enumerate(discs):
                     set_weights(disc, disc_ndarrays[i])
                 train_G(
@@ -455,11 +465,14 @@ class GeraFed(Strategy):
             elif self.agg == "f2a":
                 # Define os pesos do modelo
                 disc_ndarrays = [parameters_to_ndarrays(fit_res.parameters) for _, fit_res in results_gen]
-                discs = [CGAN() for _ in range(len(disc_ndarrays))]
+                if self.gan_arq == "simple_cnn":
+                    discs = [CGAN().to(self.device) for _ in range(len(disc_ndarrays))]
+                elif self.gan_arq == "f2u_gan":
+                    discs = [F2U_GAN().to(self.device) for _ in range(len(disc_ndarrays))]
                 for i, disc in enumerate(discs):
                     set_weights(disc, disc_ndarrays[i])
                 train_G(
-                gen=self.gen,
+                net=self.gen,
                 discs=discs,
                 epochs=20,
                 lr=self.lr_gen,
