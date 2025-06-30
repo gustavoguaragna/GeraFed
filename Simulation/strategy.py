@@ -285,7 +285,7 @@ class GeraFed(Strategy):
         self.client_counter.update(conjunto_gen)
 
         fit_instructions = []
-        config_alvo = {"modelo": "alvo"}
+        config_alvo = {"modelo": "alvo", "round": server_round}
         config_gen = {"modelo": "gen", "round": server_round, "fids": json.dumps(fids)}
         
         fit_ins_alvo = FitIns(parameters=self.parameters_alvo, config=config_alvo)
