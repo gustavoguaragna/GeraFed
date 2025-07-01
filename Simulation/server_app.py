@@ -1,5 +1,6 @@
 """GeraFed: um framework para balancear dados heterogêneos em aprendizado federado."""
 
+import os
 from flwr.common import Context, ndarrays_to_parameters
 from flwr.server import ServerApp, ServerAppComponents, ServerConfig
 from Simulation.task import Net, CGAN, get_weights
@@ -33,7 +34,8 @@ def server_fn(context: Context):
     gan_arq = context.run_config["gan_arq"]
     fid = context.run_config["fid"]
     teste = context.run_config["teste"]
-
+    folder = context.run_config["Exp_name_folder"]
+    os.makedirs(folder, exist_ok=True)
     # Initialize model parameters
     ndarrays_alvo = get_weights(Net())
     parameters_alvo = ndarrays_to_parameters(ndarrays_alvo)
@@ -59,7 +61,8 @@ def server_fn(context: Context):
         model=model,
         gan_arq=gan_arq,
         fid=fid,
-        teste=teste
+        teste=teste,
+        folder=folder
     )
     config = ServerConfig(num_rounds=num_rounds)
 

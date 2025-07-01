@@ -108,6 +108,7 @@ class GeraFed(Strategy):
         fid: bool = False,
         teste: bool = False,
         lr_gen: float = 0.0001,
+        folder: str = ".",
     ) -> None:
         super().__init__()
 
@@ -145,6 +146,7 @@ class GeraFed(Strategy):
         self.teste = teste
         self.lr_gen = lr_gen
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.folder = folder
         if self.gan_arq == "simple_cnn":
             self.gen = CGAN(dataset=self.dataset,
                             img_size=self.img_size,
@@ -390,9 +392,10 @@ class GeraFed(Strategy):
             set_weights(model, aggregated_ndarrays_alvo)
             # Salva o modelo no disco com o nome específico do dataset
             model_path = f"modelo_alvo_round_{server_round}_mnist.pt"
-            torch.save(model.state_dict(), model_path)
-            print(f"Modelo alvo salvo em {model_path}")
-        
+            save_path = f"{self.folder}/{model_path}"
+            torch.save(model.state_dict(), save_path)
+            print(f"Modelo alvo salvo em {save_path}")
+
         elif self.model == "gen":
             if self.agg == "full":
                 if parameters_aggregated_gen is not None:
@@ -405,8 +408,9 @@ class GeraFed(Strategy):
                     set_weights(model, aggregated_ndarrays_gen)
                     # Salva o modelo no disco com o nome específico do dataset
                     model_path = f"modelo_gen_round_{server_round}_mnist.pt"
-                    torch.save(model.state_dict(), model_path)
-                    print(f"Modelo gen salvo em {model_path}")
+                    save_path = f"{self.folder}/{model_path}"
+                    torch.save(model.state_dict(), save_path)
+                    print(f"Modelo gen salvo em {save_path}")
             elif self.agg == "f2a":
                 # Define os pesos do modelo
                 disc_ndarrays = [parameters_to_ndarrays(fit_res.parameters) for _, fit_res in results_gen]
@@ -426,10 +430,11 @@ class GeraFed(Strategy):
                 batch_size=128
                 )
                 model_path = f"modelo_gen_round_{server_round}_mnist.pt"
-                torch.save(self.gen.state_dict(), model_path)
-                print(f"Modelo gen salvo em {model_path}")
-                figura = generate_plot(net=self.gen, device=self.device, round_number=server_round, server=True)
-                figura.savefig(f"mnist_CGAN_r{server_round}_{2}e_{128}b_100z_4c_{self.lr_gen}lr_niid_01dir_f2a.png")
+                save_path = f"{self.folder}/{model_path}"
+                torch.save(self.gen.state_dict(), save_path)
+                print(f"Modelo gen salvo em {save_path}")
+                figura = generate_plot(net=self.gen, device=self.device, round_number=server_round, server=True, latent_dim=self.latent_dim)
+                figura.savefig(f"{self.folder}/mnist_CGAN_r{server_round}_{2}e_{128}b_100z_4c_{self.lr_gen}lr_niid_01dir_f2a.png")
 
                 ndarrays = get_weights(self.gen)
                 parameters_aggregated_gen = ndarrays_to_parameters(ndarrays)
@@ -446,8 +451,9 @@ class GeraFed(Strategy):
             set_weights(model, ndarrays)
             # Salva o modelo no disco com o nome específico do dataset
             model_path = f"modelo_alvo_round_{server_round}_mnist.pt"
-            torch.save(model.state_dict(), model_path)
-            print(f"Modelo alvo salvo em {model_path}")
+            save_path = f"{self.folder}/{model_path}"
+            torch.save(model.state_dict(), save_path)
+            print(f"Modelo alvo salvo em {save_path}")
 
             if self.agg == "full":
                 # Salva o modelo após a agregaçãO
@@ -460,8 +466,9 @@ class GeraFed(Strategy):
                 set_weights(model, ndarrays)
                 # Salva o modelo no disco com o nome específico do dataset
                 model_path = f"modelo_gen_round_{server_round}_mnist.pt"
-                torch.save(model.state_dict(), model_path)
-                print(f"Modelo gen salvo em {model_path}")
+                save_path = f"{self.folder}/{model_path}"
+                torch.save(model.state_dict(), save_path)
+                print(f"Modelo gen salvo em {save_path}")
             elif self.agg == "f2a":
                 # Define os pesos do modelo
                 disc_ndarrays = [parameters_to_ndarrays(fit_res.parameters) for _, fit_res in results_gen]
@@ -481,10 +488,11 @@ class GeraFed(Strategy):
                 batch_size=128
                 )
                 model_path = f"modelo_gen_round_{server_round}_mnist.pt"
-                torch.save(self.gen.state_dict(), model_path)
-                print(f"Modelo gen salvo em {model_path}")
-                figura = generate_plot(net=self.gen, device=self.device, round_number=server_round, server=True)
-                figura.savefig(f"mnist_CGAN_r{server_round}_{2}e_{128}b_100z_4c_{self.lr_gen}lr_niid_01dir_f2a.png")
+                save_path = f"{self.folder}/{model_path}"
+                torch.save(self.gen.state_dict(), save_path)
+                print(f"Modelo gen salvo em {save_path}")
+                figura = generate_plot(net=self.gen, device=self.device, round_number=server_round, server=True, latent_dim=self.latent_dim)
+                figura.savefig(f"{self.folder}/mnist_CGAN_r{server_round}_{2}e_{128}b_100z_4c_{self.lr_gen}lr_niid_01dir_f2a.png")
 
                 ndarrays = get_weights(self.gen)
                 parameters_aggregated_gen = ndarrays_to_parameters(ndarrays)
@@ -524,7 +532,7 @@ class GeraFed(Strategy):
                 sum(accuracies) / sum(examples) if sum(examples) != 0 else 0
             )
 
-            loss_file = f"losses.txt"
+            loss_file = f"Log_files/losses.txt"
             with open(loss_file, "a") as f:
                 f.write(f"Rodada {server_round}, Perda: {loss_aggregated}, Acuracia: {accuracy_aggregated}\n")
             print(f"Perda da rodada {server_round} salva em {loss_file}")

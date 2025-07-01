@@ -21,6 +21,7 @@ from Simulation.task import (
 import random
 import numpy as np
 import json
+import os
 
 SEED = 42
 random.seed(SEED)
@@ -53,7 +54,8 @@ class FlowerClient(NumPyClient):
                 niid: bool,
                 alpha_dir: float,
                 batch_size: int,
-                teste: bool):
+                teste: bool,
+                folder: str = "."):
         self.cid=cid
         self.net_alvo = net_alvo
         self.net_gen = net_gen
@@ -78,6 +80,7 @@ class FlowerClient(NumPyClient):
         self.alpha_dir = alpha_dir
         self.batch_size = batch_size
         self.teste = teste
+        self.folder = folder
 
     def fit(self, parameters, config):
         if config["modelo"] == "alvo":
@@ -92,7 +95,7 @@ class FlowerClient(NumPyClient):
             )
             return (
                 get_weights(self.net_alvo),
-                len(self.trainloader.dataset),
+                len(self.trainloader[chunk_idx].dataset),
                 {"train_loss": train_loss, "modelo": "alvo"},
             )
         elif config["modelo"] == "gen":
@@ -117,8 +120,8 @@ class FlowerClient(NumPyClient):
                       print(f"cliente {self.cid} nao vai treinar pois fids sao piores")
                 set_weights(self.net_gen, parameters)
                 #Gera imagens do modelo agregado do round anterior
-                figura = generate_plot(net=self.net_gen, device=self.device, round_number=config["round"])
-                figura.savefig(f"mnist_CGAN_r{config['round']-1}_{self.local_epochs_gen}e_{self.batch_size}b_100z_4c_{self.lr_gen}lr_{'niid' if self.niid else 'iid'}_{self.alpha_dir if self.niid else ''}.png")
+                figura = generate_plot(net=self.net_gen, device=self.device, round_number=config["round"], latent_dim=self.latent_dim)
+                figura.savefig(f"{self.folder}/mnist_CGAN_r{config['round']-1}_{self.local_epochs_gen}e_{self.batch_size}b_100z_4c_{self.lr_gen}lr_{'niid' if self.niid else 'iid'}_{self.alpha_dir if self.niid else ''}.png")
                 train_gen(
                 net=self.net_gen,
                 trainloader=self.trainloader,
@@ -128,8 +131,8 @@ class FlowerClient(NumPyClient):
                 dataset=self.dataset,
                 latent_dim=self.latent_dim
             )
-                figura = generate_plot(net=self.net_gen, device=self.device, round_number=config["round"]+10, client_id=self.cid)
-                figura.savefig(f"mnist_CGAN_r{config['round']}_{self.local_epochs_gen}e_{self.batch_size}b_100z_4c_{self.lr_gen}lr_{'niid' if self.niid else 'iid'}_{self.alpha_dir if self.niid else ''}_cliente{self.cid}.png")
+                figura = generate_plot(net=self.net_gen, device=self.device, round_number=config["round"]+10, client_id=self.cid, latent_dim=self.latent_dim)
+                figura.savefig(f"{self.folder}/mnist_CGAN_r{config['round']}_{self.local_epochs_gen}e_{self.batch_size}b_100z_4c_{self.lr_gen}lr_{'niid' if self.niid else 'iid'}_{self.alpha_dir if self.niid else ''}_cliente{self.cid}.png")
                 return (
                 get_weights(self.net_gen),
                 len(self.trainloader.dataset),
@@ -168,8 +171,8 @@ class FlowerClient(NumPyClient):
 
                     self.net_gen.load_state_dict(new_state_dict)
 
-                    figura = generate_plot(net=self.net_gen, device=self.device, round_number=config["round"])
-                    figura.savefig(f"mnist_CGAN_r{config['round']-1}_{self.local_epochs_gen}e_{self.batch_size}b_100z_4c_{self.lr_gen}lr_{'niid' if self.niid else 'iid'}_{self.alpha_dir if self.niid else ''}.png")
+                    figura = generate_plot(net=self.net_gen, device=self.device, round_number=config["round"], latent_dim=self.latent_dim)
+                    figura.savefig(f"{self.folder}/mnist_CGAN_r{config['round']-1}_{self.local_epochs_gen}e_{self.batch_size}b_100z_4c_{self.lr_gen}lr_{'niid' if self.niid else 'iid'}_{self.alpha_dir if self.niid else ''}.png")
 
                 train_gen(
                     net=self.net_gen,
@@ -189,10 +192,11 @@ class FlowerClient(NumPyClient):
                 self.client_state.parameters_records["net_parameters"] = p_record
 
                 model_path = f"modelo_gen_round_{config['round']}_client_{self.cid}.pt"
-                torch.save(self.net_gen.state_dict(), model_path)
+                save_path = f"{self.folder}/{model_path}"
+                torch.save(self.net_gen.state_dict(), save_path)
 
-                figura = generate_plot(net=self.net_gen, device=self.device, round_number=config["round"], client_id=self.cid)
-                figura.savefig(f"mnist_CGAN_r{config['round']}_{self.local_epochs_gen}e_{self.batch_size}b_100z_4c_{self.lr_gen}lr_{'niid' if self.niid else 'iid'}_{self.alpha_dir if self.niid else ''}_cliente{self.cid}.png")
+                figura = generate_plot(net=self.net_gen, device=self.device, round_number=config["round"], client_id=self.cid, latent_dim=self.latent_dim)
+                figura.savefig(f"{self.folder}/mnist_CGAN_r{config['round']}_{self.local_epochs_gen}e_{self.batch_size}b_100z_4c_{self.lr_gen}lr_{'niid' if self.niid else 'iid'}_{self.alpha_dir if self.niid else ''}_cliente{self.cid}.png")
                 return (
                     get_weights_gen(self.net_gen),
                     len(self.trainloader.dataset),
@@ -311,7 +315,7 @@ def client_fn(context: Context):
     if gan_arq == "simple_cnn":
         # Use a simple CNN architecture for the generator
         net_gen = CGAN(dataset=dataset, img_size=img_size, latent_dim=latent_dim, gan_arq=gan_arq)
-    elif gan_arq == "f2u":
+    elif gan_arq == "f2u_gan":
         net_gen = F2U_GAN()
     net_alvo = Net()
     partition_id = context.node_config["partition-id"]
@@ -338,6 +342,8 @@ def client_fn(context: Context):
     agg = context.run_config["agg"]
     model = context.run_config["model"]
     niid = False if partitioner == "IID" else True 
+    folder = context.run_config["Exp_name_folder"]
+    os.makedirs(folder, exist_ok=True)
 
     # Return Client instance
     return FlowerClient(cid=partition_id,
@@ -358,7 +364,8 @@ def client_fn(context: Context):
                         niid=niid,
                         alpha_dir=alpha_dir,
                         batch_size=batch_size,
-                        teste=teste).to_client()
+                        teste=teste,
+                        folder=folder).to_client()
 
 
 # Flower ClientApp

@@ -255,3 +255,9 @@ Rodada 7, Perda: 1.116454267654175, Acuracia: 0.6278
 Rodada 8, Perda: 1.0075347751093369, Acuracia: 0.6537
 Rodada 9, Perda: 1.2155322874316012, Acuracia: 0.5686
 Rodada 10, Perda: 1.197660440644517, Acuracia: 0.6024
+Rodada 1, Perda: 2.329778506732977, Acuracia: 0.1009
+Rodada 2, Perda: 2.329092348726413, Acuracia: 0.1387
+Rodada 3, Perda: 2.5902939558790896, Acuracia: 0.2646
+Rodada 1, Perda: 2.555120529839025, Acuracia: 0.1933
+Rodada 2, Perda: 2.277735220357633, Acuracia: 0.2409
+Rodada 3, Perda: 2.3285325845590417, Acuracia: 0.2102
