@@ -433,8 +433,9 @@ class GeraFed(Strategy):
                 save_path = f"{self.folder}/{model_path}"
                 torch.save(self.gen.state_dict(), save_path)
                 print(f"Modelo gen salvo em {save_path}")
-                figura = generate_plot(net=self.gen, device=self.device, round_number=server_round, server=True, latent_dim=self.latent_dim)
-                figura.savefig(f"{self.folder}/mnist_CGAN_r{server_round}_{1}b_{self.latent_dim}z_4c_{self.lr_gen}lr_niid_01dir_f2u.png")
+                if server_round % 100 == 0:
+                    figura = generate_plot(net=self.gen, device=self.device, round_number=server_round/100, server=True, latent_dim=self.latent_dim)
+                    figura.savefig(f"{self.folder}/mnist_CGAN_e{server_round/100}_{1}b_{self.latent_dim}z_4c_{self.lr_gen}lr_niid_01dir_f2u.png")
 
                 ndarrays = get_weights(self.gen)
                 parameters_aggregated_gen = ndarrays_to_parameters(ndarrays)
@@ -443,17 +444,18 @@ class GeraFed(Strategy):
             return parameters_aggregated_gen, metrics_aggregated
         
         else:
-            # Salva o modelo após a agregação
-            ndarrays = parameters_to_ndarrays(parameters_aggregated_alvo)
-            # Cria uma instância do modelo
-            model = Net()
-            # Define os pesos do modelo
-            set_weights(model, ndarrays)
-            # Salva o modelo no disco com o nome específico do dataset
-            model_path = f"modelo_alvo_round_{server_round}_mnist.pt"
-            save_path = f"{self.folder}/{model_path}"
-            torch.save(model.state_dict(), save_path)
-            print(f"Modelo alvo salvo em {save_path}")
+            if server_round % 100 == 0:
+                # Salva o modelo após a agregação
+                ndarrays = parameters_to_ndarrays(parameters_aggregated_alvo)
+                # Cria uma instância do modelo
+                model = Net()
+                # Define os pesos do modelo
+                set_weights(model, ndarrays)
+                # Salva o modelo no disco com o nome específico do dataset
+                model_path = f"modelo_alvo_round_{server_round/100}_mnist.pt"
+                save_path = f"{self.folder}/{model_path}"
+                torch.save(model.state_dict(), save_path)
+                print(f"Modelo alvo salvo em {save_path}")
 
             if self.agg == "full":
                 # Salva o modelo após a agregaçãO
@@ -487,12 +489,13 @@ class GeraFed(Strategy):
                 latent_dim=self.latent_dim,
                 batch_size=1
                 )
-                model_path = f"modelo_gen_round_{server_round}_mnist.pt"
-                save_path = f"{self.folder}/{model_path}"
-                torch.save(self.gen.state_dict(), save_path)
-                print(f"Modelo gen salvo em {save_path}")
-                figura = generate_plot(net=self.gen, device=self.device, round_number=server_round, server=True, latent_dim=self.latent_dim)
-                figura.savefig(f"{self.folder}/mnist_CGAN_r{server_round}_{2}e_{128}b_{self.latent_dim}z_4c_{self.lr_gen}lr_niid_01dir_f2a.png")
+                if server_round % 100 == 0:
+                    model_path = f"modelo_gen_round_{server_round}_mnist.pt"
+                    save_path = f"{self.folder}/{model_path}"
+                    torch.save(self.gen.state_dict(), save_path)
+                    print(f"Modelo gen salvo em {save_path}")
+                    figura = generate_plot(net=self.gen, device=self.device, round_number=server_round, server=True, latent_dim=self.latent_dim)
+                    figura.savefig(f"{self.folder}/mnist_CGAN_r{server_round}_{2}e_{128}b_{self.latent_dim}z_4c_{self.lr_gen}lr_niid_01dir_f2a.png")
 
                 ndarrays = get_weights(self.gen)
                 parameters_aggregated_gen = ndarrays_to_parameters(ndarrays)

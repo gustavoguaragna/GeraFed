@@ -1,8 +1,0 @@
-Esse documento reúne as informações de treinamento das GANs e acurácias atingidas com uma rede neural em cima do MNIST.
-
-MODELO ALVO
-O modelo alvo é uma rede neural com 2 camadas convolucionas e 3 camadas lineares. As camadas convolucionais tem 6 e 16 filtros de tamanho 5, respectivamente. 
-A saída de cada camada conta com a função de ativação ReLU e elas são divididas por uma camada 2x2 max pool. As 3 camadas lineares tem outputs 120, 84 e 10, 
-respectivamente. As 2 primeiras camadas também contam, na saída, com a função de ativação ReLU. 
-O estado da arte para o MNIST é (...) (não vi a arquitetura em detalhes), atingindo 99.87% de acurácia quando utilizado ensemble e 99.84% sem utilizar nenhum 
-ensemble (NO ROUTING NEEDED BETWEEN CAPSULES 2021 - https://arxiv.org/pdf/2001.09136v6).
