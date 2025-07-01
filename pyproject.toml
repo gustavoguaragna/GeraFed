@@ -27,25 +27,25 @@ serverapp = "Simulation.server_app:app"
 clientapp = "Simulation.client_app:app"
 
 [tool.flwr.app.config]
-num_rodadas = 3
+num_rodadas = 10000
 fraction_fit_alvo = 1.0
 fraction_fit_gen = 1.0
 tam_ruido = 128
 tam_batch = 32
 tam_img = 28
-epocas_alvo = 2
-epocas_gen = 2
+epocas_alvo = 1
+epocas_gen = 1
 learn_rate_alvo = 0.001
 learn_rate_gen = 0.0002
 dataset = "mnist"
 partitioner = "Dir" # 'Dir', 'IID' (IID no else)
 alpha_dir = 0.1
 agg = "f2a" # 'disc', 'full', 'f2a', 'none'
-num_chunks = 10 
+num_chunks = 100 
 model = "both" # 'alvo', 'gen', 'both'
 gan_arq = "f2u_gan" # 'simple_cnn'
 fid = false
-teste = true
+teste = false
 Exp_name_folder = "Experimentos/F2U_4c_NIID01Dir"
 xgb_params.objective = "binary:logistic"
 xgb_params.eta = 0.1 # Learning rate
@@ -62,5 +62,5 @@ default = "local-simulation"
 [tool.flwr.federations.local-simulation]
 options.num-supernodes = 4
 options.backend.client-resources.num-cpus = 1
-options.backend.client-resources.num-gpus = 0.2
+options.backend.client-resources.num-gpus = 0.25
 

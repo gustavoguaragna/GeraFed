@@ -3,7 +3,7 @@
 import os
 from flwr.common import Context, ndarrays_to_parameters
 from flwr.server import ServerApp, ServerAppComponents, ServerConfig
-from Simulation.task import Net, CGAN, get_weights
+from Simulation.task import Net, CGAN, F2U_GAN,get_weights
 from Simulation.strategy import GeraFed
 import random
 import numpy as np
@@ -39,9 +39,14 @@ def server_fn(context: Context):
     # Initialize model parameters
     ndarrays_alvo = get_weights(Net())
     parameters_alvo = ndarrays_to_parameters(ndarrays_alvo)
-    ndarrays_gen = get_weights(CGAN(dataset=dataset,
-                                    img_size=img_size,
-                                    latent_dim=latent_dim))
+    if gan_arq == "simple_cnn":
+        ndarrays_gen = get_weights(CGAN(dataset=dataset,
+                                        img_size=img_size,
+                                        latent_dim=latent_dim))
+    elif gan_arq == "f2u_gan":
+        ndarrays_gen = get_weights(F2U_GAN(dataset=dataset,
+                                            img_size=img_size,
+                                            latent_dim=latent_dim))
     parameters_gen = ndarrays_to_parameters(ndarrays_gen)
 
     client_counter = Counter()

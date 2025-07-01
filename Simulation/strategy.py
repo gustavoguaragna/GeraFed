@@ -427,14 +427,14 @@ class GeraFed(Strategy):
                 lr=self.lr_gen,
                 device=self.device,
                 latent_dim=self.latent_dim,
-                batch_size=128
+                batch_size=1
                 )
                 model_path = f"modelo_gen_round_{server_round}_mnist.pt"
                 save_path = f"{self.folder}/{model_path}"
                 torch.save(self.gen.state_dict(), save_path)
                 print(f"Modelo gen salvo em {save_path}")
                 figura = generate_plot(net=self.gen, device=self.device, round_number=server_round, server=True, latent_dim=self.latent_dim)
-                figura.savefig(f"{self.folder}/mnist_CGAN_r{server_round}_{2}e_{128}b_100z_4c_{self.lr_gen}lr_niid_01dir_f2a.png")
+                figura.savefig(f"{self.folder}/mnist_CGAN_r{server_round}_{1}b_{self.latent_dim}z_4c_{self.lr_gen}lr_niid_01dir_f2u.png")
 
                 ndarrays = get_weights(self.gen)
                 parameters_aggregated_gen = ndarrays_to_parameters(ndarrays)
@@ -485,14 +485,14 @@ class GeraFed(Strategy):
                 lr=self.lr_gen,
                 device=self.device,
                 latent_dim=self.latent_dim,
-                batch_size=128
+                batch_size=1
                 )
                 model_path = f"modelo_gen_round_{server_round}_mnist.pt"
                 save_path = f"{self.folder}/{model_path}"
                 torch.save(self.gen.state_dict(), save_path)
                 print(f"Modelo gen salvo em {save_path}")
                 figura = generate_plot(net=self.gen, device=self.device, round_number=server_round, server=True, latent_dim=self.latent_dim)
-                figura.savefig(f"{self.folder}/mnist_CGAN_r{server_round}_{2}e_{128}b_100z_4c_{self.lr_gen}lr_niid_01dir_f2a.png")
+                figura.savefig(f"{self.folder}/mnist_CGAN_r{server_round}_{2}e_{128}b_{self.latent_dim}z_4c_{self.lr_gen}lr_niid_01dir_f2a.png")
 
                 ndarrays = get_weights(self.gen)
                 parameters_aggregated_gen = ndarrays_to_parameters(ndarrays)

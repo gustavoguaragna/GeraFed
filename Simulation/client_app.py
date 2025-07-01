@@ -121,7 +121,7 @@ class FlowerClient(NumPyClient):
                 set_weights(self.net_gen, parameters)
                 #Gera imagens do modelo agregado do round anterior
                 figura = generate_plot(net=self.net_gen, device=self.device, round_number=config["round"], latent_dim=self.latent_dim)
-                figura.savefig(f"{self.folder}/mnist_CGAN_r{config['round']-1}_{self.local_epochs_gen}e_{self.batch_size}b_100z_4c_{self.lr_gen}lr_{'niid' if self.niid else 'iid'}_{self.alpha_dir if self.niid else ''}.png")
+                figura.savefig(f"{self.folder}/mnist_CGAN_r{config['round']-1}_{self.local_epochs_gen}e_{self.batch_size}b_{self.latent_dim}z_4c_{self.lr_gen}lr_{'niid' if self.niid else 'iid'}_{self.alpha_dir if self.niid else ''}.png")
                 train_gen(
                 net=self.net_gen,
                 trainloader=self.trainloader,
@@ -132,7 +132,7 @@ class FlowerClient(NumPyClient):
                 latent_dim=self.latent_dim
             )
                 figura = generate_plot(net=self.net_gen, device=self.device, round_number=config["round"]+10, client_id=self.cid, latent_dim=self.latent_dim)
-                figura.savefig(f"{self.folder}/mnist_CGAN_r{config['round']}_{self.local_epochs_gen}e_{self.batch_size}b_100z_4c_{self.lr_gen}lr_{'niid' if self.niid else 'iid'}_{self.alpha_dir if self.niid else ''}_cliente{self.cid}.png")
+                figura.savefig(f"{self.folder}/mnist_CGAN_r{config['round']}_{self.local_epochs_gen}e_{self.batch_size}b_{self.latent_dim}z_4c_{self.lr_gen}lr_{'niid' if self.niid else 'iid'}_{self.alpha_dir if self.niid else ''}_cliente{self.cid}.png")
                 return (
                 get_weights(self.net_gen),
                 len(self.trainloader.dataset),
@@ -172,7 +172,7 @@ class FlowerClient(NumPyClient):
                     self.net_gen.load_state_dict(new_state_dict)
 
                     figura = generate_plot(net=self.net_gen, device=self.device, round_number=config["round"], latent_dim=self.latent_dim)
-                    figura.savefig(f"{self.folder}/mnist_CGAN_r{config['round']-1}_{self.local_epochs_gen}e_{self.batch_size}b_100z_4c_{self.lr_gen}lr_{'niid' if self.niid else 'iid'}_{self.alpha_dir if self.niid else ''}.png")
+                    figura.savefig(f"{self.folder}/mnist_CGAN_r{config['round']-1}_{self.local_epochs_gen}e_{self.batch_size}b_{self.latent_dim}z_4c_{self.lr_gen}lr_{'niid' if self.niid else 'iid'}_{self.alpha_dir if self.niid else ''}.png")
 
                 train_gen(
                     net=self.net_gen,
@@ -196,7 +196,7 @@ class FlowerClient(NumPyClient):
                 torch.save(self.net_gen.state_dict(), save_path)
 
                 figura = generate_plot(net=self.net_gen, device=self.device, round_number=config["round"], client_id=self.cid, latent_dim=self.latent_dim)
-                figura.savefig(f"{self.folder}/mnist_CGAN_r{config['round']}_{self.local_epochs_gen}e_{self.batch_size}b_100z_4c_{self.lr_gen}lr_{'niid' if self.niid else 'iid'}_{self.alpha_dir if self.niid else ''}_cliente{self.cid}.png")
+                figura.savefig(f"{self.folder}/mnist_CGAN_r{config['round']}_{self.local_epochs_gen}e_{self.batch_size}b_{self.latent_dim}z_4c_{self.lr_gen}lr_{'niid' if self.niid else 'iid'}_{self.alpha_dir if self.niid else ''}_cliente{self.cid}.png")
                 return (
                     get_weights_gen(self.net_gen),
                     len(self.trainloader.dataset),
