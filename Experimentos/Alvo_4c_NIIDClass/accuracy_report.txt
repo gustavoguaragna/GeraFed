@@ -1,0 +1,3800 @@
+Round 1 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          252       
+Class 1    0.0000     1369       0         
+Class 2    0.0017     1207       8         
+Class 3      N/A      0          0         
+Class 4      N/A      0          0         
+Class 5      N/A      0          3         
+Class 6    0.8684     1147       3460      
+Class 7      N/A      0          0         
+Class 8      N/A      0          0         
+Class 9      N/A      0          0         
+
+Overall Accuracy:    0.2681
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 3.6203
+
+Round 1 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          423       
+Class 1      N/A      0          0         
+Class 2      N/A      0          67        
+Class 3    0.0000     1224       0         
+Class 4    0.0000     1149       0         
+Class 5      N/A      0          6         
+Class 6      N/A      0          3088      
+Class 7      N/A      0          0         
+Class 8      N/A      0          0         
+Class 9    0.0000     1211       0         
+
+Overall Accuracy:    0.0000
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 2.8491
+
+Round 1 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.1888     1218       288       
+Class 1      N/A      0          0         
+Class 2      N/A      0          175       
+Class 3      N/A      0          0         
+Class 4      N/A      0          0         
+Class 5    0.0000     1050       0         
+Class 6      N/A      0          1805      
+Class 7      N/A      0          0         
+Class 8      N/A      0          0         
+Class 9      N/A      0          0         
+
+Overall Accuracy:    0.1014
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 1.8629
+
+Round 1 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          402       
+Class 1      N/A      0          0         
+Class 2      N/A      0          7         
+Class 3      N/A      0          0         
+Class 4      N/A      0          0         
+Class 5      N/A      0          13        
+Class 6      N/A      0          2001      
+Class 7    0.0000     1244       0         
+Class 8    0.0000     1179       0         
+Class 9      N/A      0          0         
+
+Overall Accuracy:    0.0000
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.0185
+
+Round 2 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          0         
+Class 1    0.9839     1369       1348      
+Class 2    0.9975     1207       1228      
+Class 3      N/A      0          1         
+Class 4      N/A      0          4         
+Class 5      N/A      0          0         
+Class 6    0.9939     1147       1142      
+Class 7      N/A      0          0         
+Class 8      N/A      0          0         
+Class 9      N/A      0          0         
+
+Overall Accuracy:    0.9914
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 3.2436
+
+Round 2 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          0         
+Class 1      N/A      0          42        
+Class 2      N/A      0          574       
+Class 3    0.6144     1224       752       
+Class 4    0.9487     1149       1137      
+Class 5      N/A      0          22        
+Class 6      N/A      0          59        
+Class 7      N/A      0          0         
+Class 8      N/A      0          4         
+Class 9    0.8183     1211       994       
+
+Overall Accuracy:    0.7905
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 3.1555
+
+Round 2 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.0033     1218       4         
+Class 1      N/A      0          15        
+Class 2      N/A      0          998       
+Class 3      N/A      0          37        
+Class 4      N/A      0          21        
+Class 5    0.4067     1050       427       
+Class 6      N/A      0          629       
+Class 7      N/A      0          0         
+Class 8      N/A      0          8         
+Class 9      N/A      0          129       
+
+Overall Accuracy:    0.1900
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 1.9902
+
+Round 2 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          0         
+Class 1      N/A      0          373       
+Class 2      N/A      0          1163      
+Class 3      N/A      0          1         
+Class 4      N/A      0          15        
+Class 5      N/A      0          0         
+Class 6      N/A      0          63        
+Class 7    0.0000     1244       0         
+Class 8    0.5140     1179       606       
+Class 9      N/A      0          202       
+
+Overall Accuracy:    0.2501
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.0543
+
+Round 3 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          0         
+Class 1    0.9489     1369       1300      
+Class 2    0.9867     1207       1206      
+Class 3      N/A      0          1         
+Class 4      N/A      0          42        
+Class 5      N/A      0          1         
+Class 6    0.9904     1147       1152      
+Class 7      N/A      0          0         
+Class 8      N/A      0          20        
+Class 9      N/A      0          1         
+
+Overall Accuracy:    0.9739
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 3.2548
+
+Round 3 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          2         
+Class 1      N/A      0          2         
+Class 2      N/A      0          143       
+Class 3    0.9224     1224       1129      
+Class 4    0.9765     1149       1177      
+Class 5      N/A      0          5         
+Class 6      N/A      0          48        
+Class 7      N/A      0          2         
+Class 8      N/A      0          44        
+Class 9    0.8505     1211       1032      
+
+Overall Accuracy:    0.9155
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 3.1565
+
+Round 3 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.8161     1218       994       
+Class 1      N/A      0          0         
+Class 2      N/A      0          102       
+Class 3      N/A      0          141       
+Class 4      N/A      0          3         
+Class 5    0.2762     1050       290       
+Class 6      N/A      0          679       
+Class 7      N/A      0          3         
+Class 8      N/A      0          54        
+Class 9      N/A      0          2         
+
+Overall Accuracy:    0.5661
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 1.9687
+
+Round 3 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          2         
+Class 1      N/A      0          7         
+Class 2      N/A      0          283       
+Class 3      N/A      0          8         
+Class 4      N/A      0          34        
+Class 5      N/A      0          5         
+Class 6      N/A      0          59        
+Class 7    0.7371     1244       917       
+Class 8    0.9042     1179       1067      
+Class 9      N/A      0          41        
+
+Overall Accuracy:    0.8184
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.1887
+
+Round 4 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          1         
+Class 1    0.9817     1369       1345      
+Class 2    0.9710     1207       1178      
+Class 3      N/A      0          3         
+Class 4      N/A      0          12        
+Class 5      N/A      0          1         
+Class 6    0.9861     1147       1143      
+Class 7      N/A      0          7         
+Class 8      N/A      0          33        
+Class 9      N/A      0          0         
+
+Overall Accuracy:    0.9796
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 4.2030
+
+Round 4 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          8         
+Class 1      N/A      0          32        
+Class 2      N/A      0          62        
+Class 3    0.9428     1224       1155      
+Class 4    0.9452     1149       1130      
+Class 5      N/A      0          32        
+Class 6      N/A      0          63        
+Class 7      N/A      0          63        
+Class 8      N/A      0          45        
+Class 9    0.8192     1211       994       
+
+Overall Accuracy:    0.9018
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 4.0272
+
+Round 4 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.8013     1218       976       
+Class 1      N/A      0          0         
+Class 2      N/A      0          157       
+Class 3      N/A      0          183       
+Class 4      N/A      0          1         
+Class 5    0.6686     1050       702       
+Class 6      N/A      0          191       
+Class 7      N/A      0          0         
+Class 8      N/A      0          57        
+Class 9      N/A      0          1         
+
+Overall Accuracy:    0.7399
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 2.5783
+
+Round 4 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          3         
+Class 1      N/A      0          7         
+Class 2      N/A      0          54        
+Class 3      N/A      0          2         
+Class 4      N/A      0          9         
+Class 5      N/A      0          7         
+Class 6      N/A      0          32        
+Class 7    0.9510     1244       1184      
+Class 8    0.9517     1179       1124      
+Class 9      N/A      0          1         
+
+Overall Accuracy:    0.9513
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.9056
+
+Round 5 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          23        
+Class 1    0.9869     1369       1352      
+Class 2    0.9544     1207       1154      
+Class 3      N/A      0          0         
+Class 4      N/A      0          15        
+Class 5      N/A      0          2         
+Class 6    0.9503     1147       1093      
+Class 7      N/A      0          17        
+Class 8      N/A      0          65        
+Class 9      N/A      0          2         
+
+Overall Accuracy:    0.9651
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 4.2313
+
+Round 5 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          19        
+Class 1      N/A      0          7         
+Class 2      N/A      0          48        
+Class 3    0.8137     1224       996       
+Class 4    0.9565     1149       1112      
+Class 5      N/A      0          71        
+Class 6      N/A      0          57        
+Class 7      N/A      0          63        
+Class 8      N/A      0          75        
+Class 9    0.9059     1211       1136      
+
+Overall Accuracy:    0.8906
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 4.1190
+
+Round 5 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.9376     1218       1145      
+Class 1      N/A      0          1         
+Class 2      N/A      0          4         
+Class 3      N/A      0          0         
+Class 4      N/A      0          2         
+Class 5    0.9152     1050       961       
+Class 6      N/A      0          21        
+Class 7      N/A      0          7         
+Class 8      N/A      0          122       
+Class 9      N/A      0          5         
+
+Overall Accuracy:    0.9272
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 2.7282
+
+Round 5 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          7         
+Class 1      N/A      0          8         
+Class 2      N/A      0          19        
+Class 3      N/A      0          0         
+Class 4      N/A      0          9         
+Class 5      N/A      0          8         
+Class 6      N/A      0          11        
+Class 7    0.9711     1244       1210      
+Class 8    0.9669     1179       1143      
+Class 9      N/A      0          8         
+
+Overall Accuracy:    0.9690
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.7472
+
+Round 6 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          5         
+Class 1    0.8912     1369       1220      
+Class 2    0.9776     1207       1187      
+Class 3      N/A      0          8         
+Class 4      N/A      0          35        
+Class 5      N/A      0          5         
+Class 6    0.9939     1147       1163      
+Class 7      N/A      0          20        
+Class 8      N/A      0          80        
+Class 9      N/A      0          0         
+
+Overall Accuracy:    0.9508
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 3.3215
+
+Round 6 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          8         
+Class 1      N/A      0          6         
+Class 2      N/A      0          52        
+Class 3    0.9167     1224       1131      
+Class 4    0.8930     1149       1036      
+Class 5      N/A      0          49        
+Class 6      N/A      0          196       
+Class 7      N/A      0          35        
+Class 8      N/A      0          36        
+Class 9    0.8514     1211       1035      
+
+Overall Accuracy:    0.8870
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 2.9316
+
+Round 6 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.8818     1218       1075      
+Class 1      N/A      0          0         
+Class 2      N/A      0          16        
+Class 3      N/A      0          12        
+Class 4      N/A      0          9         
+Class 5    0.8895     1050       934       
+Class 6      N/A      0          213       
+Class 7      N/A      0          0         
+Class 8      N/A      0          9         
+Class 9      N/A      0          0         
+
+Overall Accuracy:    0.8854
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 1.8165
+
+Round 6 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          15        
+Class 1      N/A      0          1         
+Class 2      N/A      0          109       
+Class 3      N/A      0          5         
+Class 4      N/A      0          20        
+Class 5      N/A      0          18        
+Class 6      N/A      0          137       
+Class 7    0.8352     1244       1039      
+Class 8    0.9126     1179       1076      
+Class 9      N/A      0          3         
+
+Overall Accuracy:    0.8729
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.0187
+
+Round 7 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          5         
+Class 1    0.9832     1369       1347      
+Class 2    0.9917     1207       1204      
+Class 3      N/A      0          4         
+Class 4      N/A      0          14        
+Class 5      N/A      0          0         
+Class 6    0.9878     1147       1133      
+Class 7      N/A      0          4         
+Class 8      N/A      0          8         
+Class 9      N/A      0          4         
+
+Overall Accuracy:    0.9874
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 3.1383
+
+Round 7 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          11        
+Class 1      N/A      0          5         
+Class 2      N/A      0          59        
+Class 3    0.9436     1224       1156      
+Class 4    0.9748     1149       1126      
+Class 5      N/A      0          0         
+Class 6      N/A      0          9         
+Class 7      N/A      0          1         
+Class 8      N/A      0          11        
+Class 9    0.9777     1211       1206      
+
+Overall Accuracy:    0.9651
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 2.8648
+
+Round 7 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.9540     1218       1162      
+Class 1      N/A      0          0         
+Class 2      N/A      0          35        
+Class 3      N/A      0          74        
+Class 4      N/A      0          21        
+Class 5    0.5705     1050       599       
+Class 6      N/A      0          177       
+Class 7      N/A      0          2         
+Class 8      N/A      0          166       
+Class 9      N/A      0          32        
+
+Overall Accuracy:    0.7765
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 2.0052
+
+Round 7 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          32        
+Class 1      N/A      0          36        
+Class 2      N/A      0          121       
+Class 3      N/A      0          10        
+Class 4      N/A      0          15        
+Class 5      N/A      0          1         
+Class 6      N/A      0          12        
+Class 7    0.8489     1244       1056      
+Class 8    0.9025     1179       1065      
+Class 9      N/A      0          75        
+
+Overall Accuracy:    0.8749
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.0063
+
+Round 8 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          1         
+Class 1    0.8955     1369       1226      
+Class 2    0.9859     1207       1199      
+Class 3      N/A      0          13        
+Class 4      N/A      0          51        
+Class 5      N/A      0          0         
+Class 6    0.9887     1147       1137      
+Class 7      N/A      0          3         
+Class 8      N/A      0          93        
+Class 9      N/A      0          0         
+
+Overall Accuracy:    0.9535
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 3.3052
+
+Round 8 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          6         
+Class 1      N/A      0          2         
+Class 2      N/A      0          191       
+Class 3    0.9199     1224       1153      
+Class 4    0.9869     1149       1306      
+Class 5      N/A      0          17        
+Class 6      N/A      0          10        
+Class 7      N/A      0          1         
+Class 8      N/A      0          43        
+Class 9    0.7044     1211       855       
+
+Overall Accuracy:    0.8686
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 2.8335
+
+Round 8 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.7496     1218       915       
+Class 1      N/A      0          2         
+Class 2      N/A      0          227       
+Class 3      N/A      0          110       
+Class 4      N/A      0          7         
+Class 5    0.5771     1050       606       
+Class 6      N/A      0          225       
+Class 7      N/A      0          0         
+Class 8      N/A      0          170       
+Class 9      N/A      0          6         
+
+Overall Accuracy:    0.6698
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 1.9882
+
+Round 8 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          5         
+Class 1      N/A      0          7         
+Class 2      N/A      0          299       
+Class 3      N/A      0          35        
+Class 4      N/A      0          74        
+Class 5      N/A      0          1         
+Class 6      N/A      0          20        
+Class 7    0.7267     1244       904       
+Class 8    0.9033     1179       1070      
+Class 9      N/A      0          8         
+
+Overall Accuracy:    0.8126
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.1018
+
+Round 9 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          1         
+Class 1    0.9898     1369       1357      
+Class 2    0.9677     1207       1171      
+Class 3      N/A      0          23        
+Class 4      N/A      0          16        
+Class 5      N/A      0          4         
+Class 6    0.9799     1147       1126      
+Class 7      N/A      0          11        
+Class 8      N/A      0          12        
+Class 9      N/A      0          2         
+
+Overall Accuracy:    0.9796
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 4.3041
+
+Round 9 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          0         
+Class 1      N/A      0          15        
+Class 2      N/A      0          15        
+Class 3    0.9559     1224       1171      
+Class 4    0.9930     1149       1223      
+Class 5      N/A      0          29        
+Class 6      N/A      0          10        
+Class 7      N/A      0          19        
+Class 8      N/A      0          47        
+Class 9    0.8687     1211       1055      
+
+Overall Accuracy:    0.9383
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 4.0236
+
+Round 9 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.7816     1218       952       
+Class 1      N/A      0          2         
+Class 2      N/A      0          33        
+Class 3      N/A      0          26        
+Class 4      N/A      0          2         
+Class 5    0.9495     1050       998       
+Class 6      N/A      0          34        
+Class 7      N/A      0          161       
+Class 8      N/A      0          50        
+Class 9      N/A      0          10        
+
+Overall Accuracy:    0.8593
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 2.5743
+
+Round 9 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          0         
+Class 1      N/A      0          14        
+Class 2      N/A      0          60        
+Class 3      N/A      0          36        
+Class 4      N/A      0          27        
+Class 5      N/A      0          12        
+Class 6      N/A      0          14        
+Class 7    0.9220     1244       1148      
+Class 8    0.9296     1179       1097      
+Class 9      N/A      0          15        
+
+Overall Accuracy:    0.9257
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.7593
+
+Round 10 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          1         
+Class 1    0.9869     1369       1353      
+Class 2    0.9710     1207       1179      
+Class 3      N/A      0          19        
+Class 4      N/A      0          2         
+Class 5      N/A      0          2         
+Class 6    0.9765     1147       1121      
+Class 7      N/A      0          17        
+Class 8      N/A      0          28        
+Class 9      N/A      0          1         
+
+Overall Accuracy:    0.9785
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 4.4788
+
+Round 10 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          3         
+Class 1      N/A      0          19        
+Class 2      N/A      0          77        
+Class 3    0.9338     1224       1148      
+Class 4    0.8686     1149       1006      
+Class 5      N/A      0          40        
+Class 6      N/A      0          15        
+Class 7      N/A      0          69        
+Class 8      N/A      0          153       
+Class 9    0.8671     1211       1054      
+
+Overall Accuracy:    0.8903
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 4.0389
+
+Round 10 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.7775     1218       947       
+Class 1      N/A      0          3         
+Class 2      N/A      0          10        
+Class 3      N/A      0          38        
+Class 4      N/A      0          1         
+Class 5    0.8924     1050       942       
+Class 6      N/A      0          62        
+Class 7      N/A      0          50        
+Class 8      N/A      0          210       
+Class 9      N/A      0          5         
+
+Overall Accuracy:    0.8307
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 2.7036
+
+Round 10 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          0         
+Class 1      N/A      0          10        
+Class 2      N/A      0          48        
+Class 3      N/A      0          22        
+Class 4      N/A      0          4         
+Class 5      N/A      0          4         
+Class 6      N/A      0          6         
+Class 7    0.9437     1244       1177      
+Class 8    0.9635     1179       1144      
+Class 9      N/A      0          8         
+
+Overall Accuracy:    0.9534
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.7713
+
+Round 11 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          0         
+Class 1    0.9664     1369       1324      
+Class 2    0.9652     1207       1172      
+Class 3      N/A      0          6         
+Class 4      N/A      0          7         
+Class 5      N/A      0          5         
+Class 6    0.9826     1147       1128      
+Class 7      N/A      0          46        
+Class 8      N/A      0          33        
+Class 9      N/A      0          2         
+
+Overall Accuracy:    0.9710
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 4.1839
+
+Round 11 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          0         
+Class 1      N/A      0          4         
+Class 2      N/A      0          194       
+Class 3    0.8554     1224       1047      
+Class 4    0.8799     1149       1025      
+Class 5      N/A      0          22        
+Class 6      N/A      0          16        
+Class 7      N/A      0          33        
+Class 8      N/A      0          78        
+Class 9    0.9546     1211       1165      
+
+Overall Accuracy:    0.8968
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 3.9225
+
+Round 11 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.3768     1218       459       
+Class 1      N/A      0          3         
+Class 2      N/A      0          169       
+Class 3      N/A      0          14        
+Class 4      N/A      0          0         
+Class 5    0.8714     1050       916       
+Class 6      N/A      0          99        
+Class 7      N/A      0          407       
+Class 8      N/A      0          122       
+Class 9      N/A      0          79        
+
+Overall Accuracy:    0.6058
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 2.5069
+
+Round 11 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          0         
+Class 1      N/A      0          3         
+Class 2      N/A      0          69        
+Class 3      N/A      0          5         
+Class 4      N/A      0          3         
+Class 5      N/A      0          22        
+Class 6      N/A      0          18        
+Class 7    0.9357     1244       1168      
+Class 8    0.9313     1179       1099      
+Class 9      N/A      0          36        
+
+Overall Accuracy:    0.9336
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.7250
+
+Round 12 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          4         
+Class 1    0.9686     1369       1326      
+Class 2    0.9909     1207       1203      
+Class 3      N/A      0          1         
+Class 4      N/A      0          51        
+Class 5      N/A      0          4         
+Class 6    0.9529     1147       1094      
+Class 7      N/A      0          8         
+Class 8      N/A      0          30        
+Class 9      N/A      0          2         
+
+Overall Accuracy:    0.9710
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 4.4521
+
+Round 12 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          17        
+Class 1      N/A      0          4         
+Class 2      N/A      0          42        
+Class 3    0.8627     1224       1056      
+Class 4    0.9913     1149       1149      
+Class 5      N/A      0          87        
+Class 6      N/A      0          10        
+Class 7      N/A      0          45        
+Class 8      N/A      0          17        
+Class 9    0.9438     1211       1157      
+
+Overall Accuracy:    0.9314
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 4.0027
+
+Round 12 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.9516     1218       1159      
+Class 1      N/A      0          0         
+Class 2      N/A      0          9         
+Class 3      N/A      0          2         
+Class 4      N/A      0          7         
+Class 5    0.9533     1050       1004      
+Class 6      N/A      0          23        
+Class 7      N/A      0          23        
+Class 8      N/A      0          32        
+Class 9      N/A      0          9         
+
+Overall Accuracy:    0.9524
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 2.7153
+
+Round 12 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          2         
+Class 1      N/A      0          6         
+Class 2      N/A      0          67        
+Class 3      N/A      0          1         
+Class 4      N/A      0          31        
+Class 5      N/A      0          28        
+Class 6      N/A      0          21        
+Class 7    0.9317     1244       1161      
+Class 8    0.9025     1179       1064      
+Class 9      N/A      0          42        
+
+Overall Accuracy:    0.9175
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.8386
+
+Round 13 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          1         
+Class 1    0.9817     1369       1345      
+Class 2    0.9743     1207       1179      
+Class 3      N/A      0          6         
+Class 4      N/A      0          19        
+Class 5      N/A      0          2         
+Class 6    0.9948     1147       1144      
+Class 7      N/A      0          7         
+Class 8      N/A      0          15        
+Class 9      N/A      0          5         
+
+Overall Accuracy:    0.9833
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 4.3356
+
+Round 13 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          1         
+Class 1      N/A      0          5         
+Class 2      N/A      0          45        
+Class 3    0.9371     1224       1147      
+Class 4    0.9574     1149       1104      
+Class 5      N/A      0          24        
+Class 6      N/A      0          49        
+Class 7      N/A      0          5         
+Class 8      N/A      0          30        
+Class 9    0.9612     1211       1174      
+
+Overall Accuracy:    0.9517
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 4.2636
+
+Round 13 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.7315     1218       891       
+Class 1      N/A      0          0         
+Class 2      N/A      0          21        
+Class 3      N/A      0          9         
+Class 4      N/A      0          0         
+Class 5    0.8714     1050       915       
+Class 6      N/A      0          322       
+Class 7      N/A      0          12        
+Class 8      N/A      0          85        
+Class 9      N/A      0          13        
+
+Overall Accuracy:    0.7963
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 2.6116
+
+Round 13 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          0         
+Class 1      N/A      0          13        
+Class 2      N/A      0          89        
+Class 3      N/A      0          6         
+Class 4      N/A      0          11        
+Class 5      N/A      0          28        
+Class 6      N/A      0          43        
+Class 7    0.8320     1244       1035      
+Class 8    0.9534     1179       1126      
+Class 9      N/A      0          72        
+
+Overall Accuracy:    0.8910
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.8893
+
+Round 14 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          5         
+Class 1    0.9766     1369       1339      
+Class 2    0.9693     1207       1173      
+Class 3      N/A      0          2         
+Class 4      N/A      0          9         
+Class 5      N/A      0          3         
+Class 6    0.9582     1147       1099      
+Class 7      N/A      0          24        
+Class 8      N/A      0          68        
+Class 9      N/A      0          1         
+
+Overall Accuracy:    0.9686
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 4.3547
+
+Round 14 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          41        
+Class 1      N/A      0          15        
+Class 2      N/A      0          48        
+Class 3    0.8856     1224       1084      
+Class 4    0.9634     1149       1115      
+Class 5      N/A      0          80        
+Class 6      N/A      0          15        
+Class 7      N/A      0          17        
+Class 8      N/A      0          76        
+Class 9    0.8951     1211       1093      
+
+Overall Accuracy:    0.9138
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 4.2598
+
+Round 14 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.9672     1218       1182      
+Class 1      N/A      0          2         
+Class 2      N/A      0          11        
+Class 3      N/A      0          9         
+Class 4      N/A      0          1         
+Class 5    0.9171     1050       964       
+Class 6      N/A      0          45        
+Class 7      N/A      0          8         
+Class 8      N/A      0          41        
+Class 9      N/A      0          5         
+
+Overall Accuracy:    0.9440
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 2.7228
+
+Round 14 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          6         
+Class 1      N/A      0          8         
+Class 2      N/A      0          59        
+Class 3      N/A      0          1         
+Class 4      N/A      0          11        
+Class 5      N/A      0          26        
+Class 6      N/A      0          6         
+Class 7    0.9188     1244       1143      
+Class 8    0.9669     1179       1144      
+Class 9      N/A      0          19        
+
+Overall Accuracy:    0.9422
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.7610
+
+Round 15 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          23        
+Class 1    0.9810     1369       1346      
+Class 2    0.9785     1207       1184      
+Class 3      N/A      0          1         
+Class 4      N/A      0          9         
+Class 5      N/A      0          3         
+Class 6    0.9808     1147       1127      
+Class 7      N/A      0          3         
+Class 8      N/A      0          25        
+Class 9      N/A      0          2         
+
+Overall Accuracy:    0.9801
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 4.7987
+
+Round 15 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          51        
+Class 1      N/A      0          15        
+Class 2      N/A      0          30        
+Class 3    0.9371     1224       1147      
+Class 4    0.9408     1149       1085      
+Class 5      N/A      0          32        
+Class 6      N/A      0          57        
+Class 7      N/A      0          10        
+Class 8      N/A      0          58        
+Class 9    0.8943     1211       1099      
+
+Overall Accuracy:    0.9238
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 3.9537
+
+Round 15 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.9581     1218       1171      
+Class 1      N/A      0          6         
+Class 2      N/A      0          8         
+Class 3      N/A      0          6         
+Class 4      N/A      0          0         
+Class 5    0.8476     1050       891       
+Class 6      N/A      0          51        
+Class 7      N/A      0          0         
+Class 8      N/A      0          125       
+Class 9      N/A      0          10        
+
+Overall Accuracy:    0.9070
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 2.6464
+
+Round 15 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          166       
+Class 1      N/A      0          8         
+Class 2      N/A      0          85        
+Class 3      N/A      0          5         
+Class 4      N/A      0          3         
+Class 5      N/A      0          5         
+Class 6      N/A      0          22        
+Class 7    0.7854     1244       977       
+Class 8    0.9610     1179       1138      
+Class 9      N/A      0          14        
+
+Overall Accuracy:    0.8708
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.7498
+
+Round 16 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          8         
+Class 1    0.9781     1369       1340      
+Class 2    0.9901     1207       1204      
+Class 3      N/A      0          8         
+Class 4      N/A      0          13        
+Class 5      N/A      0          18        
+Class 6    0.9520     1147       1093      
+Class 7      N/A      0          11        
+Class 8      N/A      0          27        
+Class 9      N/A      0          1         
+
+Overall Accuracy:    0.9739
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 4.2847
+
+Round 16 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          12        
+Class 1      N/A      0          6         
+Class 2      N/A      0          161       
+Class 3    0.9739     1224       1196      
+Class 4    0.9617     1149       1121      
+Class 5      N/A      0          32        
+Class 6      N/A      0          24        
+Class 7      N/A      0          44        
+Class 8      N/A      0          6         
+Class 9    0.8101     1211       982       
+
+Overall Accuracy:    0.9146
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 4.1230
+
+Round 16 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.9360     1218       1142      
+Class 1      N/A      0          3         
+Class 2      N/A      0          42        
+Class 3      N/A      0          20        
+Class 4      N/A      0          1         
+Class 5    0.9400     1050       988       
+Class 6      N/A      0          51        
+Class 7      N/A      0          15        
+Class 8      N/A      0          4         
+Class 9      N/A      0          2         
+
+Overall Accuracy:    0.9378
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 2.5761
+
+Round 16 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          12        
+Class 1      N/A      0          3         
+Class 2      N/A      0          236       
+Class 3      N/A      0          46        
+Class 4      N/A      0          21        
+Class 5      N/A      0          63        
+Class 6      N/A      0          27        
+Class 7    0.8320     1244       1044      
+Class 8    0.8168     1179       963       
+Class 9      N/A      0          8         
+
+Overall Accuracy:    0.8246
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.9010
+
+Round 17 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          0         
+Class 1    0.9774     1369       1339      
+Class 2    0.9867     1207       1194      
+Class 3      N/A      0          7         
+Class 4      N/A      0          36        
+Class 5      N/A      0          1         
+Class 6    0.9930     1147       1145      
+Class 7      N/A      0          0         
+Class 8      N/A      0          0         
+Class 9      N/A      0          1         
+
+Overall Accuracy:    0.9852
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 4.2978
+
+Round 17 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          2         
+Class 1      N/A      0          7         
+Class 2      N/A      0          62        
+Class 3    0.9510     1224       1165      
+Class 4    0.9721     1149       1137      
+Class 5      N/A      0          11        
+Class 6      N/A      0          75        
+Class 7      N/A      0          2         
+Class 8      N/A      0          1         
+Class 9    0.9199     1211       1122      
+
+Overall Accuracy:    0.9473
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 3.9786
+
+Round 17 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.7537     1218       918       
+Class 1      N/A      0          4         
+Class 2      N/A      0          40        
+Class 3      N/A      0          34        
+Class 4      N/A      0          4         
+Class 5    0.6457     1050       679       
+Class 6      N/A      0          544       
+Class 7      N/A      0          0         
+Class 8      N/A      0          3         
+Class 9      N/A      0          42        
+
+Overall Accuracy:    0.7037
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 2.5279
+
+Round 17 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          3         
+Class 1      N/A      0          52        
+Class 2      N/A      0          460       
+Class 3      N/A      0          42        
+Class 4      N/A      0          70        
+Class 5      N/A      0          10        
+Class 6      N/A      0          428       
+Class 7    0.4019     1244       500       
+Class 8    0.7142     1179       842       
+Class 9      N/A      0          16        
+
+Overall Accuracy:    0.5539
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.9799
+
+Round 18 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          23        
+Class 1    0.9817     1369       1348      
+Class 2    0.9271     1207       1120      
+Class 3      N/A      0          12        
+Class 4      N/A      0          46        
+Class 5      N/A      0          4         
+Class 6    0.9922     1147       1142      
+Class 7      N/A      0          21        
+Class 8      N/A      0          1         
+Class 9      N/A      0          6         
+
+Overall Accuracy:    0.9672
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 4.2509
+
+Round 18 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          75        
+Class 1      N/A      0          15        
+Class 2      N/A      0          9         
+Class 3    0.9232     1224       1130      
+Class 4    0.9861     1149       1178      
+Class 5      N/A      0          40        
+Class 6      N/A      0          10        
+Class 7      N/A      0          41        
+Class 8      N/A      0          12        
+Class 9    0.8794     1211       1074      
+
+Overall Accuracy:    0.9286
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 4.3117
+
+Round 18 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.9540     1218       1169      
+Class 1      N/A      0          1         
+Class 2      N/A      0          0         
+Class 3      N/A      0          12        
+Class 4      N/A      0          2         
+Class 5    0.8962     1050       942       
+Class 6      N/A      0          122       
+Class 7      N/A      0          6         
+Class 8      N/A      0          4         
+Class 9      N/A      0          10        
+
+Overall Accuracy:    0.9272
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 2.6367
+
+Round 18 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          90        
+Class 1      N/A      0          27        
+Class 2      N/A      0          33        
+Class 3      N/A      0          15        
+Class 4      N/A      0          45        
+Class 5      N/A      0          19        
+Class 6      N/A      0          72        
+Class 7    0.8867     1244       1107      
+Class 8    0.8109     1179       957       
+Class 9      N/A      0          58        
+
+Overall Accuracy:    0.8498
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.7073
+
+Round 19 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          4         
+Class 1    0.9686     1369       1327      
+Class 2    0.9403     1207       1137      
+Class 3      N/A      0          17        
+Class 4      N/A      0          39        
+Class 5      N/A      0          3         
+Class 6    0.9817     1147       1131      
+Class 7      N/A      0          32        
+Class 8      N/A      0          25        
+Class 9      N/A      0          8         
+
+Overall Accuracy:    0.9635
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 4.6085
+
+Round 19 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          21        
+Class 1      N/A      0          0         
+Class 2      N/A      0          20        
+Class 3    0.9134     1224       1118      
+Class 4    0.9669     1149       1121      
+Class 5      N/A      0          49        
+Class 6      N/A      0          35        
+Class 7      N/A      0          51        
+Class 8      N/A      0          69        
+Class 9    0.8993     1211       1100      
+
+Overall Accuracy:    0.9258
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 4.1319
+
+Round 19 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.9327     1218       1136      
+Class 1      N/A      0          0         
+Class 2      N/A      0          1         
+Class 3      N/A      0          4         
+Class 4      N/A      0          6         
+Class 5    0.9219     1050       972       
+Class 6      N/A      0          71        
+Class 7      N/A      0          13        
+Class 8      N/A      0          59        
+Class 9      N/A      0          6         
+
+Overall Accuracy:    0.9277
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 2.7498
+
+Round 19 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          9         
+Class 1      N/A      0          1         
+Class 2      N/A      0          19        
+Class 3      N/A      0          11        
+Class 4      N/A      0          17        
+Class 5      N/A      0          16        
+Class 6      N/A      0          27        
+Class 7    0.9437     1244       1174      
+Class 8    0.9483     1179       1125      
+Class 9      N/A      0          24        
+
+Overall Accuracy:    0.9459
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.7420
+
+Round 20 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          4         
+Class 1    0.9912     1369       1358      
+Class 2    0.9743     1207       1177      
+Class 3      N/A      0          13        
+Class 4      N/A      0          4         
+Class 5      N/A      0          6         
+Class 6    0.9861     1147       1134      
+Class 7      N/A      0          13        
+Class 8      N/A      0          13        
+Class 9      N/A      0          1         
+
+Overall Accuracy:    0.9842
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 4.7334
+
+Round 20 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          12        
+Class 1      N/A      0          23        
+Class 2      N/A      0          32        
+Class 3    0.9502     1224       1171      
+Class 4    0.9426     1149       1097      
+Class 5      N/A      0          32        
+Class 6      N/A      0          125       
+Class 7      N/A      0          60        
+Class 8      N/A      0          44        
+Class 9    0.8117     1211       988       
+
+Overall Accuracy:    0.9009
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 4.4314
+
+Round 20 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.8678     1218       1057      
+Class 1      N/A      0          3         
+Class 2      N/A      0          7         
+Class 3      N/A      0          17        
+Class 4      N/A      0          0         
+Class 5    0.9190     1050       971       
+Class 6      N/A      0          193       
+Class 7      N/A      0          1         
+Class 8      N/A      0          17        
+Class 9      N/A      0          2         
+
+Overall Accuracy:    0.8915
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 2.5797
+
+Round 20 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          12        
+Class 1      N/A      0          9         
+Class 2      N/A      0          37        
+Class 3      N/A      0          16        
+Class 4      N/A      0          5         
+Class 5      N/A      0          35        
+Class 6      N/A      0          47        
+Class 7    0.9341     1244       1163      
+Class 8    0.9228     1179       1093      
+Class 9      N/A      0          6         
+
+Overall Accuracy:    0.9286
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.8424
+
+Round 21 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          5         
+Class 1    0.9642     1369       1324      
+Class 2    0.9445     1207       1141      
+Class 3      N/A      0          1         
+Class 4      N/A      0          6         
+Class 5      N/A      0          3         
+Class 6    0.9878     1147       1134      
+Class 7      N/A      0          95        
+Class 8      N/A      0          14        
+Class 9      N/A      0          0         
+
+Overall Accuracy:    0.9651
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 4.3548
+
+Round 21 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          16        
+Class 1      N/A      0          30        
+Class 2      N/A      0          148       
+Class 3    0.8056     1224       986       
+Class 4    0.9504     1149       1115      
+Class 5      N/A      0          149       
+Class 6      N/A      0          19        
+Class 7      N/A      0          326       
+Class 8      N/A      0          130       
+Class 9    0.5491     1211       665       
+
+Overall Accuracy:    0.7653
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 1.9649
+
+Round 21 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.9327     1218       1136      
+Class 1      N/A      0          3         
+Class 2      N/A      0          8         
+Class 3      N/A      0          0         
+Class 4      N/A      0          3         
+Class 5    0.9524     1050       1002      
+Class 6      N/A      0          47        
+Class 7      N/A      0          58        
+Class 8      N/A      0          11        
+Class 9      N/A      0          0         
+
+Overall Accuracy:    0.9418
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 1.2923
+
+Round 21 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          6         
+Class 1      N/A      0          10        
+Class 2      N/A      0          36        
+Class 3      N/A      0          1         
+Class 4      N/A      0          10        
+Class 5      N/A      0          28        
+Class 6      N/A      0          22        
+Class 7    0.9775     1244       1224      
+Class 8    0.9194     1179       1086      
+Class 9      N/A      0          0         
+
+Overall Accuracy:    0.9492
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 1.8497
+
+Round 22 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          1         
+Class 1    0.9920     1369       1359      
+Class 2    0.9644     1207       1165      
+Class 3      N/A      0          5         
+Class 4      N/A      0          6         
+Class 5      N/A      0          10        
+Class 6    0.9826     1147       1127      
+Class 7      N/A      0          27        
+Class 8      N/A      0          10        
+Class 9      N/A      0          13        
+
+Overall Accuracy:    0.9801
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 3.3194
+
+Round 22 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          1         
+Class 1      N/A      0          8         
+Class 2      N/A      0          21        
+Class 3    0.9150     1224       1121      
+Class 4    0.9600     1149       1105      
+Class 5      N/A      0          66        
+Class 6      N/A      0          5         
+Class 7      N/A      0          42        
+Class 8      N/A      0          20        
+Class 9    0.9637     1211       1195      
+
+Overall Accuracy:    0.9459
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 2.8605
+
+Round 22 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.8916     1218       1086      
+Class 1      N/A      0          7         
+Class 2      N/A      0          6         
+Class 3      N/A      0          3         
+Class 4      N/A      0          2         
+Class 5    0.9305     1050       978       
+Class 6      N/A      0          41        
+Class 7      N/A      0          15        
+Class 8      N/A      0          30        
+Class 9      N/A      0          100       
+
+Overall Accuracy:    0.9096
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 1.8685
+
+Round 22 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          2         
+Class 1      N/A      0          12        
+Class 2      N/A      0          34        
+Class 3      N/A      0          3         
+Class 4      N/A      0          12        
+Class 5      N/A      0          16        
+Class 6      N/A      0          12        
+Class 7    0.9180     1244       1143      
+Class 8    0.9406     1179       1113      
+Class 9      N/A      0          76        
+
+Overall Accuracy:    0.9290
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.0463
+
+Round 23 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          1         
+Class 1    0.9752     1369       1336      
+Class 2    0.9959     1207       1216      
+Class 3      N/A      0          0         
+Class 4      N/A      0          11        
+Class 5      N/A      0          2         
+Class 6    0.9765     1147       1121      
+Class 7      N/A      0          15        
+Class 8      N/A      0          21        
+Class 9      N/A      0          0         
+
+Overall Accuracy:    0.9823
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 3.3375
+
+Round 23 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          3         
+Class 1      N/A      0          8         
+Class 2      N/A      0          473       
+Class 3    0.8840     1224       1083      
+Class 4    0.9417     1149       1109      
+Class 5      N/A      0          26        
+Class 6      N/A      0          10        
+Class 7      N/A      0          69        
+Class 8      N/A      0          5         
+Class 9    0.6581     1211       798       
+
+Overall Accuracy:    0.8262
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 2.8908
+
+Round 23 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.9146     1218       1114      
+Class 1      N/A      0          1         
+Class 2      N/A      0          31        
+Class 3      N/A      0          12        
+Class 4      N/A      0          2         
+Class 5    0.9238     1050       989       
+Class 6      N/A      0          80        
+Class 7      N/A      0          12        
+Class 8      N/A      0          24        
+Class 9      N/A      0          3         
+
+Overall Accuracy:    0.9189
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 1.9747
+
+Round 23 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          2         
+Class 1      N/A      0          6         
+Class 2      N/A      0          198       
+Class 3      N/A      0          2         
+Class 4      N/A      0          10        
+Class 5      N/A      0          27        
+Class 6      N/A      0          21        
+Class 7    0.8650     1244       1076      
+Class 8    0.9092     1179       1072      
+Class 9      N/A      0          9         
+
+Overall Accuracy:    0.8865
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.0768
+
+Round 24 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          0         
+Class 1    0.9890     1369       1355      
+Class 2    0.9975     1207       1215      
+Class 3      N/A      0          0         
+Class 4      N/A      0          1         
+Class 5      N/A      0          0         
+Class 6    0.9878     1147       1135      
+Class 7      N/A      0          2         
+Class 8      N/A      0          15        
+Class 9      N/A      0          0         
+
+Overall Accuracy:    0.9914
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 2.7514
+
+Round 24 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          2         
+Class 1      N/A      0          65        
+Class 2      N/A      0          681       
+Class 3    0.8913     1224       1095      
+Class 4    0.9487     1149       1099      
+Class 5      N/A      0          2         
+Class 6      N/A      0          6         
+Class 7      N/A      0          36        
+Class 8      N/A      0          108       
+Class 9    0.4038     1211       490       
+
+Overall Accuracy:    0.7450
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 4.5297
+
+Round 24 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.7069     1218       861       
+Class 1      N/A      0          19        
+Class 2      N/A      0          326       
+Class 3      N/A      0          29        
+Class 4      N/A      0          1         
+Class 5    0.4905     1050       515       
+Class 6      N/A      0          118       
+Class 7      N/A      0          41        
+Class 8      N/A      0          354       
+Class 9      N/A      0          4         
+
+Overall Accuracy:    0.6067
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 2.4416
+
+Round 24 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          0         
+Class 1      N/A      0          14        
+Class 2      N/A      0          192       
+Class 3      N/A      0          3         
+Class 4      N/A      0          5         
+Class 5      N/A      0          0         
+Class 6      N/A      0          7         
+Class 7    0.8859     1244       1102      
+Class 8    0.9296     1179       1098      
+Class 9      N/A      0          2         
+
+Overall Accuracy:    0.9071
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.7241
+
+Round 25 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          5         
+Class 1    0.9927     1369       1361      
+Class 2    0.9843     1207       1198      
+Class 3      N/A      0          7         
+Class 4      N/A      0          10        
+Class 5      N/A      0          4         
+Class 6    0.9782     1147       1122      
+Class 7      N/A      0          2         
+Class 8      N/A      0          11        
+Class 9      N/A      0          3         
+
+Overall Accuracy:    0.9855
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 4.4692
+
+Round 25 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          0         
+Class 1      N/A      0          11        
+Class 2      N/A      0          39        
+Class 3    0.9583     1224       1173      
+Class 4    0.9695     1149       1122      
+Class 5      N/A      0          31        
+Class 6      N/A      0          1         
+Class 7      N/A      0          9         
+Class 8      N/A      0          14        
+Class 9    0.9711     1211       1184      
+
+Overall Accuracy:    0.9662
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 4.3262
+
+Round 25 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.9269     1218       1132      
+Class 1      N/A      0          3         
+Class 2      N/A      0          21        
+Class 3      N/A      0          31        
+Class 4      N/A      0          0         
+Class 5    0.9114     1050       959       
+Class 6      N/A      0          35        
+Class 7      N/A      0          0         
+Class 8      N/A      0          31        
+Class 9      N/A      0          56        
+
+Overall Accuracy:    0.9198
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 2.6838
+
+Round 25 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          5         
+Class 1      N/A      0          26        
+Class 2      N/A      0          123       
+Class 3      N/A      0          18        
+Class 4      N/A      0          14        
+Class 5      N/A      0          12        
+Class 6      N/A      0          16        
+Class 7    0.8473     1244       1054      
+Class 8    0.9042     1179       1067      
+Class 9      N/A      0          88        
+
+Overall Accuracy:    0.8749
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.8012
+
+Round 26 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          0         
+Class 1    0.9810     1369       1345      
+Class 2    0.9867     1207       1194      
+Class 3      N/A      0          6         
+Class 4      N/A      0          12        
+Class 5      N/A      0          6         
+Class 6    0.9738     1147       1119      
+Class 7      N/A      0          4         
+Class 8      N/A      0          37        
+Class 9      N/A      0          0         
+
+Overall Accuracy:    0.9807
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 4.2215
+
+Round 26 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          1         
+Class 1      N/A      0          5         
+Class 2      N/A      0          155       
+Class 3    0.9387     1224       1151      
+Class 4    0.9800     1149       1147      
+Class 5      N/A      0          125       
+Class 6      N/A      0          41        
+Class 7      N/A      0          9         
+Class 8      N/A      0          282       
+Class 9    0.5508     1211       668       
+
+Overall Accuracy:    0.8209
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 4.3462
+
+Round 26 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.6412     1218       781       
+Class 1      N/A      0          4         
+Class 2      N/A      0          9         
+Class 3      N/A      0          14        
+Class 4      N/A      0          1         
+Class 5    0.8343     1050       877       
+Class 6      N/A      0          164       
+Class 7      N/A      0          1         
+Class 8      N/A      0          416       
+Class 9      N/A      0          1         
+
+Overall Accuracy:    0.7306
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 2.6768
+
+Round 26 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          0         
+Class 1      N/A      0          15        
+Class 2      N/A      0          82        
+Class 3      N/A      0          8         
+Class 4      N/A      0          29        
+Class 5      N/A      0          31        
+Class 6      N/A      0          12        
+Class 7    0.8408     1244       1046      
+Class 8    0.9686     1179       1197      
+Class 9      N/A      0          3         
+
+Overall Accuracy:    0.9030
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.6609
+
+Round 27 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          8         
+Class 1    0.9817     1369       1344      
+Class 2    0.9569     1207       1159      
+Class 3      N/A      0          16        
+Class 4      N/A      0          30        
+Class 5      N/A      0          7         
+Class 6    0.9826     1147       1127      
+Class 7      N/A      0          11        
+Class 8      N/A      0          21        
+Class 9      N/A      0          0         
+
+Overall Accuracy:    0.9739
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 4.7865
+
+Round 27 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          46        
+Class 1      N/A      0          4         
+Class 2      N/A      0          16        
+Class 3    0.9690     1224       1187      
+Class 4    0.9913     1149       1177      
+Class 5      N/A      0          51        
+Class 6      N/A      0          11        
+Class 7      N/A      0          15        
+Class 8      N/A      0          35        
+Class 9    0.8596     1211       1042      
+
+Overall Accuracy:    0.9392
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 4.5662
+
+Round 27 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.9696     1218       1184      
+Class 1      N/A      0          0         
+Class 2      N/A      0          3         
+Class 3      N/A      0          34        
+Class 4      N/A      0          6         
+Class 5    0.9124     1050       959       
+Class 6      N/A      0          42        
+Class 7      N/A      0          0         
+Class 8      N/A      0          38        
+Class 9      N/A      0          2         
+
+Overall Accuracy:    0.9431
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 2.7501
+
+Round 27 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          89        
+Class 1      N/A      0          31        
+Class 2      N/A      0          30        
+Class 3      N/A      0          16        
+Class 4      N/A      0          47        
+Class 5      N/A      0          25        
+Class 6      N/A      0          15        
+Class 7    0.8151     1244       1014      
+Class 8    0.9576     1179       1133      
+Class 9      N/A      0          23        
+
+Overall Accuracy:    0.8844
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.8798
+
+Round 28 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          0         
+Class 1    0.9861     1369       1358      
+Class 2    0.9751     1207       1182      
+Class 3      N/A      0          7         
+Class 4      N/A      0          14        
+Class 5      N/A      0          5         
+Class 6    0.9677     1147       1110      
+Class 7      N/A      0          9         
+Class 8      N/A      0          37        
+Class 9      N/A      0          1         
+
+Overall Accuracy:    0.9769
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 4.6044
+
+Round 28 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          1         
+Class 1      N/A      0          18        
+Class 2      N/A      0          21        
+Class 3    0.9551     1224       1174      
+Class 4    0.9730     1149       1139      
+Class 5      N/A      0          56        
+Class 6      N/A      0          1         
+Class 7      N/A      0          33        
+Class 8      N/A      0          49        
+Class 9    0.8984     1211       1092      
+
+Overall Accuracy:    0.9417
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 4.2389
+
+Round 28 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.8801     1218       1072      
+Class 1      N/A      0          4         
+Class 2      N/A      0          12        
+Class 3      N/A      0          13        
+Class 4      N/A      0          3         
+Class 5    0.9248     1050       971       
+Class 6      N/A      0          20        
+Class 7      N/A      0          45        
+Class 8      N/A      0          121       
+Class 9      N/A      0          7         
+
+Overall Accuracy:    0.9008
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 2.6609
+
+Round 28 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          3         
+Class 1      N/A      0          21        
+Class 2      N/A      0          54        
+Class 3      N/A      0          17        
+Class 4      N/A      0          26        
+Class 5      N/A      0          29        
+Class 6      N/A      0          2         
+Class 7    0.8915     1244       1110      
+Class 8    0.9627     1179       1139      
+Class 9      N/A      0          22        
+
+Overall Accuracy:    0.9261
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.8521
+
+Round 29 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          0         
+Class 1    0.9730     1369       1342      
+Class 2    0.9114     1207       1101      
+Class 3      N/A      0          14        
+Class 4      N/A      0          29        
+Class 5      N/A      0          2         
+Class 6    0.9887     1147       1135      
+Class 7      N/A      0          17        
+Class 8      N/A      0          82        
+Class 9      N/A      0          1         
+
+Overall Accuracy:    0.9578
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 3.3562
+
+Round 29 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          1         
+Class 1      N/A      0          50        
+Class 2      N/A      0          11        
+Class 3    0.9493     1224       1164      
+Class 4    0.9765     1149       1145      
+Class 5      N/A      0          8         
+Class 6      N/A      0          14        
+Class 7      N/A      0          13        
+Class 8      N/A      0          139       
+Class 9    0.8547     1211       1039      
+
+Overall Accuracy:    0.9261
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 3.1723
+
+Round 29 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.5920     1218       721       
+Class 1      N/A      0          11        
+Class 2      N/A      0          20        
+Class 3      N/A      0          15        
+Class 4      N/A      0          0         
+Class 5    0.5362     1050       563       
+Class 6      N/A      0          51        
+Class 7      N/A      0          19        
+Class 8      N/A      0          864       
+Class 9      N/A      0          4         
+
+Overall Accuracy:    0.5661
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 2.0498
+
+Round 29 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          1         
+Class 1      N/A      0          13        
+Class 2      N/A      0          17        
+Class 3      N/A      0          9         
+Class 4      N/A      0          14        
+Class 5      N/A      0          7         
+Class 6      N/A      0          14        
+Class 7    0.9043     1244       1125      
+Class 8    0.9737     1179       1206      
+Class 9      N/A      0          17        
+
+Overall Accuracy:    0.9381
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 1.9677
+
+Round 30 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          1         
+Class 1    0.9854     1369       1349      
+Class 2    0.9801     1207       1187      
+Class 3      N/A      0          10        
+Class 4      N/A      0          16        
+Class 5      N/A      0          20        
+Class 6    0.9817     1147       1126      
+Class 7      N/A      0          8         
+Class 8      N/A      0          4         
+Class 9      N/A      0          2         
+
+Overall Accuracy:    0.9825
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 2.5231
+
+Round 30 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          0         
+Class 1      N/A      0          7         
+Class 2      N/A      0          29        
+Class 3    0.8587     1224       1053      
+Class 4    0.9861     1149       1160      
+Class 5      N/A      0          167       
+Class 6      N/A      0          2         
+Class 7      N/A      0          8         
+Class 8      N/A      0          4         
+Class 9    0.9480     1211       1154      
+
+Overall Accuracy:    0.9297
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 3.2882
+
+Round 30 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.8998     1218       1096      
+Class 1      N/A      0          4         
+Class 2      N/A      0          8         
+Class 3      N/A      0          3         
+Class 4      N/A      0          1         
+Class 5    0.9838     1050       1040      
+Class 6      N/A      0          47        
+Class 7      N/A      0          12        
+Class 8      N/A      0          6         
+Class 9      N/A      0          51        
+
+Overall Accuracy:    0.9387
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 1.8610
+
+Round 30 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          2         
+Class 1      N/A      0          9         
+Class 2      N/A      0          61        
+Class 3      N/A      0          14        
+Class 4      N/A      0          32        
+Class 5      N/A      0          55        
+Class 6      N/A      0          8         
+Class 7    0.9043     1244       1125      
+Class 8    0.9016     1179       1063      
+Class 9      N/A      0          54        
+
+Overall Accuracy:    0.9030
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.0303
+
+Round 31 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          0         
+Class 1    0.9774     1369       1339      
+Class 2    0.9934     1207       1204      
+Class 3      N/A      0          0         
+Class 4      N/A      0          15        
+Class 5      N/A      0          1         
+Class 6    0.9922     1147       1141      
+Class 7      N/A      0          9         
+Class 8      N/A      0          11        
+Class 9      N/A      0          3         
+
+Overall Accuracy:    0.9871
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 3.4016
+
+Round 31 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          0         
+Class 1      N/A      0          18        
+Class 2      N/A      0          678       
+Class 3    0.4044     1224       495       
+Class 4    0.9817     1149       1136      
+Class 5      N/A      0          30        
+Class 6      N/A      0          9         
+Class 7      N/A      0          23        
+Class 8      N/A      0          9         
+Class 9    0.9678     1211       1186      
+
+Overall Accuracy:    0.7799
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 2.9018
+
+Round 31 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.7274     1218       886       
+Class 1      N/A      0          6         
+Class 2      N/A      0          55        
+Class 3      N/A      0          1         
+Class 4      N/A      0          0         
+Class 5    0.8371     1050       880       
+Class 6      N/A      0          119       
+Class 7      N/A      0          204       
+Class 8      N/A      0          64        
+Class 9      N/A      0          53        
+
+Overall Accuracy:    0.7782
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 1.9045
+
+Round 31 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          1         
+Class 1      N/A      0          7         
+Class 2      N/A      0          142       
+Class 3      N/A      0          0         
+Class 4      N/A      0          11        
+Class 5      N/A      0          2         
+Class 6      N/A      0          20        
+Class 7    0.9148     1244       1138      
+Class 8    0.9220     1179       1087      
+Class 9      N/A      0          15        
+
+Overall Accuracy:    0.9183
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.1986
+
+Round 32 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          21        
+Class 1    0.9861     1369       1353      
+Class 2    0.9420     1207       1137      
+Class 3      N/A      0          0         
+Class 4      N/A      0          19        
+Class 5      N/A      0          1         
+Class 6    0.9852     1147       1136      
+Class 7      N/A      0          27        
+Class 8      N/A      0          29        
+Class 9      N/A      0          0         
+
+Overall Accuracy:    0.9715
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 4.7694
+
+Round 32 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          26        
+Class 1      N/A      0          18        
+Class 2      N/A      0          42        
+Class 3    0.8031     1224       984       
+Class 4    0.9678     1149       1125      
+Class 5      N/A      0          17        
+Class 6      N/A      0          16        
+Class 7      N/A      0          208       
+Class 8      N/A      0          50        
+Class 9    0.9042     1211       1098      
+
+Overall Accuracy:    0.8901
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 3.8974
+
+Round 32 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.9885     1218       1211      
+Class 1      N/A      0          1         
+Class 2      N/A      0          2         
+Class 3      N/A      0          3         
+Class 4      N/A      0          2         
+Class 5    0.7905     1050       830       
+Class 6      N/A      0          43        
+Class 7      N/A      0          52        
+Class 8      N/A      0          123       
+Class 9      N/A      0          1         
+
+Overall Accuracy:    0.8968
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 2.7971
+
+Round 32 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          14        
+Class 1      N/A      0          6         
+Class 2      N/A      0          16        
+Class 3      N/A      0          1         
+Class 4      N/A      0          12        
+Class 5      N/A      0          3         
+Class 6      N/A      0          24        
+Class 7    0.9711     1244       1210      
+Class 8    0.9508     1179       1124      
+Class 9      N/A      0          13        
+
+Overall Accuracy:    0.9612
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.8290
+
+Round 33 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          10        
+Class 1    0.9664     1369       1324      
+Class 2    0.9710     1207       1186      
+Class 3      N/A      0          7         
+Class 4      N/A      0          34        
+Class 5      N/A      0          3         
+Class 6    0.9625     1147       1105      
+Class 7      N/A      0          12        
+Class 8      N/A      0          35        
+Class 9      N/A      0          7         
+
+Overall Accuracy:    0.9667
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 3.6704
+
+Round 33 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          8         
+Class 1      N/A      0          8         
+Class 2      N/A      0          43        
+Class 3    0.9175     1224       1125      
+Class 4    0.9765     1149       1146      
+Class 5      N/A      0          6         
+Class 6      N/A      0          1         
+Class 7      N/A      0          46        
+Class 8      N/A      0          85        
+Class 9    0.9149     1211       1116      
+
+Overall Accuracy:    0.9355
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 3.4076
+
+Round 33 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.9425     1218       1170      
+Class 1      N/A      0          12        
+Class 2      N/A      0          11        
+Class 3      N/A      0          26        
+Class 4      N/A      0          18        
+Class 5    0.6419     1050       674       
+Class 6      N/A      0          40        
+Class 7      N/A      0          26        
+Class 8      N/A      0          253       
+Class 9      N/A      0          38        
+
+Overall Accuracy:    0.8034
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 1.9423
+
+Round 33 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          24        
+Class 1      N/A      0          2         
+Class 2      N/A      0          168       
+Class 3      N/A      0          7         
+Class 4      N/A      0          17        
+Class 5      N/A      0          0         
+Class 6      N/A      0          4         
+Class 7    0.8183     1244       1018      
+Class 8    0.9669     1179       1142      
+Class 9      N/A      0          41        
+
+Overall Accuracy:    0.8906
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.1014
+
+Round 34 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          23        
+Class 1    0.9744     1369       1335      
+Class 2    0.9495     1207       1149      
+Class 3      N/A      0          11        
+Class 4      N/A      0          8         
+Class 5      N/A      0          7         
+Class 6    0.9738     1147       1119      
+Class 7      N/A      0          41        
+Class 8      N/A      0          30        
+Class 9      N/A      0          0         
+
+Overall Accuracy:    0.9662
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 2.8618
+
+Round 34 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          42        
+Class 1      N/A      0          9         
+Class 2      N/A      0          48        
+Class 3    0.8775     1224       1074      
+Class 4    0.9443     1149       1090      
+Class 5      N/A      0          25        
+Class 6      N/A      0          9         
+Class 7      N/A      0          113       
+Class 8      N/A      0          63        
+Class 9    0.9125     1211       1111      
+
+Overall Accuracy:    0.9107
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 2.9850
+
+Round 34 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.9770     1218       1205      
+Class 1      N/A      0          4         
+Class 2      N/A      0          1         
+Class 3      N/A      0          13        
+Class 4      N/A      0          1         
+Class 5    0.8495     1050       893       
+Class 6      N/A      0          10        
+Class 7      N/A      0          24        
+Class 8      N/A      0          106       
+Class 9      N/A      0          11        
+
+Overall Accuracy:    0.9180
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 1.9983
+
+Round 34 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          11        
+Class 1      N/A      0          7         
+Class 2      N/A      0          52        
+Class 3      N/A      0          4         
+Class 4      N/A      0          5         
+Class 5      N/A      0          14        
+Class 6      N/A      0          3         
+Class 7    0.9542     1244       1195      
+Class 8    0.9449     1179       1114      
+Class 9      N/A      0          18        
+
+Overall Accuracy:    0.9496
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.1393
+
+Round 35 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          7         
+Class 1    0.9905     1369       1359      
+Class 2    0.9677     1207       1173      
+Class 3      N/A      0          6         
+Class 4      N/A      0          6         
+Class 5      N/A      0          8         
+Class 6    0.9730     1147       1116      
+Class 7      N/A      0          24        
+Class 8      N/A      0          22        
+Class 9      N/A      0          2         
+
+Overall Accuracy:    0.9777
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 2.9771
+
+Round 35 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          2         
+Class 1      N/A      0          48        
+Class 2      N/A      0          60        
+Class 3    0.9118     1224       1116      
+Class 4    0.6501     1149       759       
+Class 5      N/A      0          37        
+Class 6      N/A      0          24        
+Class 7      N/A      0          408       
+Class 8      N/A      0          11        
+Class 9    0.9166     1211       1119      
+
+Overall Accuracy:    0.8295
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 3.3457
+
+Round 35 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.9351     1218       1139      
+Class 1      N/A      0          4         
+Class 2      N/A      0          17        
+Class 3      N/A      0          21        
+Class 4      N/A      0          1         
+Class 5    0.8629     1050       906       
+Class 6      N/A      0          41        
+Class 7      N/A      0          56        
+Class 8      N/A      0          52        
+Class 9      N/A      0          31        
+
+Overall Accuracy:    0.9017
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 2.1311
+
+Round 35 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          13        
+Class 1      N/A      0          39        
+Class 2      N/A      0          48        
+Class 3      N/A      0          2         
+Class 4      N/A      0          2         
+Class 5      N/A      0          15        
+Class 6      N/A      0          31        
+Class 7    0.9502     1244       1192      
+Class 8    0.8957     1179       1057      
+Class 9      N/A      0          24        
+
+Overall Accuracy:    0.9236
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.2417
+
+Round 36 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          4         
+Class 1    0.9817     1369       1344      
+Class 2    0.9511     1207       1151      
+Class 3      N/A      0          36        
+Class 4      N/A      0          14        
+Class 5      N/A      0          1         
+Class 6    0.9913     1147       1141      
+Class 7      N/A      0          18        
+Class 8      N/A      0          11        
+Class 9      N/A      0          3         
+
+Overall Accuracy:    0.9748
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 3.0240
+
+Round 36 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          1         
+Class 1      N/A      0          12        
+Class 2      N/A      0          15        
+Class 3    0.9493     1224       1168      
+Class 4    0.9591     1149       1110      
+Class 5      N/A      0          6         
+Class 6      N/A      0          34        
+Class 7      N/A      0          63        
+Class 8      N/A      0          7         
+Class 9    0.9554     1211       1168      
+
+Overall Accuracy:    0.9545
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 3.2689
+
+Round 36 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.9080     1218       1106      
+Class 1      N/A      0          11        
+Class 2      N/A      0          2         
+Class 3      N/A      0          44        
+Class 4      N/A      0          9         
+Class 5    0.8124     1050       853       
+Class 6      N/A      0          56        
+Class 7      N/A      0          132       
+Class 8      N/A      0          37        
+Class 9      N/A      0          18        
+
+Overall Accuracy:    0.8638
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 2.0648
+
+Round 36 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          4         
+Class 1      N/A      0          3         
+Class 2      N/A      0          51        
+Class 3      N/A      0          20        
+Class 4      N/A      0          22        
+Class 5      N/A      0          7         
+Class 6      N/A      0          23        
+Class 7    0.9413     1244       1178      
+Class 8    0.9160     1179       1080      
+Class 9      N/A      0          35        
+
+Overall Accuracy:    0.9290
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.0967
+
+Round 37 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          3         
+Class 1    0.9905     1369       1357      
+Class 2    0.9553     1207       1157      
+Class 3      N/A      0          23        
+Class 4      N/A      0          3         
+Class 5      N/A      0          12        
+Class 6    0.9669     1147       1110      
+Class 7      N/A      0          0         
+Class 8      N/A      0          38        
+Class 9      N/A      0          20        
+
+Overall Accuracy:    0.9718
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 3.2653
+
+Round 37 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          1         
+Class 1      N/A      0          8         
+Class 2      N/A      0          29        
+Class 3    0.9077     1224       1112      
+Class 4    0.9173     1149       1057      
+Class 5      N/A      0          97        
+Class 6      N/A      0          6         
+Class 7      N/A      0          1         
+Class 8      N/A      0          55        
+Class 9    0.9843     1211       1218      
+
+Overall Accuracy:    0.9367
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 3.1333
+
+Round 37 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.8662     1218       1055      
+Class 1      N/A      0          4         
+Class 2      N/A      0          8         
+Class 3      N/A      0          17        
+Class 4      N/A      0          0         
+Class 5    0.8914     1050       936       
+Class 6      N/A      0          13        
+Class 7      N/A      0          0         
+Class 8      N/A      0          112       
+Class 9      N/A      0          123       
+
+Overall Accuracy:    0.8779
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 2.3481
+
+Round 37 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          12        
+Class 1      N/A      0          48        
+Class 2      N/A      0          178       
+Class 3      N/A      0          23        
+Class 4      N/A      0          9         
+Class 5      N/A      0          101       
+Class 6      N/A      0          2         
+Class 7    0.5659     1244       704       
+Class 8    0.9618     1179       1137      
+Class 9      N/A      0          209       
+
+Overall Accuracy:    0.7586
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.1837
+
+Round 38 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          5         
+Class 1    0.9817     1369       1348      
+Class 2    0.9453     1207       1143      
+Class 3      N/A      0          6         
+Class 4      N/A      0          22        
+Class 5      N/A      0          1         
+Class 6    0.9922     1147       1145      
+Class 7      N/A      0          26        
+Class 8      N/A      0          22        
+Class 9      N/A      0          5         
+
+Overall Accuracy:    0.9731
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 3.3850
+
+Round 38 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          4         
+Class 1      N/A      0          26        
+Class 2      N/A      0          15        
+Class 3    0.8162     1224       1000      
+Class 4    0.9025     1149       1041      
+Class 5      N/A      0          37        
+Class 6      N/A      0          120       
+Class 7      N/A      0          157       
+Class 8      N/A      0          23        
+Class 9    0.9521     1211       1161      
+
+Overall Accuracy:    0.8898
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 3.4017
+
+Round 38 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.9146     1218       1115      
+Class 1      N/A      0          6         
+Class 2      N/A      0          1         
+Class 3      N/A      0          2         
+Class 4      N/A      0          7         
+Class 5    0.6895     1050       724       
+Class 6      N/A      0          152       
+Class 7      N/A      0          44        
+Class 8      N/A      0          182       
+Class 9      N/A      0          35        
+
+Overall Accuracy:    0.8104
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 2.0365
+
+Round 38 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          3         
+Class 1      N/A      0          23        
+Class 2      N/A      0          15        
+Class 3      N/A      0          0         
+Class 4      N/A      0          17        
+Class 5      N/A      0          0         
+Class 6      N/A      0          92        
+Class 7    0.9317     1244       1164      
+Class 8    0.9152     1179       1079      
+Class 9      N/A      0          30        
+
+Overall Accuracy:    0.9236
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.2206
+
+Round 39 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          1         
+Class 1    0.9847     1369       1349      
+Class 2    0.9685     1207       1176      
+Class 3      N/A      0          24        
+Class 4      N/A      0          5         
+Class 5      N/A      0          1         
+Class 6    0.9904     1147       1152      
+Class 7      N/A      0          1         
+Class 8      N/A      0          2         
+Class 9      N/A      0          12        
+
+Overall Accuracy:    0.9812
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 3.5524
+
+Round 39 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          4         
+Class 1      N/A      0          19        
+Class 2      N/A      0          14        
+Class 3    0.9853     1224       1219      
+Class 4    0.8686     1149       1001      
+Class 5      N/A      0          7         
+Class 6      N/A      0          176       
+Class 7      N/A      0          11        
+Class 8      N/A      0          3         
+Class 9    0.9240     1211       1130      
+
+Overall Accuracy:    0.9272
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 3.2784
+
+Round 39 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.7463     1218       910       
+Class 1      N/A      0          1         
+Class 2      N/A      0          20        
+Class 3      N/A      0          106       
+Class 4      N/A      0          2         
+Class 5    0.8038     1050       844       
+Class 6      N/A      0          313       
+Class 7      N/A      0          7         
+Class 8      N/A      0          10        
+Class 9      N/A      0          55        
+
+Overall Accuracy:    0.7729
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 2.0236
+
+Round 39 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          4         
+Class 1      N/A      0          53        
+Class 2      N/A      0          114       
+Class 3      N/A      0          30        
+Class 4      N/A      0          8         
+Class 5      N/A      0          7         
+Class 6      N/A      0          478       
+Class 7    0.8682     1244       1080      
+Class 8    0.4885     1179       576       
+Class 9      N/A      0          73        
+
+Overall Accuracy:    0.6835
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.1879
+
+Round 40 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          4         
+Class 1    0.9759     1369       1339      
+Class 2    0.9677     1207       1182      
+Class 3      N/A      0          1         
+Class 4      N/A      0          23        
+Class 5      N/A      0          65        
+Class 6    0.8997     1147       1034      
+Class 7      N/A      0          7         
+Class 8      N/A      0          56        
+Class 9      N/A      0          12        
+
+Overall Accuracy:    0.9498
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 3.1653
+
+Round 40 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          2         
+Class 1      N/A      0          4         
+Class 2      N/A      0          79        
+Class 3    0.8766     1224       1073      
+Class 4    0.9452     1149       1094      
+Class 5      N/A      0          194       
+Class 6      N/A      0          3         
+Class 7      N/A      0          29        
+Class 8      N/A      0          7         
+Class 9    0.9001     1211       1099      
+
+Overall Accuracy:    0.9065
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 3.0449
+
+Round 40 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.9245     1218       1126      
+Class 1      N/A      0          4         
+Class 2      N/A      0          36        
+Class 3      N/A      0          8         
+Class 4      N/A      0          6         
+Class 5    0.9676     1050       1027      
+Class 6      N/A      0          14        
+Class 7      N/A      0          1         
+Class 8      N/A      0          35        
+Class 9      N/A      0          11        
+
+Overall Accuracy:    0.9444
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 2.1188
+
+Round 40 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          12        
+Class 1      N/A      0          8         
+Class 2      N/A      0          121       
+Class 3      N/A      0          0         
+Class 4      N/A      0          30        
+Class 5      N/A      0          137       
+Class 6      N/A      0          3         
+Class 7    0.8666     1244       1078      
+Class 8    0.8338     1179       984       
+Class 9      N/A      0          50        
+
+Overall Accuracy:    0.8506
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.0976
+
+Round 41 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          1         
+Class 1    0.9817     1369       1345      
+Class 2    0.9776     1207       1191      
+Class 3      N/A      0          1         
+Class 4      N/A      0          14        
+Class 5      N/A      0          0         
+Class 6    0.9512     1147       1094      
+Class 7      N/A      0          4         
+Class 8      N/A      0          62        
+Class 9      N/A      0          11        
+
+Overall Accuracy:    0.9710
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 3.5665
+
+Round 41 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          0         
+Class 1      N/A      0          3         
+Class 2      N/A      0          98        
+Class 3    0.8668     1224       1061      
+Class 4    0.9460     1149       1091      
+Class 5      N/A      0          40        
+Class 6      N/A      0          23        
+Class 7      N/A      0          20        
+Class 8      N/A      0          86        
+Class 9    0.9463     1211       1162      
+
+Overall Accuracy:    0.9191
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 3.2736
+
+Round 41 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.8366     1218       1019      
+Class 1      N/A      0          3         
+Class 2      N/A      0          102       
+Class 3      N/A      0          4         
+Class 4      N/A      0          10        
+Class 5    0.0571     1050       60        
+Class 6      N/A      0          20        
+Class 7      N/A      0          8         
+Class 8      N/A      0          1007      
+Class 9      N/A      0          35        
+
+Overall Accuracy:    0.4757
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 1.9498
+
+Round 41 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          0         
+Class 1      N/A      0          6         
+Class 2      N/A      0          57        
+Class 3      N/A      0          0         
+Class 4      N/A      0          18        
+Class 5      N/A      0          8         
+Class 6      N/A      0          23        
+Class 7    0.9140     1244       1138      
+Class 8    0.9449     1179       1118      
+Class 9      N/A      0          55        
+
+Overall Accuracy:    0.9290
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.4143
+
+Round 42 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          4         
+Class 1    0.9671     1369       1331      
+Class 2    0.9619     1207       1168      
+Class 3      N/A      0          14        
+Class 4      N/A      0          11        
+Class 5      N/A      0          0         
+Class 6    0.9756     1147       1121      
+Class 7      N/A      0          27        
+Class 8      N/A      0          33        
+Class 9      N/A      0          14        
+
+Overall Accuracy:    0.9680
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 3.3388
+
+Round 42 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          11        
+Class 1      N/A      0          28        
+Class 2      N/A      0          41        
+Class 3    0.9444     1224       1158      
+Class 4    0.9443     1149       1091      
+Class 5      N/A      0          18        
+Class 6      N/A      0          14        
+Class 7      N/A      0          59        
+Class 8      N/A      0          32        
+Class 9    0.9298     1211       1132      
+
+Overall Accuracy:    0.9395
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 3.4154
+
+Round 42 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.9302     1218       1133      
+Class 1      N/A      0          3         
+Class 2      N/A      0          14        
+Class 3      N/A      0          21        
+Class 4      N/A      0          1         
+Class 5    0.5152     1050       541       
+Class 6      N/A      0          30        
+Class 7      N/A      0          41        
+Class 8      N/A      0          469       
+Class 9      N/A      0          15        
+
+Overall Accuracy:    0.7381
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 2.1779
+
+Round 42 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          6         
+Class 1      N/A      0          34        
+Class 2      N/A      0          57        
+Class 3      N/A      0          8         
+Class 4      N/A      0          6         
+Class 5      N/A      0          4         
+Class 6      N/A      0          10        
+Class 7    0.9357     1244       1165      
+Class 8    0.9364     1179       1104      
+Class 9      N/A      0          29        
+
+Overall Accuracy:    0.9360
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.1148
+
+Round 43 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          1         
+Class 1    0.9781     1369       1348      
+Class 2    0.9611     1207       1165      
+Class 3      N/A      0          6         
+Class 4      N/A      0          22        
+Class 5      N/A      0          16        
+Class 6    0.9817     1147       1137      
+Class 7      N/A      0          2         
+Class 8      N/A      0          10        
+Class 9      N/A      0          16        
+
+Overall Accuracy:    0.9737
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 2.9683
+
+Round 43 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          2         
+Class 1      N/A      0          33        
+Class 2      N/A      0          27        
+Class 3    0.9003     1224       1102      
+Class 4    0.9695     1149       1125      
+Class 5      N/A      0          109       
+Class 6      N/A      0          25        
+Class 7      N/A      0          11        
+Class 8      N/A      0          18        
+Class 9    0.9282     1211       1132      
+
+Overall Accuracy:    0.9319
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 3.0730
+
+Round 43 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.9442     1218       1150      
+Class 1      N/A      0          3         
+Class 2      N/A      0          5         
+Class 3      N/A      0          3         
+Class 4      N/A      0          6         
+Class 5    0.9181     1050       965       
+Class 6      N/A      0          58        
+Class 7      N/A      0          1         
+Class 8      N/A      0          54        
+Class 9      N/A      0          23        
+
+Overall Accuracy:    0.9321
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 1.9531
+
+Round 43 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          5         
+Class 1      N/A      0          122       
+Class 2      N/A      0          66        
+Class 3      N/A      0          1         
+Class 4      N/A      0          25        
+Class 5      N/A      0          61        
+Class 6      N/A      0          26        
+Class 7    0.8199     1244       1020      
+Class 8    0.8872     1179       1052      
+Class 9      N/A      0          45        
+
+Overall Accuracy:    0.8527
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 1.8803
+
+Round 44 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          1         
+Class 1    0.9766     1369       1338      
+Class 2    0.9876     1207       1203      
+Class 3      N/A      0          3         
+Class 4      N/A      0          14        
+Class 5      N/A      0          0         
+Class 6    0.9991     1147       1156      
+Class 7      N/A      0          6         
+Class 8      N/A      0          0         
+Class 9      N/A      0          2         
+
+Overall Accuracy:    0.9871
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 3.3489
+
+Round 44 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          3         
+Class 1      N/A      0          10        
+Class 2      N/A      0          242       
+Class 3    0.7884     1224       965       
+Class 4    0.9391     1149       1089      
+Class 5      N/A      0          0         
+Class 6      N/A      0          91        
+Class 7      N/A      0          34        
+Class 8      N/A      0          5         
+Class 9    0.9405     1211       1145      
+
+Overall Accuracy:    0.8881
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 3.3404
+
+Round 44 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.9220     1218       1142      
+Class 1      N/A      0          0         
+Class 2      N/A      0          38        
+Class 3      N/A      0          8         
+Class 4      N/A      0          0         
+Class 5    0.0124     1050       13        
+Class 6      N/A      0          706       
+Class 7      N/A      0          142       
+Class 8      N/A      0          90        
+Class 9      N/A      0          129       
+
+Overall Accuracy:    0.5009
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 1.8343
+
+Round 44 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          36        
+Class 1      N/A      0          12        
+Class 2      N/A      0          242       
+Class 3      N/A      0          0         
+Class 4      N/A      0          14        
+Class 5      N/A      0          0         
+Class 6      N/A      0          70        
+Class 7    0.9011     1244       1128      
+Class 8    0.7142     1179       842       
+Class 9      N/A      0          79        
+
+Overall Accuracy:    0.8102
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.0769
+
+Round 45 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          6         
+Class 1    0.9883     1369       1363      
+Class 2    0.9304     1207       1127      
+Class 3      N/A      0          13        
+Class 4      N/A      0          14        
+Class 5      N/A      0          0         
+Class 6    0.9660     1147       1116      
+Class 7      N/A      0          5         
+Class 8      N/A      0          75        
+Class 9      N/A      0          4         
+
+Overall Accuracy:    0.9627
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 3.5162
+
+Round 45 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          0         
+Class 1      N/A      0          636       
+Class 2      N/A      0          24        
+Class 3    0.8652     1224       1059      
+Class 4    0.4212     1149       490       
+Class 5      N/A      0          3         
+Class 6      N/A      0          53        
+Class 7      N/A      0          10        
+Class 8      N/A      0          165       
+Class 9    0.9389     1211       1144      
+
+Overall Accuracy:    0.7478
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 3.0853
+
+Round 45 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.8358     1218       1018      
+Class 1      N/A      0          6         
+Class 2      N/A      0          23        
+Class 3      N/A      0          9         
+Class 4      N/A      0          13        
+Class 5    0.1619     1050       170       
+Class 6      N/A      0          184       
+Class 7      N/A      0          27        
+Class 8      N/A      0          784       
+Class 9      N/A      0          34        
+
+Overall Accuracy:    0.5238
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 2.0121
+
+Round 45 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          4         
+Class 1      N/A      0          93        
+Class 2      N/A      0          57        
+Class 3      N/A      0          4         
+Class 4      N/A      0          4         
+Class 5      N/A      0          1         
+Class 6      N/A      0          17        
+Class 7    0.8006     1244       996       
+Class 8    0.9508     1179       1155      
+Class 9      N/A      0          92        
+
+Overall Accuracy:    0.8737
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 1.9750
+
+Round 46 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          6         
+Class 1    0.9869     1369       1352      
+Class 2    0.9718     1207       1179      
+Class 3      N/A      0          1         
+Class 4      N/A      0          25        
+Class 5      N/A      0          0         
+Class 6    0.9738     1147       1117      
+Class 7      N/A      0          19        
+Class 8      N/A      0          22        
+Class 9      N/A      0          2         
+
+Overall Accuracy:    0.9780
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 4.8383
+
+Round 46 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          0         
+Class 1      N/A      0          74        
+Class 2      N/A      0          146       
+Class 3    0.8243     1224       1009      
+Class 4    0.9565     1149       1120      
+Class 5      N/A      0          2         
+Class 6      N/A      0          10        
+Class 7      N/A      0          43        
+Class 8      N/A      0          96        
+Class 9    0.8918     1211       1084      
+
+Overall Accuracy:    0.8895
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 4.2294
+
+Round 46 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.9319     1218       1137      
+Class 1      N/A      0          50        
+Class 2      N/A      0          19        
+Class 3      N/A      0          20        
+Class 4      N/A      0          13        
+Class 5    0.1790     1050       188       
+Class 6      N/A      0          46        
+Class 7      N/A      0          507       
+Class 8      N/A      0          284       
+Class 9      N/A      0          4         
+
+Overall Accuracy:    0.5833
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 2.5249
+
+Round 46 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          4         
+Class 1      N/A      0          45        
+Class 2      N/A      0          121       
+Class 3      N/A      0          3         
+Class 4      N/A      0          14        
+Class 5      N/A      0          0         
+Class 6      N/A      0          10        
+Class 7    0.8987     1244       1124      
+Class 8    0.9220     1179       1088      
+Class 9      N/A      0          14        
+
+Overall Accuracy:    0.9100
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.7769
+
+Round 47 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          1         
+Class 1    0.9759     1369       1339      
+Class 2    0.9834     1207       1198      
+Class 3      N/A      0          3         
+Class 4      N/A      0          40        
+Class 5      N/A      0          9         
+Class 6    0.9712     1147       1115      
+Class 7      N/A      0          5         
+Class 8      N/A      0          7         
+Class 9      N/A      0          6         
+
+Overall Accuracy:    0.9769
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 0.9697
+
+Round 47 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          0         
+Class 1      N/A      0          13        
+Class 2      N/A      0          71        
+Class 3    0.9281     1224       1136      
+Class 4    0.9852     1149       1156      
+Class 5      N/A      0          14        
+Class 6      N/A      0          9         
+Class 7      N/A      0          5         
+Class 8      N/A      0          36        
+Class 9    0.9422     1211       1144      
+
+Overall Accuracy:    0.9512
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 2.4608
+
+Round 47 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.4130     1218       503       
+Class 1      N/A      0          13        
+Class 2      N/A      0          161       
+Class 3      N/A      0          33        
+Class 4      N/A      0          13        
+Class 5    0.8810     1050       925       
+Class 6      N/A      0          100       
+Class 7      N/A      0          119       
+Class 8      N/A      0          376       
+Class 9      N/A      0          25        
+
+Overall Accuracy:    0.6296
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 2.1645
+
+Round 47 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          0         
+Class 1      N/A      0          11        
+Class 2      N/A      0          108       
+Class 3      N/A      0          23        
+Class 4      N/A      0          30        
+Class 5      N/A      0          14        
+Class 6      N/A      0          21        
+Class 7    0.8915     1244       1109      
+Class 8    0.8999     1179       1062      
+Class 9      N/A      0          45        
+
+Overall Accuracy:    0.8956
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.1081
+
+Round 48 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          13        
+Class 1    0.9752     1369       1336      
+Class 2    0.9851     1207       1199      
+Class 3      N/A      0          0         
+Class 4      N/A      0          20        
+Class 5      N/A      0          1         
+Class 6    0.9608     1147       1103      
+Class 7      N/A      0          8         
+Class 8      N/A      0          39        
+Class 9      N/A      0          4         
+
+Overall Accuracy:    0.9739
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 3.3617
+
+Round 48 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          16        
+Class 1      N/A      0          22        
+Class 2      N/A      0          301       
+Class 3    0.7255     1224       888       
+Class 4    0.9487     1149       1104      
+Class 5      N/A      0          15        
+Class 6      N/A      0          9         
+Class 7      N/A      0          19        
+Class 8      N/A      0          103       
+Class 9    0.9083     1211       1107      
+
+Overall Accuracy:    0.8588
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 3.1475
+
+Round 48 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.8924     1218       1088      
+Class 1      N/A      0          2         
+Class 2      N/A      0          91        
+Class 3      N/A      0          0         
+Class 4      N/A      0          2         
+Class 5    0.8048     1050       845       
+Class 6      N/A      0          28        
+Class 7      N/A      0          34        
+Class 8      N/A      0          170       
+Class 9      N/A      0          8         
+
+Overall Accuracy:    0.8519
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 1.8951
+
+Round 48 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          12        
+Class 1      N/A      0          11        
+Class 2      N/A      0          122       
+Class 3      N/A      0          0         
+Class 4      N/A      0          13        
+Class 5      N/A      0          3         
+Class 6      N/A      0          9         
+Class 7    0.9172     1244       1143      
+Class 8    0.9220     1179       1089      
+Class 9      N/A      0          21        
+
+Overall Accuracy:    0.9195
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.2321
+
+Round 49 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          2         
+Class 1    0.9795     1369       1344      
+Class 2    0.9553     1207       1158      
+Class 3      N/A      0          2         
+Class 4      N/A      0          26        
+Class 5      N/A      0          0         
+Class 6    0.9843     1147       1131      
+Class 7      N/A      0          22        
+Class 8      N/A      0          37        
+Class 9      N/A      0          1         
+
+Overall Accuracy:    0.9731
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 3.3977
+
+Round 49 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          0         
+Class 1      N/A      0          8         
+Class 2      N/A      0          125       
+Class 3    0.8521     1224       1043      
+Class 4    0.9347     1149       1085      
+Class 5      N/A      0          26        
+Class 6      N/A      0          16        
+Class 7      N/A      0          36        
+Class 8      N/A      0          96        
+Class 9    0.9422     1211       1149      
+
+Overall Accuracy:    0.9090
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 3.2059
+
+Round 49 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.8621     1218       1051      
+Class 1      N/A      0          1         
+Class 2      N/A      0          30        
+Class 3      N/A      0          7         
+Class 4      N/A      0          16        
+Class 5    0.8352     1050       880       
+Class 6      N/A      0          128       
+Class 7      N/A      0          61        
+Class 8      N/A      0          65        
+Class 9      N/A      0          29        
+
+Overall Accuracy:    0.8496
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 1.8349
+
+Round 49 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          0         
+Class 1      N/A      0          8         
+Class 2      N/A      0          109       
+Class 3      N/A      0          6         
+Class 4      N/A      0          31        
+Class 5      N/A      0          4         
+Class 6      N/A      0          24        
+Class 7    0.9003     1244       1125      
+Class 8    0.9203     1179       1091      
+Class 9      N/A      0          25        
+
+Overall Accuracy:    0.9100
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.2492
+
+Round 50 - Cliente 0
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          19        
+Class 1    0.9861     1369       1365      
+Class 2    0.9445     1207       1140      
+Class 3      N/A      0          18        
+Class 4      N/A      0          25        
+Class 5      N/A      0          32        
+Class 6    0.9503     1147       1090      
+Class 7      N/A      0          20        
+Class 8      N/A      0          8         
+Class 9      N/A      0          6         
+
+Overall Accuracy:    0.9616
+Total Samples:       3723
+Total Predictions:   3723
+Client Evaluation Time: 3.1686
+
+Round 50 - Cliente 1
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          17        
+Class 1      N/A      0          186       
+Class 2      N/A      0          25        
+Class 3    0.9395     1224       1151      
+Class 4    0.9330     1149       1084      
+Class 5      N/A      0          64        
+Class 6      N/A      0          1         
+Class 7      N/A      0          40        
+Class 8      N/A      0          15        
+Class 9    0.8216     1211       1001      
+
+Overall Accuracy:    0.8976
+Total Samples:       3584
+Total Predictions:   3584
+Client Evaluation Time: 3.3638
+
+Round 50 - Cliente 2
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0    0.9680     1218       1180      
+Class 1      N/A      0          14        
+Class 2      N/A      0          4         
+Class 3      N/A      0          30        
+Class 4      N/A      0          10        
+Class 5    0.9238     1050       977       
+Class 6      N/A      0          14        
+Class 7      N/A      0          7         
+Class 8      N/A      0          13        
+Class 9      N/A      0          19        
+
+Overall Accuracy:    0.9475
+Total Samples:       2268
+Total Predictions:   2268
+Client Evaluation Time: 2.1079
+
+Round 50 - Cliente 3
+Class      Accuracy   Samples    Predictions
+---------------------------------------------
+Class 0      N/A      0          66        
+Class 1      N/A      0          245       
+Class 2      N/A      0          45        
+Class 3      N/A      0          16        
+Class 4      N/A      0          35        
+Class 5      N/A      0          55        
+Class 6      N/A      0          5         
+Class 7    0.7275     1244       908       
+Class 8    0.8685     1179       1026      
+Class 9      N/A      0          22        
+
+Overall Accuracy:    0.7961
+Total Samples:       2423
+Total Predictions:   2423
+Client Evaluation Time: 2.1749
+
