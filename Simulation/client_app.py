@@ -329,7 +329,7 @@ def client_fn(context: Context):
     # pretrained_cgan.load_state_dict(torch.load("model_round_10_mnist.pt"))
     trainloader, valloader = load_data(partition_id=partition_id,
                                        num_partitions=num_partitions,
-                                       partitioner=partitioner,
+                                       partitioner_type=partitioner,
                                        alpha_dir=alpha_dir,
                                        batch_size=batch_size,
                                        teste=teste,
