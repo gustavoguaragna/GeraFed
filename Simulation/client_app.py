@@ -22,6 +22,7 @@ import random
 import numpy as np
 import json
 import os
+import pickle
 
 SEED = 42
 random.seed(SEED)
@@ -39,8 +40,6 @@ class FlowerClient(NumPyClient):
                 cid: int, 
                 net_alvo,
                 net_gen, 
-                trainloader, 
-                valloader,
                 local_epochs_alvo: int, 
                 local_epochs_gen: int, 
                 dataset: str, 
@@ -59,8 +58,6 @@ class FlowerClient(NumPyClient):
         self.cid=cid
         self.net_alvo = net_alvo
         self.net_gen = net_gen
-        self.trainloader = trainloader
-        self.valloader = valloader
         self.local_epochs_alvo = local_epochs_alvo
         self.local_epochs_gen = local_epochs_gen
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -81,21 +78,42 @@ class FlowerClient(NumPyClient):
         self.batch_size = batch_size
         self.teste = teste
         self.folder = folder
+  
 
     def fit(self, parameters, config):
+
+        gan_dict = pickle.loads(config["gan"])
+        set_weights(self.net_gen, pickle.loads(gan_dict.values()))
+
+
+        self.trainloader_real, self.trainloader_syn, self.testloader, self.testloader_local = load_data(partition_id=self.cid,
+                                num_partitions=self.num_partitions,
+                                partitioner_type=self.partitioner,
+                                alpha_dir=self.alpha_dir,
+                                batch_size=self.batch_size,
+                                teste=self.teste,
+                                num_chunks=self.num_chunks,
+                                syn_samples=config["round"]*10,
+                                gan=self.net_gen,)
+
         if config["modelo"] == "alvo":
-            chunk_idx = config["round"] % len(self.trainloader)
             set_weights(self.net_alvo, parameters)
+            if isinstance(self.trainloader_syn, list):
+                chunk_idx = config["round"] % len(self.trainloader_syn)
+                trainloader = self.trainloader_syn[chunk_idx]
+            else:
+                trainloader = self.trainloader_syn
             train_loss = train_alvo(
                 net=self.net_alvo,
-                trainloader=self.trainloader[chunk_idx],
+                trainloader=trainloader,
                 epochs=self.local_epochs_alvo,
                 lr=self.lr_alvo,
                 device=self.device,
             )
+            lenght = len(trainloader.dataset)
             return (
                 get_weights(self.net_alvo),
-                len(self.trainloader[chunk_idx].dataset),
+                lenght,
                 {"train_loss": train_loss, "modelo": "alvo"},
             )
         elif config["modelo"] == "gen":
@@ -327,13 +345,6 @@ def client_fn(context: Context):
     num_chunks = context.run_config["num_chunks"]
     # pretrained_cgan = CGAN()
     # pretrained_cgan.load_state_dict(torch.load("model_round_10_mnist.pt"))
-    trainloader, valloader = load_data(partition_id=partition_id,
-                                       num_partitions=num_partitions,
-                                       partitioner_type=partitioner,
-                                       alpha_dir=alpha_dir,
-                                       batch_size=batch_size,
-                                       teste=teste,
-                                       num_chunks=num_chunks)
     local_epochs_alvo = context.run_config["epocas_alvo"]
     local_epochs_gen = context.run_config["epocas_gen"]
     lr_gen = context.run_config["learn_rate_gen"]
@@ -348,9 +359,7 @@ def client_fn(context: Context):
     # Return Client instance
     return FlowerClient(cid=partition_id,
                         net_alvo=net_alvo, 
-                        net_gen=net_gen, 
-                        trainloader=trainloader, 
-                        valloader=valloader, 
+                        net_gen=net_gen,  
                         local_epochs_alvo=local_epochs_alvo, 
                         local_epochs_gen=local_epochs_gen,
                         dataset=dataset,

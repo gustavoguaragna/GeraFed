@@ -509,27 +509,6 @@ def load_data(partition_id: int,
         "test":  client_test,
     })
 
-    if num_chunks > 1:
-        dataset = client_dataset["train"]
-        n = len(dataset)
-
-        # 1) embaralha os índices com seed fixa
-        indices = list(range(n))
-        random.seed(42)
-        random.shuffle(indices)
-
-        # 2) calcula tamanho aproximado de cada chunk
-        chunk_size = math.ceil(n / num_chunks)
-
-        # 3) divide em chunks usando fatias dos índices embaralhados
-        chunks = []
-        for i in range(num_chunks):
-            start = i * chunk_size
-            end = min((i + 1) * chunk_size, n)
-            chunk_indices = indices[start:end]
-            chunks.append(Subset(dataset, chunk_indices))
-
-
     if gan and syn_samples > 0:
         generated_dataset = GeneratedDataset(
             generator=gan.to("cpu"),  # Move GAN to CPU for generation
@@ -555,46 +534,47 @@ def load_data(partition_id: int,
 
         train_partition = ConcatDataset([client_dataset["train"], generated_dataset])
 
-        if num_chunks > 1:
-            n_gen = len(train_partition)
-            n_real = len(client_dataset["train"])
+    if num_chunks > 1:
+        n_gen = len(train_partition)
+        n_real = len(client_dataset["train"])
 
-            # 1) embaralha os índices com seed fixa
-            indices_gen = list(range(n_gen))
-            indices_real = list(range(n_real))
-            random.seed(42)
-            random.shuffle(indices_gen)
-            random.shuffle(indices_real)
+        # 1) embaralha os índices com seed fixa
+        indices_gen = list(range(n_gen))
+        indices_real = list(range(n_real))
+        random.seed(42)
+        random.shuffle(indices_gen)
+        random.shuffle(indices_real)
 
-            # 2) calcula tamanho aproximado de cada chunk
-            chunk_size_gen = math.ceil(n_gen / num_chunks)
-            chunk_size_real = math.ceil(n_real / num_chunks)
+        # 2) calcula tamanho aproximado de cada chunk
+        chunk_size_gen = math.ceil(n_gen / num_chunks)
+        chunk_size_real = math.ceil(n_real / num_chunks)
 
-            # 3) divide em chunks usando fatias dos índices embaralhados
-            chunks_gen = []
-            chunks_real = []
-            for i in range(num_chunks):
-                start = i * chunk_size_gen
-                end = min((i + 1) * chunk_size_gen, n_gen)
-                chunk_indices = indices_gen[start:end]
-                chunks_gen.append(Subset(train_partition, chunk_indices))
+        # 3) divide em chunks usando fatias dos índices embaralhados
+        chunks_gen = []
+        chunks_real = []
+        for i in range(num_chunks):
+            start = i * chunk_size_gen
+            end = min((i + 1) * chunk_size_gen, n_gen)
+            chunk_indices = indices_gen[start:end]
+            chunks_gen.append(Subset(train_partition, chunk_indices))
 
-                start = i * chunk_size_real
-                end = min((i + 1) * chunk_size_real, n_real)
-                chunk_indices = indices_real[start:end]
-                chunks_real.append(Subset(client_dataset["train"], chunk_indices))
+            start = i * chunk_size_real
+            end = min((i + 1) * chunk_size_real, n_real)
+            chunk_indices = indices_real[start:end]
+            chunks_real.append(Subset(client_dataset["train"], chunk_indices))
 
 
-        trainloader_with_syn = [DataLoader(chunk, batch_size=batch_size, shuffle=True) for chunk in chunks_gen if len(chunk) > 0]
-        trainloader_only_real = [DataLoader(chunk, batch_size=batch_size, shuffle=True) for chunk in chunks_real if len(chunk) > 0]
+        trainloader_syn = [DataLoader(chunk, batch_size=batch_size, shuffle=True) for chunk in chunks_gen if len(chunk) > 0]
+        trainloader_real = [DataLoader(chunk, batch_size=batch_size, shuffle=True) for chunk in chunks_real if len(chunk) > 0]
 
     else:
-        trainloader_only_real = DataLoader(client_dataset["train"], batch_size=batch_size, shuffle=True)
+        trainloader_real = DataLoader(client_dataset["train"], batch_size=batch_size, shuffle=True)
+        trainloader_syn = DataLoader(train_partition, batch_size=batch_size, shuffle=True)
 
     testloader = DataLoader(test_partition, batch_size=batch_size, shuffle=True)
     testloader_local = DataLoader(client_dataset["test"], batch_size=batch_size, shuffle=True)
 
-    return trainloader_only_real, trainloader_with_syn, testloader, testloader_local
+    return trainloader_real, trainloader_syn, testloader, testloader_local
 
 
 def train_alvo(net, trainloader, epochs, lr, device):
