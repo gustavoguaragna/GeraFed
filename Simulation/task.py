@@ -7,11 +7,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 from flwr_datasets import FederatedDataset
 from flwr_datasets.partitioner import IidPartitioner, DirichletPartitioner, Partitioner
-from torch.utils.data import DataLoader, Subset, Dataset, ConcatDataset, random_split
+from torch.utils.data import DataLoader, Subset
 from torchvision.transforms import Compose, Normalize, ToTensor
 import numpy as np
 from torchvision.transforms.functional import to_pil_image
-from datasets import Features, ClassLabel, Image
+from datasets import Dataset, Features, ClassLabel, Image
 import random
 import torchvision
 from torch.utils.model_zoo import load_url as load_state_dict_from_url
@@ -21,10 +21,9 @@ from scipy import linalg
 import time
 from tqdm import tqdm
 from flwr.common import parameters_to_ndarrays
-from collections import defaultdict, OrderedDict
+from collections import defaultdict
 from typing import Optional, List
 import math
-from torchvision.utils import save_image
 
 os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
@@ -42,9 +41,7 @@ if torch.cuda.is_available():
 class Net(nn.Module):
     """Model (simple CNN adapted from 'PyTorch: A 60 Minute Blitz')"""
 
-    def __init__(self, seed=42):
-        if seed is not None:
-          torch.manual_seed(seed)
+    def __init__(self):
         super(Net, self).__init__()
         self.conv1 = nn.Conv2d(1, 6, 5)
         self.pool = nn.MaxPool2d(2, 2)
@@ -120,8 +117,8 @@ class CGAN(nn.Module):
                     nn.init.constant_(m.bias, 0.0)
 
     def forward(self, input, labels):
-        # device = input.device  # Ensure all tensors are on the same device
-        # labels = labels.to(device)  # Move labels to the same device as input
+        device = input.device  # Ensure all tensors are on the same device
+        labels = labels.to(device)  # Move labels to the same device as input
         
         if input.dim() == 2:
             z = torch.cat((self.label_embedding(labels), input), -1)
@@ -136,9 +133,7 @@ class CGAN(nn.Module):
         return self.adv_loss(output, label)
     
 class F2U_GAN(nn.Module):
-    def __init__(self, dataset="mnist", img_size=28, latent_dim=128, condition=True, seed=42):
-        if seed is not None:
-          torch.manual_seed(seed)
+    def __init__(self, dataset="mnist", img_size=28, latent_dim=128, condition=True):
         super(F2U_GAN, self).__init__()
         if dataset == "mnist":
             self.classes = 10
@@ -222,90 +217,88 @@ class F2U_GAN(nn.Module):
         return self.adv_loss(output, label)
 
 
-# def generate_images(cgan, examples_per_class):
-#     cgan.eval()
-#     device = next(cgan.parameters()).device
-#     latent_dim = cgan.latent_dim
-#     classes = cgan.classes
+def generate_images(cgan, examples_per_class):
+    cgan.eval()
+    device = next(cgan.parameters()).device
+    latent_dim = cgan.latent_dim
+    classes = cgan.classes
     
-#     # Cria um vetor de rótulos balanceado
-#     labels = torch.tensor([i for i in range(classes) for _ in range(examples_per_class)], device=device)
-#     # Número total de imagens geradas
-#     num_samples = examples_per_class * classes
-#     # Gera vetores latentes aleatórios
-#     z = torch.randn(num_samples, latent_dim, device=device)
+    # Cria um vetor de rótulos balanceado
+    labels = torch.tensor([i for i in range(classes) for _ in range(examples_per_class)], device=device)
+    # Número total de imagens geradas
+    num_samples = examples_per_class * classes
+    # Gera vetores latentes aleatórios
+    z = torch.randn(num_samples, latent_dim, device=device)
 
-#     with torch.no_grad():
-#         cgan.eval()
-#         gen_imgs = cgan(z, labels)  # [N, C, H, W]
+    with torch.no_grad():
+        cgan.eval()
+        gen_imgs = cgan(z, labels)  # [N, C, H, W]
 
-#     # Retorna como lista para aplicar transforms depois
-#     # Convertendo para CPU para aplicar transforms com PIL, se necessário
-#     gen_imgs_list = [img.cpu() for img in gen_imgs]
-#     gen_labels_list = labels.cpu().tolist()
+    # Retorna como lista para aplicar transforms depois
+    # Convertendo para CPU para aplicar transforms com PIL, se necessário
+    gen_imgs_list = [img.cpu() for img in gen_imgs]
+    gen_labels_list = labels.cpu().tolist()
 
-#     #converte para PIL
-#     gen_imgs_pil = [to_pil_image((img * 0.5 + 0.5).clamp(0,1)) for img in gen_imgs_list]
+    #converte para PIL
+    gen_imgs_pil = [to_pil_image((img * 0.5 + 0.5).clamp(0,1)) for img in gen_imgs_list]
 
-#     #Monta dataset como do FederatedDataset
-#     features = Features({
-#     "image": Image(),
-#     "label": ClassLabel(names=[str(i) for i in range(classes)])
-#     })
+    #Monta dataset como do FederatedDataset
+    features = Features({
+    "image": Image(),
+    "label": ClassLabel(names=[str(i) for i in range(classes)])
+    })
 
-#     # Cria um dicionário com os dados
-#     gen_dict = {"image": gen_imgs_pil, "label": gen_labels_list}
+    # Cria um dicionário com os dados
+    gen_dict = {"image": gen_imgs_pil, "label": gen_labels_list}
 
-#     # Cria o dataset Hugging Face
-#     gen_dataset_hf = datasets.Dataset.from_dict(gen_dict, features=features)
-#     return gen_dataset_hf
+    # Cria o dataset Hugging Face
+    gen_dataset_hf = Dataset.from_dict(gen_dict, features=features)
+    return gen_dataset_hf
 
-# def split_balanced(gen_dataset_hf, num_clientes):
-#     # Identificar as classes
-#     class_label = gen_dataset_hf.features["label"]
-#     num_classes = class_label.num_classes
+def split_balanced(gen_dataset_hf, num_clientes):
+    # Identificar as classes
+    class_label = gen_dataset_hf.features["label"]
+    num_classes = class_label.num_classes
     
-#     # Cria um mapeamento classe -> índices
-#     class_to_indices = {c: [] for c in range(num_classes)}
-#     for i in range(len(gen_dataset_hf)):
-#         lbl = gen_dataset_hf[i]["label"]
-#         class_to_indices[lbl].append(i)
+    # Cria um mapeamento classe -> índices
+    class_to_indices = {c: [] for c in range(num_classes)}
+    for i in range(len(gen_dataset_hf)):
+        lbl = gen_dataset_hf[i]["label"]
+        class_to_indices[lbl].append(i)
     
-#     # Verifica quantos exemplos por classe temos
-#     examples_per_class = len(class_to_indices[0])
-#     # Garantir que o número de exemplos por classe seja divisível por num_clientes 
-#     # (ou lidar com o resto de alguma forma)
-#     if examples_per_class % num_clientes != 0:
-#         raise ValueError("O número de exemplos por classe não é divisível igualmente pelo número de clientes.")
+    # Verifica quantos exemplos por classe temos
+    examples_per_class = len(class_to_indices[0])
+    # Garantir que o número de exemplos por classe seja divisível por num_clientes 
+    # (ou lidar com o resto de alguma forma)
+    if examples_per_class % num_clientes != 0:
+        raise ValueError("O número de exemplos por classe não é divisível igualmente pelo número de clientes.")
         
-#     # Número de exemplos por classe por cliente
-#     examples_per_class_per_client = examples_per_class // num_clientes
+    # Número de exemplos por classe por cliente
+    examples_per_class_per_client = examples_per_class // num_clientes
 
-#     # Agora, distribui igualmente os índices para cada cliente
-#     client_indices = [[] for _ in range(num_clientes)]
-#     for c in range(num_classes):
-#         # Índices dessa classe
-#         idxs = class_to_indices[c]
-#         # Divide em partes iguais
-#         for i in range(num_clientes):
-#             start = i * examples_per_class_per_client
-#             end = (i+1) * examples_per_class_per_client
-#             client_indices[i].extend(idxs[start:end])
+    # Agora, distribui igualmente os índices para cada cliente
+    client_indices = [[] for _ in range(num_clientes)]
+    for c in range(num_classes):
+        # Índices dessa classe
+        idxs = class_to_indices[c]
+        # Divide em partes iguais
+        for i in range(num_clientes):
+            start = i * examples_per_class_per_client
+            end = (i+1) * examples_per_class_per_client
+            client_indices[i].extend(idxs[start:end])
     
-#     # Agora criamos um DatasetDict com um subset para cada cliente
-#     # Cada cliente terá a mesma quantidade total de exemplos (classes * examples_per_class_per_client)
-#     client_datasets = {}
-#     for i in range(num_clientes):
-#         # Ordena os índices do cliente (opcional, mas pode manter a ordem)
-#         client_indices[i].sort()
-#         # Seleciona os exemplos
-#         client_subset = gen_dataset_hf.select(client_indices[i])
-#         client_datasets[i] = client_subset
+    # Agora criamos um DatasetDict com um subset para cada cliente
+    # Cada cliente terá a mesma quantidade total de exemplos (classes * examples_per_class_per_client)
+    client_datasets = {}
+    for i in range(num_clientes):
+        # Ordena os índices do cliente (opcional, mas pode manter a ordem)
+        client_indices[i].sort()
+        # Seleciona os exemplos
+        client_subset = gen_dataset_hf.select(client_indices[i])
+        client_datasets[i] = client_subset
     
-#     return client_datasets
+    return client_datasets
 
-
-#######################################################################################
 
 # Copyright 2023 Flower Labs GmbH. All Rights Reserved.
 #
@@ -383,18 +376,18 @@ class ClassPartitioner(Partitioner):
             self._partition_indices.append(indices)
 
     @property
-    def dataset(self) -> datasets.Dataset:
+    def dataset(self) -> Dataset:
         return super().dataset
 
     @dataset.setter
-    def dataset(self, value: datasets.Dataset) -> None:
+    def dataset(self, value: Dataset) -> None:
         # Use parent setter for basic validation
         super(ClassPartitioner, ClassPartitioner).dataset.fset(self, value)
 
         # Create partitions once dataset is set
         self._create_partitions()
 
-    def load_partition(self, partition_id: int) -> datasets.Dataset:
+    def load_partition(self, partition_id: int) -> Dataset:
         """Load a partition containing exclusive classes.
 
         Args:
@@ -425,21 +418,21 @@ gen_img_part = None # Cache GeneratedDataset
 def load_data(partition_id: int, 
               num_partitions: int,  
               alpha_dir: float, 
-              batch_size: int,
+              batch_size: int, 
+              cgan=None, 
+              examples_per_class=5000,
               filter_classes=None,
               teste: bool = False,
-              partitioner_type: str = "IID",
-              num_chunks: int = 1,
-              syn_samples: int = 0,
-              gan: Optional[nn.Module] = None) -> tuple[DataLoader, Optional[DataLoader], DataLoader, DataLoader]:
+              partitioner: str = "IID",
+              num_chunks: int = 1,):
     
-    """Carrega MNIST com splits de treino e teste separados. Se syn_samples > 0, inclui dados gerados."""
+    """Carrega MNIST com splits de treino e teste separados. Se examples_per_class > 0, inclui dados gerados."""
    
     global fds
 
     if fds is None:
         print("Carregamento dos Dados")
-        if partitioner_type == "Dir":
+        if partitioner == "Dir":
             print("Dados por Dirichlet")
             partitioner = DirichletPartitioner(
                 num_partitions=num_partitions,
@@ -448,7 +441,7 @@ def load_data(partition_id: int,
                 min_partition_size=0,
                 self_balancing=False
             )
-        elif partitioner_type == "Class":
+        elif partitioner == "Class":
             print("Dados por classe")
             partitioner = ClassPartitioner(num_partitions=num_partitions, seed=42)
         else:
@@ -462,13 +455,24 @@ def load_data(partition_id: int,
 
     # Carrega a partição de treino e teste separadamente
     test_partition = fds.load_split("test")
-    train_partition = fds.load_partition(partition_id, split="train")
+
+    global gen_img_part
+
+    if cgan is not None and examples_per_class > 0:
+        if gen_img_part is None:
+            print("Gerando dados para treino")
+            generated_images = generate_images(cgan, examples_per_class)
+            gen_img_part = split_balanced(gen_dataset_hf=generated_images, num_clientes=num_partitions)
+        train_partition = gen_img_part[partition_id]
+    else:
+        train_partition = fds.load_partition(partition_id, split="train")
 
     from collections import Counter
     labels = train_partition["label"]
     class_distribution = Counter(labels)
     print(f"CID {partition_id}: {class_distribution}")
         
+
     if teste:
         print("reduzindo dataset para modo teste")
         num_samples = int(len(train_partition)/10)
@@ -490,91 +494,21 @@ def load_data(partition_id: int,
 
     train_partition = train_partition.with_transform(apply_transforms)
     test_partition = test_partition.with_transform(apply_transforms)
-
-    test_frac = 0.2
-    client_dataset = []
-
-    total     = len(train_partition)
-    test_size = int(total * test_frac)
-    train_size = total - test_size
-
-    client_train, client_test = random_split(
-        train_partition,
-        [train_size, test_size],
-        generator=torch.Generator().manual_seed(42),
-    )
-
-    client_dataset.append({
-        "train": client_train,
-        "test":  client_test,
-    })
-
-    if gan and syn_samples > 0:
-        generated_dataset = GeneratedDataset(
-            generator=gan.to("cpu"),  # Move GAN to CPU for generation
-            num_samples=syn_samples,
-            latent_dim=gan.latent_dim,
-            device="cpu",  # Use CPU for generation
-            image_col_name="image"
-        )
-
-        # Cria a pasta de saída se não existir
-        os.makedirs("syn_samples", exist_ok=True)
-        # Escolhe até 5 índices aleatórios dentro do tamanho do dataset
-        num_to_save = min(5, len(generated_dataset))
-        sample_idxs = random.sample(range(len(generated_dataset)), num_to_save)
-
-        for i, idx in enumerate(sample_idxs, start=1):
-            sample = generated_dataset[idx]
-            img = sample["image"]       # tensor C×H×W
-            lbl = sample["label"]       # inteiro
-            # Aqui você pode incluir qualquer informação no nome do arquivo
-            filename = f"syn_samples/syn_img_{i:02d}_idx{idx}_lbl{lbl}_r{round}.png"
-            save_image(img, filename)
-
-        train_partition = ConcatDataset([client_dataset["train"], generated_dataset])
-
+    
     if num_chunks > 1:
-        n_gen = len(train_partition)
-        n_real = len(client_dataset["train"])
-
-        # 1) embaralha os índices com seed fixa
-        indices_gen = list(range(n_gen))
-        indices_real = list(range(n_real))
-        random.seed(42)
-        random.shuffle(indices_gen)
-        random.shuffle(indices_real)
-
-        # 2) calcula tamanho aproximado de cada chunk
-        chunk_size_gen = math.ceil(n_gen / num_chunks)
-        chunk_size_real = math.ceil(n_real / num_chunks)
-
-        # 3) divide em chunks usando fatias dos índices embaralhados
-        chunks_gen = []
-        chunks_real = []
+        chunk_size = math.ceil(len(train_partition) / num_chunks)
+        chunks = []
         for i in range(num_chunks):
-            start = i * chunk_size_gen
-            end = min((i + 1) * chunk_size_gen, n_gen)
-            chunk_indices = indices_gen[start:end]
-            chunks_gen.append(Subset(train_partition, chunk_indices))
-
-            start = i * chunk_size_real
-            end = min((i + 1) * chunk_size_real, n_real)
-            chunk_indices = indices_real[start:end]
-            chunks_real.append(Subset(client_dataset["train"], chunk_indices))
-
-
-        trainloader_syn = [DataLoader(chunk, batch_size=batch_size, shuffle=True) for chunk in chunks_gen if len(chunk) > 0]
-        trainloader_real = [DataLoader(chunk, batch_size=batch_size, shuffle=True) for chunk in chunks_real if len(chunk) > 0]
-
+            start = i * chunk_size
+            end = min((i + 1) * chunk_size, len(train_partition))
+            chunks.append(Subset(train_partition, range(start, end)))
+        trainloader = [DataLoader(chunk, batch_size=batch_size, shuffle=True) for chunk in chunks if len(chunk) > 0]
     else:
-        trainloader_real = DataLoader(client_dataset["train"], batch_size=batch_size, shuffle=True)
-        trainloader_syn = DataLoader(train_partition, batch_size=batch_size, shuffle=True)
+        trainloader = DataLoader(train_partition, batch_size=batch_size, shuffle=True)
 
-    testloader = DataLoader(test_partition, batch_size=batch_size, shuffle=True)
-    testloader_local = DataLoader(client_dataset["test"], batch_size=batch_size, shuffle=True)
+    testloader = DataLoader(test_partition, batch_size=batch_size)
 
-    return trainloader_real, trainloader_syn, testloader, testloader_local
+    return trainloader, testloader
 
 
 def train_alvo(net, trainloader, epochs, lr, device):
@@ -1087,170 +1021,46 @@ class InceptionV3(nn.Module):
         return outp
 
 class GeneratedDataset(Dataset):
-    def __init__(self,
-                 generator,
-                 num_samples,
-                 latent_dim=100,
-                 num_classes=10, # Total classes the generator model knows
-                 desired_classes=None, # Optional: List of specific class indices to generate
-                 device="cpu",
-                 image_col_name="image",
-                 label_col_name="label"):
-        """
-        Generates a dataset using a conditional generative model, potentially
-        focusing on a subset of classes.
-
-        Args:
-            generator: The pre-trained generative model.
-            num_samples (int): Total number of images to generate across the desired classes.
-            latent_dim (int): Dimension of the latent space vector (z).
-            num_classes (int): The total number of classes the generator was trained on.
-                               This is crucial for correct label conditioning (e.g., one-hot dim).
-            desired_classes (list[int], optional): A list of integer class indices to generate.
-                                                  If None or empty, images for all classes
-                                                  (from 0 to num_classes-1) will be generated,
-                                                  distributed as evenly as possible.
-                                                  Defaults to None.
-            device (str): Device to run generation on ('cpu' or 'cuda').
-            image_col_name (str): Name for the image column in the output dictionary.
-            label_col_name (str): Name for the label column in the output dictionary.
-        """
+    def __init__(self, generator, num_samples, latent_dim, num_classes, device):
         self.generator = generator
         self.num_samples = num_samples
         self.latent_dim = latent_dim
-        # Store the total number of classes the generator understands
-        self.total_num_classes = num_classes
+        self.num_classes = num_classes
         self.device = device
-        self.model_type = type(self.generator).__name__ # Get generator class name
-        self.image_col_name = image_col_name
-        self.label_col_name = label_col_name
-
-        # Determine the actual classes to generate based on desired_classes
-        if desired_classes is not None and len(desired_classes) > 0:
-            # Validate that desired classes are within the generator's known range
-            if not all(0 <= c < self.total_num_classes for c in desired_classes):
-                raise ValueError(f"All desired classes must be integers between 0 and {self.total_num_classes - 1}")
-            # Use only the unique desired classes, sorted for consistency
-            self._actual_classes_to_generate = sorted(list(set(desired_classes)))
-        else:
-            # If no specific classes desired, generate all classes
-            self._actual_classes_to_generate = list(range(self.total_num_classes))
-
-        # The 'classes' attribute of the dataset reflects only those generated
-        self.classes = self._actual_classes_to_generate
-        self.num_generated_classes = len(self.classes) # Number of classes being generated
-
-        if self.num_generated_classes == 0 and self.num_samples > 0:
-             raise ValueError("Cannot generate samples with an empty list of desired classes.")
-        elif self.num_samples == 0:
-             print("Warning: num_samples is 0. Dataset will be empty.")
-             self.images = torch.empty(0) # Adjust shape if known
-             self.labels = torch.empty(0, dtype=torch.long)
-        else:
-             # Generate the data only if needed
-             self.images, self.labels = self.generate_data()
+        self.model = type(self.generator).__name__
+        self.images = self.generate_data()
+        self.classes = [i for i in range(self.num_classes)]
 
 
     def generate_data(self):
-        """Generates images and corresponding labels for the specified classes."""
-        self.generator.eval()
+        gen_imgs = {}
         self.generator.to(self.device)
+        self.generator.eval()
+        labels = {c: torch.tensor([c for i in range(self.num_samples)], device=self.device) for c in range(self.num_classes)}
+        for c, label in labels.items():
+          if self.model == 'Generator':
+              labels_one_hot = F.one_hot(label, self.num_classes).float().to(self.device) #
+          z = torch.randn(self.num_samples, self.latent_dim, device=self.device)
+          with torch.no_grad():
+              if self.model == 'Generator':
+                  gen_imgs_class = self.generator(torch.cat([z, labels_one_hot], dim=1))
+              elif self.model == 'CGAN':
+                  gen_imgs_class = self.generator(z, label)
+          gen_imgs[c] = gen_imgs_class
 
-        # --- Create Labels ---
-        generated_labels_list = []
-        if self.num_generated_classes > 0:
-            # Distribute samples as evenly as possible among the desired classes
-            samples_per_class = self.num_samples // self.num_generated_classes
-            for cls in self._actual_classes_to_generate:
-                generated_labels_list.extend([cls] * samples_per_class)
-
-            # Handle remaining samples if num_samples is not perfectly divisible
-            num_remaining = self.num_samples - len(generated_labels_list)
-            if num_remaining > 0:
-                # Add remaining samples by randomly choosing from the desired classes
-                remainder_labels = random.choices(self._actual_classes_to_generate, k=num_remaining)
-                generated_labels_list.extend(remainder_labels)
-
-            # Shuffle labels for better distribution in batches later
-            random.shuffle(generated_labels_list)
-
-        # Convert labels list to tensor
-        labels = torch.tensor(generated_labels_list, dtype=torch.long, device=self.device)
-
-        # Double check label count (should match num_samples due to logic above)
-        if len(labels) != self.num_samples:
-             # This indicates an unexpected issue, potentially if num_generated_classes was 0 initially
-             # but num_samples > 0. Raise error or adjust. Let's adjust defensively.
-             print(f"Warning: Label count mismatch. Expected {self.num_samples}, got {len(labels)}. Adjusting size.")
-             if len(labels) > self.num_samples:
-                 labels = labels[:self.num_samples]
-             else:
-                 # Pad if too few (less likely with current logic unless num_generated_classes=0)
-                 num_needed = self.num_samples - len(labels)
-                 if self.num_generated_classes > 0:
-                      padding = torch.tensor(random.choices(self._actual_classes_to_generate, k=num_needed), dtype=torch.long, device=self.device)
-                      labels = torch.cat((labels, padding))
-                 # If no classes to generate from, labels tensor might remain smaller
-
-        # --- Create Latent Noise ---
-        z = torch.randn(self.num_samples, self.latent_dim, device=self.device)
-
-        # --- Generate Images in Batches ---
-        generated_images_list = []
-        # Consider making batch_size configurable
-        batch_size = min(1024, self.num_samples) if self.num_samples > 0 else 1
-
-        with torch.no_grad():
-            for i in range(0, self.num_samples, batch_size):
-                z_batch = z[i : min(i + batch_size, self.num_samples)]
-                labels_batch = labels[i : min(i + batch_size, self.num_samples)]
-
-                # Skip if batch is empty (can happen if num_samples = 0)
-                if z_batch.shape[0] == 0:
-                    continue
-
-                # --- Condition the generator based on its type ---
-                if self.model_type == 'Generator': # Assumes input: concat(z, one_hot_label)
-                    # One-hot encode labels using the TOTAL number of classes the generator knows
-                    labels_one_hot_batch = F.one_hot(labels_batch, num_classes=self.total_num_classes).float()
-                    generator_input = torch.cat([z_batch, labels_one_hot_batch], dim=1)
-                    gen_imgs = self.generator(generator_input)
-                elif self.model_type in ('CGAN', 'F2U_GAN', 'F2U_GAN_CIFAR'): # Assumes input: z, label_index
-                    gen_imgs = self.generator(z_batch, labels_batch)
-                else:
-                    # Handle other potential generator architectures or raise an error
-                    raise NotImplementedError(f"Generation logic not defined for model type: {self.model_type}")
-
-                generated_images_list.append(gen_imgs.cpu()) # Move generated images to CPU
-
-        self.generator.cpu() # Move generator back to CPU after generation
-
-        # Concatenate all generated image batches
-        if generated_images_list:
-            all_gen_imgs = torch.cat(generated_images_list, dim=0)
-        else:
-            # If no images were generated (e.g., num_samples = 0)
-            # Create an empty tensor. Shape needs care - determine from generator or use placeholder.
-            # Let's attempt a placeholder [0, C, H, W] - requires knowing C, H, W.
-            # For now, a simple empty tensor. User might need to handle this downstream.
-            print("Warning: No images generated. Returning empty tensor for images.")
-            all_gen_imgs = torch.empty(0)
-
-        return all_gen_imgs, labels.cpu() # Return images and labels (on CPU)
+        return gen_imgs
 
     def __len__(self):
-        # Return the actual number of samples generated
-        return self.images.shape[0]
+        return self.num_samples * self.num_classes
 
     def __getitem__(self, idx):
-        if idx >= len(self):
-            raise IndexError("Dataset index out of range")
-        return {
-            self.image_col_name: self.images[idx],
-            self.label_col_name: int(self.labels[idx]) # Return label as standard Python int
-        }
+        # Mapear o índice global para (classe, índice interno)
+        class_idx = idx // self.num_samples
+        sample_idx = idx % self.num_samples
+        # Retorna apenas a imagem (sem o rótulo)
+        return self.images[class_idx][sample_idx]
     
-class ImagePathDataset(Dataset):
+class ImagePathDataset(torch.utils.data.Dataset):
     def __init__(self, files, transforms=None):
         self.files = files
         self.transforms = transforms

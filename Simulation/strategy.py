@@ -461,9 +461,7 @@ class GeraFed(Strategy):
                 # Salva o modelo após a agregaçãO
                 ndarrays = parameters_to_ndarrays(parameters_aggregated_gen)
                 # Cria uma instância do modelo
-                model = CGAN(dataset=self.dataset,
-                            img_size=self.img_size,
-                            latent_dim=self.latent_dim)
+                model = self.gen.__class__()
                 # Define os pesos do modelo
                 set_weights(model, ndarrays)
                 # Salva o modelo no disco com o nome específico do dataset

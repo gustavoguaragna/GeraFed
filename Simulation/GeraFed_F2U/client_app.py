@@ -20,6 +20,7 @@ import random
 import numpy as np
 import math
 from flwr.common.typing import UserConfigValue
+import time
 
 SEED = 42
 random.seed(SEED)
@@ -112,6 +113,7 @@ class FlowerClient(NumPyClient):
             trainloader_syn_chunk = trainloader_syn
 
         # Treina o modelo classificador
+        train_alvo_start_time = time.time()
         train_loss = train_alvo(
             net=self.net_alvo,
             trainloader=trainloader_syn_chunk,
@@ -119,6 +121,7 @@ class FlowerClient(NumPyClient):
             lr=self.lr_alvo,
             device=self.device,
         )
+        train_classifier_time  = time.time() - train_start_time
 
         # Cria state_dict para a disc
         state_dict = {}
@@ -140,6 +143,8 @@ class FlowerClient(NumPyClient):
         else:
             trainloader_real_chunk = trainloader_real
 
+        train_gen_start_time = time.time()
+        # Treina o modelo generativo
         train_gen(
         disc=self.net_disc,
         gen=self.net_gen,
@@ -150,6 +155,8 @@ class FlowerClient(NumPyClient):
         dataset=self.dataset,
         latent_dim=self.latent_dim
         )
+        train_gen_time = time.time() - train_gen_start_time
+
         # Save all elements of the state_dict into a single RecordSet
         p_record = ParametersRecord()
         for k, v in self.net_disc.state_dict().items():
@@ -161,7 +168,10 @@ class FlowerClient(NumPyClient):
         return (
         get_weights(self.net_alvo),
         len(trainloader_syn_chunk.dataset),
-        {"train_loss": train_loss, "disc": get_weights_gen(self.net_disc)},
+        {"train_loss": train_loss,
+         "disc": get_weights_gen(self.net_disc),
+         "tempo_treino_alvo": train_classifier_time,
+         "tempo_treino_gen": train_gen_time},
         )
 
     def evaluate(self, parameters, config):
