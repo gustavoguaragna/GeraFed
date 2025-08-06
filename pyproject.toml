@@ -23,16 +23,16 @@ packages = ["."]
 publisher = "gustavoguaragna"
 
 [tool.flwr.app.components]
-serverapp = "Simulation.server_app:app"
-clientapp = "Simulation.client_app:app"
+serverapp = "Simulation.GeraFed_F2U.server_app:app"
+clientapp = "Simulation.GeraFed_F2U.client_app:app"
 
 [tool.flwr.app.config]
 agg                  = "full"        # 'disc', 'full', 'f2a', 'none'
 alpha_dir            = 0.1
 dataset              = "mnist"
-epocas_alvo          = 2
-epocas_gen           = 2
-Exp_name_folder      = "."
+epocas_alvo          = 1
+epocas_gen           = 1
+Exp_name_folder      = "Experimentos/GeraFed_F2U_4c_NIID_Class"
 fid                  = false
 fraction_fit_alvo    = 1.0
 fraction_fit_gen     = 1.0
@@ -40,8 +40,8 @@ gan_arq              = "f2u_gan"    # 'simple_cnn'
 learn_rate_alvo      = 0.001
 learn_rate_gen       = 0.0002
 model                = "both"       # 'alvo', 'gen', 'both'
-num_chunks           = 1
-num_rodadas          = 3
+num_chunks           = 10
+num_rodadas          = 20
 partitioner          = "Class"        # 'Class', 'Dir', 'IID' (IID no else)
 tam_batch            = 32
 tam_img              = 28

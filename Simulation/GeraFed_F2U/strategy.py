@@ -21,6 +21,7 @@ from flwr.server.strategy.aggregate import aggregate, aggregate_inplace, weighte
 
 from Simulation.GeraFed_F2U.task import Net, CGAN, F2U_GAN, set_weights, train_G, get_weights, generate_plot
 import torch
+import pickle
 
 WARNING_MIN_AVAILABLE_CLIENTS_TOO_LOW = """
     Setting `min_available_clients` lower than `min_fit_clients` or
@@ -210,8 +211,8 @@ class GeraFed(Strategy):
         )
 
         fit_instructions = []
-        gen_params = ndarrays_to_parameters(get_weights(self.gen))
-        config = {"round": server_round, "gan": gen_params}
+        gen_params = get_weights(self.gen)
+        config = {"round": server_round, "gan": pickle.dumps(gen_params)}
         fit_ins = FitIns(parameters=self.parameters_alvo, config=config)
         for c in clients:
             fit_instructions.append((c, fit_ins))
@@ -300,7 +301,7 @@ class GeraFed(Strategy):
             print(f"Modelo alvo salvo em {save_path}")
 
             # Define os pesos do modelo
-            disc_ndarrays = [parameters_to_ndarrays(fit_res.metrics["disc"]) for _, fit_res in results]
+            disc_ndarrays = [parameters_to_ndarrays(pickle.loads(fit_res.metrics["disc"])) for _, fit_res in results]
             if self.gan_arq == "simple_cnn":
                 discs = [CGAN().to(self.device) for _ in range(len(disc_ndarrays))]
             elif self.gan_arq == "f2u_gan":

@@ -29,13 +29,9 @@ def server_fn(context: Context):
     dataset = context.run_config["dataset"]
     img_size = context.run_config["tam_img"]
     latent_dim = context.run_config["tam_ruido"]
-    agg = context.run_config["agg"]
-    model = context.run_config["model"]
     gan_arq = context.run_config["gan_arq"]
-    fid = context.run_config["fid"]
     teste = context.run_config["teste"]
     folder = context.run_config["Exp_name_folder"]
-    save_local_resources = context.run_config["save_local_resources"]
     os.makedirs(folder, exist_ok=True)
     
     # Initialize model parameters

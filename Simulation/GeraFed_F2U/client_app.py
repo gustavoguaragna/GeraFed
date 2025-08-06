@@ -21,6 +21,7 @@ import numpy as np
 import math
 from flwr.common.typing import UserConfigValue
 import time
+import pickle
 
 SEED = 42
 random.seed(SEED)
@@ -86,7 +87,7 @@ class FlowerClient(NumPyClient):
     def fit(self, parameters, config):
         
         # Atualiza pesos do modelo generativo
-        set_weights(net=self.net_gen, parameters=config["gan"])
+        set_weights(net=self.net_gen, parameters=pickle.loads(config["gan"]))
 
         # Calcula numero de amostras sinteticas
         num_syn = int(13 * (math.exp(0.01*config["round"]) - 1) / (math.exp(0.01*50) - 1)) * 10
@@ -121,7 +122,7 @@ class FlowerClient(NumPyClient):
             lr=self.lr_alvo,
             device=self.device,
         )
-        train_classifier_time  = time.time() - train_start_time
+        train_classifier_time  = time.time() - train_alvo_start_time
 
         # Cria state_dict para a disc
         state_dict = {}
@@ -164,14 +165,18 @@ class FlowerClient(NumPyClient):
             p_record[k] = array_from_numpy(v.detach().cpu().numpy())
         # Add to a context
         self.client_state.parameters_records["net_parameters"] = p_record
+
+
+        disc_params = get_weights_gen(self.net_disc)
         
         return (
         get_weights(self.net_alvo),
         len(trainloader_syn_chunk.dataset),
         {"train_loss": train_loss,
-         "disc": get_weights_gen(self.net_disc),
+         "disc": pickle.dumps(disc_params),
          "tempo_treino_alvo": train_classifier_time,
-         "tempo_treino_gen": train_gen_time},
+         "tempo_treino_gen": train_gen_time
+        },
         )
 
     def evaluate(self, parameters, config):
