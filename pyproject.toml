@@ -23,8 +23,8 @@ packages = ["."]
 publisher = "gustavoguaragna"
 
 [tool.flwr.app.components]
-serverapp = "Simulation.server_app:app"
-clientapp = "Simulation.client_app:app"
+serverapp = "Simulation.GeraFed_F2U.server_app:app"
+clientapp = "Simulation.GeraFed_F2U.client_app:app"
 
 [tool.flwr.app.config]
 agg                  = "f2a"        # 'disc', 'full', 'f2a', 'none'
@@ -32,7 +32,7 @@ alpha_dir            = 0.1
 dataset              = "mnist"
 epocas_alvo          = 1
 epocas_gen           = 1
-Exp_name_folder      = "Experimentos/F2U_4c_NIID01Dir"
+Exp_name_folder      = "Experimentos/GeraFed_F2U_4c_NIIDClass"
 fid                  = false
 fraction_fit_alvo    = 1.0
 fraction_fit_gen     = 1.0
@@ -40,14 +40,14 @@ gan_arq              = "f2u_gan"    # 'simple_cnn'
 learn_rate_alvo      = 0.001
 learn_rate_gen       = 0.0002
 model                = "both"       # 'alvo', 'gen', 'both'
-num_chunks           = 100
-num_rodadas          = 10000
-partitioner          = "Dir"        # 'Class', 'Dir', 'IID' (IID no else)
+num_chunks           = 10
+num_rodadas          = 20
+partitioner          = "Class"        # 'Class', 'Dir', 'IID' (IID no else)
 save_local_resources = false
 tam_batch            = 32
 tam_img              = 28
 tam_ruido            = 128
-teste                = false
+teste                = true
 
 xgb_params.objective = "binary:logistic"
 xgb_params.eta = 0.1 # Learning rate
@@ -63,6 +63,6 @@ default = "local-simulation"
 
 [tool.flwr.federations.local-simulation]
 options.num-supernodes = 4
-options.backend.client-resources.num-cpus = 1
-options.backend.client-resources.num-gpus = 0.25
+options.backend.client-resources.num-cpus = 4
+options.backend.client-resources.num-gpus = 0
 

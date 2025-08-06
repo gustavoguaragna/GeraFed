@@ -19,10 +19,8 @@ from flwr.server.client_proxy import ClientProxy
 
 from flwr.server.strategy.aggregate import aggregate, aggregate_inplace, weighted_loss_avg
 
-from Simulation.task import Net, CGAN, F2U_GAN, set_weights, train_G, get_weights, generate_plot
+from Simulation.GeraFed_F2U.task import Net, CGAN, F2U_GAN, set_weights, train_G, get_weights, generate_plot
 import torch
-import json
-import pickle
 
 WARNING_MIN_AVAILABLE_CLIENTS_TOO_LOW = """
     Setting `min_available_clients` lower than `min_fit_clients` or
@@ -231,7 +229,7 @@ class GeraFed(Strategy):
             return []
 
         # Parameters and config
-        config = {}
+        config = {"round": server_round}
         if self.on_evaluate_config_fn is not None:
             # Custom evaluation config function provided
             config = self.on_evaluate_config_fn(server_round)

@@ -3,8 +3,8 @@
 import os
 from flwr.common import Context, ndarrays_to_parameters
 from flwr.server import ServerApp, ServerAppComponents, ServerConfig
-from Simulation.task import Net, CGAN, F2U_GAN, get_weights
-from Simulation.strategy import GeraFed
+from Simulation.GeraFed_F2U.task import Net, CGAN, F2U_GAN, get_weights
+from Simulation.GeraFed_F2U.strategy import GeraFed
 import random
 import numpy as np
 import torch
@@ -51,8 +51,6 @@ def server_fn(context: Context):
                                             latent_dim=latent_dim))
     parameters_gen = ndarrays_to_parameters(ndarrays_gen)
 
-    client_counter = Counter()
-
     # Define strategy
     strategy = GeraFed(
         fraction_fit_alvo=fraction_fit_alvo,
@@ -63,14 +61,9 @@ def server_fn(context: Context):
         dataset=dataset,
         img_size=img_size,
         latent_dim=latent_dim,
-        client_counter=client_counter,
-        agg=agg,
-        model=model,
         gan_arq=gan_arq,
-        fid=fid,
         teste=teste,
-        folder=folder,
-        save_local_resources=save_local_resources
+        folder=folder
     )
     config = ServerConfig(num_rounds=num_rounds)
 

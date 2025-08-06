@@ -11,8 +11,11 @@
 11. Um dos clientes testa o desempenho do modelo classificador no conjunto de teste global e salva os resultados.
 
 COISAS QUE ESTOU DEIXANDO PARA DEPOIS:
- Handling de batch size 1.
- Adicionar calculo dos tempos.
- Adicionar loss de treino do classificador.
- Parametrizar epocas extra gen
  Adicionar teste local
+ Adicionar loss de treino do classificador.
+ Adicionar calculo dos tempos.
+ Salvar todos os logs, tempo, loss classificador, loss gen e disc, acc global e local
+ Parametrizar epocas extra gen
+ Handling de batch size 1.
+ Corrigir erros Pylance
+ Docstrings para funcoes

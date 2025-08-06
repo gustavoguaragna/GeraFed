@@ -1,7 +1,6 @@
 """GeraFed: um framework para balancear dados heterogêneos em aprendizado federado."""
 
 import torch
-from collections import OrderedDict
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import Context, ParametersRecord, array_from_numpy
 from Simulation.GeraFed_F2U.task import (
@@ -14,13 +13,11 @@ from Simulation.GeraFed_F2U.task import (
     set_weights, 
     test, 
     train_alvo, 
-    train_gen, 
-    calculate_fid, 
-    generate_plot
+    train_gen,
+    local_test
 )
 import random
 import numpy as np
-import json
 import math
 from flwr.common.typing import UserConfigValue
 
@@ -55,7 +52,8 @@ class FlowerClient(NumPyClient):
                 batch_size: UserConfigValue,
                 teste: UserConfigValue,
                 folder: UserConfigValue = ".",
-                num_chunks: UserConfigValue = 1):
+                num_chunks: UserConfigValue = 1,
+                partitioner: UserConfigValue = "Class"):
         self.cid=cid
         self.net_alvo = net_alvo
         self.net_gen = net_gan
@@ -81,6 +79,7 @@ class FlowerClient(NumPyClient):
         self.teste = teste
         self.folder = folder
         self.num_chunks = num_chunks
+        self.partitioner = partitioner
   
 
     def fit(self, parameters, config):
@@ -92,7 +91,7 @@ class FlowerClient(NumPyClient):
         num_syn = int(13 * (math.exp(0.01*config["round"]) - 1) / (math.exp(0.01*50) - 1)) * 10
 
         # Carrega dados
-        self.trainloader_real, self.trainloader_syn, self.testloader, self.testloader_local = load_data(partition_id=self.cid,
+        trainloader_real, trainloader_syn, _, _ = load_data(partition_id=self.cid,
                                 num_partitions=self.num_partitions,
                                 partitioner_type=self.partitioner,
                                 alpha_dir=self.alpha_dir,
@@ -106,16 +105,16 @@ class FlowerClient(NumPyClient):
         set_weights(self.net_alvo, parameters)
 
         # Define o dataloader
-        if isinstance(self.trainloader_syn, list):
-            chunk_idx = config["round"] % len(self.trainloader_syn)
-            trainloader_syn = self.trainloader_syn[chunk_idx]
+        if isinstance(trainloader_syn, list):
+            chunk_idx = config["round"] % len(trainloader_syn)
+            trainloader_syn_chunk = trainloader_syn[chunk_idx]
         else:
-            trainloader_syn = self.trainloader_syn
+            trainloader_syn_chunk = trainloader_syn
 
         # Treina o modelo classificador
         train_loss = train_alvo(
             net=self.net_alvo,
-            trainloader=trainloader_syn,
+            trainloader=trainloader_syn_chunk,
             epochs=self.local_epochs_alvo,
             lr=self.lr_alvo,
             device=self.device,
@@ -135,16 +134,16 @@ class FlowerClient(NumPyClient):
             self.net_disc.load_state_dict(state_dict)
 
         # Define o dataloader
-        if isinstance(self.trainloader_real, list):
-            chunk_idx = config["round"] % len(self.trainloader_real)
-            trainloader_real = self.trainloader_real[chunk_idx]
+        if isinstance(trainloader_real, list):
+            chunk_idx = config["round"] % len(trainloader_real)
+            trainloader_real_chunk = trainloader_real[chunk_idx]
         else:
-            trainloader_real = self.trainloader_real
+            trainloader_real_chunk = trainloader_real
 
         train_gen(
         disc=self.net_disc,
         gen=self.net_gen,
-        trainloader=trainloader_real,
+        trainloader=trainloader_real_chunk,
         epochs=self.local_epochs_gen,
         lr=self.lr_gen,
         device=self.device,
@@ -161,15 +160,32 @@ class FlowerClient(NumPyClient):
         
         return (
         get_weights(self.net_alvo),
-        len(trainloader_syn.dataset),
+        len(trainloader_syn_chunk.dataset),
         {"train_loss": train_loss, "disc": get_weights_gen(self.net_disc)},
         )
 
     def evaluate(self, parameters, config):
 
+        # Carrega dados
+        _, _, testloader, local_testloader = load_data(partition_id=self.cid,
+                                num_partitions=self.num_partitions,
+                                partitioner_type=self.partitioner,
+                                alpha_dir=self.alpha_dir,
+                                batch_size=self.batch_size,
+                                teste=self.teste)
+
         set_weights(self.net_alvo, parameters)
-        loss, accuracy = test(self.net_alvo, self.testloader, self.device, model=self.model)
-        return loss, len(self.testloader.dataset), {"accuracy": accuracy}
+        loss, accuracy = test(self.net_alvo, testloader, self.device, model=self.model)
+
+        if config["round"] % self.num_chunks == 0 or config["round"] == 1:
+            local_test(net=self.net_alvo,
+                    testloader=local_testloader,
+                    device=self.device,
+                    acc_filepath=f"{self.folder}/accuracy_report.txt",
+                    epoch=int(config["round"]/10),
+                    cliente=self.cid)
+
+        return loss, len(testloader.dataset), {"accuracy": accuracy}
 
 
 
@@ -229,7 +245,8 @@ def client_fn(context: Context):
                         batch_size=batch_size,
                         teste=teste,
                         folder=folder,
-                        num_chunks=num_chunks).to_client()
+                        num_chunks=num_chunks,
+                        partitioner=partitioner).to_client()
 
 
 # Flower ClientApp

@@ -10,21 +10,20 @@ from flwr_datasets.partitioner import IidPartitioner, DirichletPartitioner, Part
 from torch.utils.data import DataLoader, Subset, Dataset, ConcatDataset, random_split
 from torchvision.transforms import Compose, Normalize, ToTensor
 import numpy as np
-from torchvision.transforms.functional import to_pil_image
-from datasets import Features, ClassLabel, Image
 import random
 import torchvision
 from torch.utils.model_zoo import load_url as load_state_dict_from_url
 from PIL import Image as IMG
 import os
 from scipy import linalg
-import time
 from tqdm import tqdm
 from flwr.common import parameters_to_ndarrays
 from collections import defaultdict, OrderedDict
 from typing import Optional, List
 import math
 from torchvision.utils import save_image
+import datasets
+import time
 
 os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
@@ -492,7 +491,6 @@ def load_data(partition_id: int,
     test_partition = test_partition.with_transform(apply_transforms)
 
     test_frac = 0.2
-    client_dataset = []
 
     total     = len(train_partition)
     test_size = int(total * test_frac)
@@ -504,10 +502,10 @@ def load_data(partition_id: int,
         generator=torch.Generator().manual_seed(42),
     )
 
-    client_dataset.append({
+    client_dataset = {
         "train": client_train,
         "test":  client_test,
-    })
+    }
 
     if gan and syn_samples > 0:
         generated_dataset = GeneratedDataset(
@@ -725,7 +723,92 @@ def test(net, testloader, device, model):
         accuracy = correct / len(testloader.dataset)
         loss = loss / len(testloader)
         return loss, accuracy
+    
+def local_test(net: nn.Module,
+               testloader: DataLoader,
+               device: str,
+               acc_filepath: str,
+               epoch: int,
+               cliente: str,
+               num_classes: int = 10):
+    client_eval_time = time.time()
+    # Evaluation in client test
+    # Initialize counters
+    class_correct = defaultdict(int)
+    class_total = defaultdict(int)
+    predictions_counter = defaultdict(int)
 
+    net.eval()
+    with torch.no_grad():
+        for batch in testloader:
+            images, labels = batch["image"].to(device), batch["label"].to(device)
+            outputs = net(images)
+            _, predicted = torch.max(outputs, 1)
+
+            # Update counts for each sample in batch
+            for true_label, pred_label in zip(labels, predicted):
+                true_idx = true_label.item()
+                pred_idx = pred_label.item()
+
+                class_total[true_idx] += 1
+                predictions_counter[pred_idx] += 1
+
+                if true_idx == pred_idx:
+                    class_correct[true_idx] += 1
+
+        # Create results dictionary
+        results_metrics = {
+            "class_metrics": {},
+            "overall_accuracy": None,
+            "prediction_distribution": dict(predictions_counter)
+        }
+
+        # Calculate class-wise metrics
+        for i in range(num_classes):
+            metrics = {
+                "samples": class_total[i],
+                "predictions": predictions_counter[i],
+                "accuracy": class_correct[i] / class_total[i] if class_total[i] > 0 else "N/A"
+            }
+            results_metrics["class_metrics"][f"class_{i}"] = metrics
+
+        # Calculate overall accuracy
+        total_samples = sum(class_total.values())
+        results_metrics["overall_accuracy"] = sum(class_correct.values()) / total_samples
+
+        # Save to txt file
+        with open(acc_filepath, "a") as f:
+            f.write(f"Epoch {epoch + 1} - Client {cliente}\n")
+            # Header with fixed widths
+            f.write("{:<10} {:<10} {:<10} {:<10}\n".format(
+                "Class", "Accuracy", "Samples", "Predictions"))
+            f.write("-"*45 + "\n")
+
+            # Class rows with consistent formatting
+            for cls in range(num_classes):
+                metrics = results_metrics["class_metrics"][f"class_{cls}"]
+
+                # Format accuracy (handle "N/A" case)
+                accuracy = (f"{metrics['accuracy']:.4f}"
+                            if isinstance(metrics['accuracy'], float)
+                            else "  N/A  ")
+
+                f.write("{:<10} {:<10} {:<10} {:<10}\n".format(
+                    f"Class {cls}",
+                    accuracy,
+                    metrics['samples'],
+                    metrics['predictions']
+                ))
+
+            # Footer with alignment
+            f.write("\n{:<20} {:.4f}".format("Overall Accuracy:", results_metrics["overall_accuracy"]))
+            f.write("\n{:<20} {}".format("Total Samples:", total_samples))
+            f.write("\n{:<20} {}".format("Total Predictions:", sum(predictions_counter.values())))
+            f.write("\n{:<20} {:.4f}".format("Client Evaluation Time:", time.time() - client_eval_time))
+            f.write("\n")
+            f.write("\n")
+
+    print("Results saved to accuracy_report.txt")
 
 def get_weights(net):
     return [val.cpu().numpy() for _, val in net.state_dict().items()]
