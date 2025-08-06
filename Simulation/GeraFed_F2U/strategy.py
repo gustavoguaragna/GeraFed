@@ -302,14 +302,14 @@ class GeraFed(Strategy):
             print(f"Modelo alvo salvo em {save_path}")
 
             # Define os pesos do modelo
-            disc_ndarrays = [parameters_to_ndarrays(fit_res.parameters) for _, fit_res in results]
+            disc_ndarrays = [parameters_to_ndarrays(fit_res.metrics["disc"]) for _, fit_res in results]
             if self.gan_arq == "simple_cnn":
                 discs = [CGAN().to(self.device) for _ in range(len(disc_ndarrays))]
             elif self.gan_arq == "f2u_gan":
                 discs = [F2U_GAN().to(self.device) for _ in range(len(disc_ndarrays))]
             for i, disc in enumerate(discs):
                 set_weights(disc, disc_ndarrays[i])
-                
+
             train_G(
             net=self.gen,
             discs=discs,
@@ -319,6 +319,7 @@ class GeraFed(Strategy):
             latent_dim=self.latent_dim,
             batch_size=1
             )
+
             model_path = f"modelo_gen_round_{server_round}_mnist.pt"
             save_path = f"{self.folder}/{model_path}"
             torch.save(self.gen.state_dict(), save_path)
@@ -327,72 +328,7 @@ class GeraFed(Strategy):
                 figura = generate_plot(net=self.gen, device=self.device, round_number=server_round/100, server=True, latent_dim=self.latent_dim)
                 figura.savefig(f"{self.folder}/mnist_CGAN_e{server_round/100}_{1}b_{self.latent_dim}z_4c_{self.lr_gen}lr_niid_01dir_f2u.png")
 
-            ndarrays = get_weights(self.gen)
-            parameters_aggregated_gen = ndarrays_to_parameters(ndarrays)
-            self.parameters_gen = parameters_aggregated_gen
-            
-            return parameters_aggregated_gen, metrics_aggregated
-        
-        else:
-            if server_round % 100 == 0:
-                # Salva o modelo após a agregação
-                ndarrays = parameters_to_ndarrays(parameters_aggregated_alvo)
-                # Cria uma instância do modelo
-                model = Net()
-                # Define os pesos do modelo
-                set_weights(model, ndarrays)
-                # Salva o modelo no disco com o nome específico do dataset
-                model_path = f"modelo_alvo_round_{server_round/100}_mnist.pt"
-                save_path = f"{self.folder}/{model_path}"
-                torch.save(model.state_dict(), save_path)
-                print(f"Modelo alvo salvo em {save_path}")
-
-            if self.agg == "full":
-                # Salva o modelo após a agregaçãO
-                ndarrays = parameters_to_ndarrays(parameters_aggregated_gen)
-                # Cria uma instância do modelo
-                model = CGAN(dataset=self.dataset,
-                            img_size=self.img_size,
-                            latent_dim=self.latent_dim)
-                # Define os pesos do modelo
-                set_weights(model, ndarrays)
-                # Salva o modelo no disco com o nome específico do dataset
-                model_path = f"modelo_gen_round_{server_round}_mnist.pt"
-                save_path = f"{self.folder}/{model_path}"
-                torch.save(model.state_dict(), save_path)
-                print(f"Modelo gen salvo em {save_path}")
-            elif self.agg == "f2a":
-                self.net
-                # Define os pesos do modelo
-                disc_ndarrays = [parameters_to_ndarrays(fit_res.parameters) for _, fit_res in results_gen]
-                if self.gan_arq == "simple_cnn":
-                    discs = [CGAN().to(self.device) for _ in range(len(disc_ndarrays))]
-                elif self.gan_arq == "f2u_gan":
-                    discs = [F2U_GAN().to(self.device) for _ in range(len(disc_ndarrays))]
-                for i, disc in enumerate(discs):
-                    set_weights(disc, disc_ndarrays[i])
-                train_G(
-                net=self.gen,
-                discs=discs,
-                epochs=20,
-                lr=self.lr_gen,
-                device=self.device,
-                latent_dim=self.latent_dim,
-                batch_size=1
-                )
-                if server_round % 100 == 0:
-                    model_path = f"modelo_gen_round_{server_round}_mnist.pt"
-                    save_path = f"{self.folder}/{model_path}"
-                    torch.save(self.gen.state_dict(), save_path)
-                    print(f"Modelo gen salvo em {save_path}")
-                    figura = generate_plot(net=self.gen, device=self.device, round_number=server_round, server=True, latent_dim=self.latent_dim)
-                    figura.savefig(f"{self.folder}/mnist_CGAN_r{server_round}_{2}e_{128}b_{self.latent_dim}z_4c_{self.lr_gen}lr_niid_01dir_f2a.png")
-
-                ndarrays = get_weights(self.gen)
-                parameters_aggregated_gen = ndarrays_to_parameters(ndarrays)
-                self.parameters_gen = parameters_aggregated_gen
-
-        return parameters_aggregated_alvo, metrics_aggregated
+            return parameters_aggregated, metrics_aggregated
 
 
 
@@ -416,30 +352,23 @@ class GeraFed(Strategy):
                 for _, evaluate_res in results
             ]
         )
-        if self.model != "gen":
-            accuracies = [
-                evaluate_res.metrics["accuracy"] * evaluate_res.num_examples
-                for _, evaluate_res in results
-            ]
-            examples = [evaluate_res.num_examples for _, evaluate_res in results]
-            accuracy_aggregated = (
-                sum(accuracies) / sum(examples) if sum(examples) != 0 else 0
-            )
+        accuracies = [
+            evaluate_res.metrics["accuracy"] * evaluate_res.num_examples
+            for _, evaluate_res in results
+        ]
+        examples = [evaluate_res.num_examples for _, evaluate_res in results]
+        accuracy_aggregated = (
+            sum(accuracies) / sum(examples) if sum(examples) != 0 else 0
+        )
 
-            loss_file = f"Log_files/losses.txt"
-            with open(loss_file, "a") as f:
-                f.write(f"Rodada {server_round}, Perda: {loss_aggregated}, Acuracia: {accuracy_aggregated}\n")
-            print(f"Perda da rodada {server_round} salva em {loss_file}")
+        loss_file = f"Log_files/losses.txt"
+        with open(loss_file, "a") as f:
+            f.write(f"Rodada {server_round}, Perda: {loss_aggregated}, Acuracia: {accuracy_aggregated}\n")
+        print(f"Perda da rodada {server_round} salva em {loss_file}")
 
 
-            # Aggregate custom metrics if aggregation fn was provided
-            metrics_aggregated = {"loss": loss_aggregated, "accuracy": accuracy_aggregated}
-        else:
-            metrics_aggregated = {}
-        if self.evaluate_metrics_aggregation_fn:
-            eval_metrics = [(res.num_examples, res.metrics) for _, res in results]
-            metrics_aggregated = self.evaluate_metrics_aggregation_fn(eval_metrics)
-        elif server_round == 1:  # Only log this warning once
-            log(WARNING, "No evaluate_metrics_aggregation_fn provided")
+        # Aggregate custom metrics if aggregation fn was provided
+        metrics_aggregated = {"loss": loss_aggregated, "accuracy": accuracy_aggregated}
+    
         return loss_aggregated, metrics_aggregated
 

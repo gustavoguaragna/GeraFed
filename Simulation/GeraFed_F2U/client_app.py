@@ -166,47 +166,10 @@ class FlowerClient(NumPyClient):
         )
 
     def evaluate(self, parameters, config):
-        if self.model == "gen":
-            """Evaluate the model on the data this client has."""
-            if self.agg == "full":
-                set_weights(self.net_gen, parameters)
-            elif self.agg == "disc":
-                # Supondo que net seja o modelo e parameters seja a lista de parâmetros fornecida
-                state_keys = [k for k in self.net_gen.state_dict().keys() if 'generator' not in k]
-            
-                # Criando o OrderedDict com as chaves filtradas e os parâmetros fornecidos
-                disc_dict = OrderedDict({k: torch.tensor(v) for k, v in zip(state_keys, parameters)})
 
-                state_dict = {}
-                # Extract record from context
-                if "net_parameters" in self.client_state.parameters_records:
-                    p_record = self.client_state.parameters_records["net_parameters"]
-
-                    # Deserialize arrays
-                    for k, v in p_record.items():
-                        state_dict[k] = torch.from_numpy(v.numpy())
-
-                    # Apply state dict to a new model instance
-                    model_ = CGAN()
-                    model_.load_state_dict(state_dict)
-
-                    new_state_dict = {}
-
-                    for name, param in self.net_gen.state_dict().items():
-                        if 'generator' in name:
-                            new_state_dict[name] = model_.state_dict()[name]
-                        elif 'discriminator' in name or 'label' in name:
-                            new_state_dict[name] = disc_dict[name]
-                        else:
-                            new_state_dict[name] = param
-
-                    self.net_gen.load_state_dict(new_state_dict)
-            g_loss, d_loss = test(self.net_gen, self.valloader, self.device, model=self.model)
-            return g_loss, len(self.valloader), {}
-        else:
-            set_weights(self.net_alvo, parameters)
-            loss, accuracy = test(self.net_alvo, self.valloader, self.device, model=self.model)
-            return loss, len(self.valloader.dataset), {"accuracy": accuracy}
+        set_weights(self.net_alvo, parameters)
+        loss, accuracy = test(self.net_alvo, self.testloader, self.device, model=self.model)
+        return loss, len(self.testloader.dataset), {"accuracy": accuracy}
 
 
 
