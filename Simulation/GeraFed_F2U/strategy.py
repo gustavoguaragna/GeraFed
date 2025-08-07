@@ -330,7 +330,19 @@ class GeraFed(Strategy):
             model_path = f"modelo_gen_round_{server_round}_mnist.pt"
             save_path = f"{self.folder}/{model_path}"
             torch.save(self.gen.state_dict(), save_path)
-            print(f"Modelo gen salvo em {save_path}")
+            checkpoint = {
+                'epoch': epoch+1,  # número da última época concluída
+                'alvo_state_dict': global_net.state_dict(),
+                'optimizer_alvo_state_dict': [optim.state_dict() for optim in optims],
+                'gen_state_dict': gen.state_dict(),
+                'optim_G_state_dict': optim_G.state_dict(),
+                'discs_state_dict': [model.state_dict() for model in models],
+                'optim_Ds_state_dict:': [optim_d.state_dict() for optim_d in optim_Ds]
+            }
+            checkpoint_file = f"checkpoint_epoch{epoch+1}.pth"
+            torch.save(checkpoint, checkpoint_file)
+            print(f"Checkpoint saved to {checkpoint_file}")
+
             if server_round % 100 == 0:
                 figura = generate_plot(net=self.gen, device=self.device, round_number=server_round/100, server=True, latent_dim=self.latent_dim)
                 figura.savefig(f"{self.folder}/mnist_CGAN_e{server_round/100}_{1}b_{self.latent_dim}z_4c_{self.lr_gen}lr_niid_01dir_f2u.png")

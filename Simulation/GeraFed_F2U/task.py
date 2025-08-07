@@ -425,12 +425,14 @@ def load_data(partition_id: int,
               num_partitions: int,  
               alpha_dir: float, 
               batch_size: int,
+              folder : str = ".",
               filter_classes=None,
               teste: bool = False,
               partitioner_type: str = "IID",
               num_chunks: int = 1,
               syn_samples: int = 0,
-              gan: Optional[nn.Module] = None) -> tuple[DataLoader, Optional[DataLoader], DataLoader, DataLoader]:
+              gan: Optional[nn.Module] = None,
+              round: int = 0) -> tuple[DataLoader, Optional[DataLoader], DataLoader, DataLoader]:
     
     """Carrega MNIST com splits de treino e teste separados. Se syn_samples > 0, inclui dados gerados."""
    
@@ -517,7 +519,7 @@ def load_data(partition_id: int,
         )
 
         # Cria a pasta de saída se não existir
-        os.makedirs("syn_samples", exist_ok=True)
+        os.makedirs(f"{folder}/syn_samples", exist_ok=True)
         # Escolhe até 5 índices aleatórios dentro do tamanho do dataset
         num_to_save = min(5, len(generated_dataset))
         sample_idxs = random.sample(range(len(generated_dataset)), num_to_save)
@@ -527,7 +529,7 @@ def load_data(partition_id: int,
             img = sample["image"]       # tensor C×H×W
             lbl = sample["label"]       # inteiro
             # Aqui você pode incluir qualquer informação no nome do arquivo
-            filename = f"syn_samples/syn_img_{i:02d}_idx{idx}_lbl{lbl}_r{round}.png"
+            filename = f"syn_samples/r{round}_img_{i:02d}_lbl{lbl}.png"
             save_image(img, filename)
 
         train_partition = ConcatDataset([client_dataset["train"], generated_dataset])

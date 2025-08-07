@@ -101,7 +101,9 @@ class FlowerClient(NumPyClient):
                                 teste=self.teste,
                                 num_chunks=self.num_chunks,
                                 syn_samples=num_syn,
-                                gan=self.net_gen,)
+                                gan=self.net_gen,
+                                round=config["round"],
+                                folder=self.folder)
 
         # Atualiza pesos do modelo classificador
         set_weights(self.net_alvo, parameters)
