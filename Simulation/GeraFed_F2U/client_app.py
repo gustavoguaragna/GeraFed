@@ -7,8 +7,7 @@ from Simulation.GeraFed_F2U.task import (
     Net, 
     CGAN, 
     F2U_GAN,
-    get_weights, 
-    get_weights_gen, 
+    get_weights,
     load_data, 
     set_weights, 
     test, 
@@ -20,7 +19,7 @@ import random
 import numpy as np
 import math
 from flwr.common.typing import UserConfigValue
-import time
+##import time
 import pickle
 
 SEED = 42
@@ -116,7 +115,7 @@ class FlowerClient(NumPyClient):
             trainloader_syn_chunk = trainloader_syn
 
         # Treina o modelo classificador
-        train_alvo_start_time = time.time()
+        ##train_alvo_start_time = time.time()
         train_loss = train_alvo(
             net=self.net_alvo,
             trainloader=trainloader_syn_chunk,
@@ -124,7 +123,7 @@ class FlowerClient(NumPyClient):
             lr=self.lr_alvo,
             device=self.device,
         )
-        train_classifier_time  = time.time() - train_alvo_start_time
+        ##train_classifier_time  = time.time() - train_alvo_start_time
 
         # Cria state_dict para a disc
         state_dict = {}
@@ -146,9 +145,9 @@ class FlowerClient(NumPyClient):
         else:
             trainloader_real_chunk = trainloader_real
 
-        train_gen_start_time = time.time()
+        ##train_gen_start_time = time.time()
         # Treina o modelo generativo
-        train_gen(
+        avg_d_loss = train_gen(
         disc=self.net_disc,
         gen=self.net_gen,
         trainloader=trainloader_real_chunk,
@@ -158,7 +157,7 @@ class FlowerClient(NumPyClient):
         dataset=self.dataset,
         latent_dim=self.latent_dim
         )
-        train_gen_time = time.time() - train_gen_start_time
+        ##train_gen_time = time.time() - train_gen_start_time
 
         # Save all elements of the state_dict into a single RecordSet
         p_record = ParametersRecord()
@@ -176,8 +175,9 @@ class FlowerClient(NumPyClient):
         len(trainloader_syn_chunk.dataset),
         {"train_loss": train_loss,
          "disc": pickle.dumps(disc_params),
-         "tempo_treino_alvo": train_classifier_time,
-         "tempo_treino_gen": train_gen_time
+         "avg_d_loss": avg_d_loss
+         ##"tempo_treino_alvo": train_classifier_time,
+         ##"tempo_treino_gen": train_gen_time
         },
         )
 
@@ -192,18 +192,31 @@ class FlowerClient(NumPyClient):
                                 teste=self.teste)
 
         set_weights(self.net_alvo, parameters)
+        ##test_time_start = time.time()
+        # Avalia o modelo classificador
         loss, accuracy = test(self.net_alvo, testloader, self.device, model=self.model)
+        ##test_time = time.time() - test_time_start
 
-        if config["round"] % self.num_chunks == 0 or config["round"] == 1:
+
+        test_local = config["round"] % self.num_chunks == 0 or config["round"] == 1
+        if test_local:
+            ##local_test_start_time = time.time()
+            # Avalia o modelo classificador localmente
             local_test(net=self.net_alvo,
                     testloader=local_testloader,
                     device=self.device,
                     acc_filepath=f"{self.folder}/accuracy_report.txt",
-                    epoch=int(config["round"]/10),
+                    epoch=int(config["round"]/self.num_chunks),
                     cliente=self.cid)
+            ##local_test_time = time.time() - local_test_start_time
 
-        return loss, len(testloader.dataset), {"accuracy": accuracy}
-
+        return (loss,
+                len(testloader.dataset),
+                {"accuracy": accuracy,
+                 ##"test_time": test_time,
+                 ##"local_test_time": local_test_time if test_local else None
+                 }
+            )
 
 
 def client_fn(context: Context):

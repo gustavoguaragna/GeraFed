@@ -647,6 +647,9 @@ def train_gen(gen, disc, trainloader, epochs, lr, device, dataset="mnist", laten
                 print('Epoch {} [{}/{}] loss_D_treino: {:.4f}'.format(
                         epoch, batch_idx, len(trainloader),
                         d_loss.mean().item())) 
+    avg_d_loss = np.mean(d_losses)
+    return avg_d_loss            
+        
                 
 def train_G(net: nn.Module, discs: list, device: str, lr: float, epochs: int, batch_size: int, latent_dim: int):
     net.to(device)  # move model to GPU if available

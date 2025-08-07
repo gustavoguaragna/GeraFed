@@ -109,6 +109,7 @@ class GeraFed(Strategy):
         teste: bool = False,
         lr_gen: float = 0.0001,
         folder: str = ".",
+        num_chunks: int = 1
     ) -> None:
         super().__init__()
 
@@ -158,6 +159,8 @@ class GeraFed(Strategy):
                         "net_acc_chunk": [],
                         "time_chunk": []
                         }
+        self.num_chunks = num_chunks
+        self.freq_save = self.num_chunks // 10 if self.num_chunks >= 10 else 1
             
     def __repr__(self) -> str:
         """Compute a string representation of the strategy."""
@@ -326,26 +329,28 @@ class GeraFed(Strategy):
             latent_dim=self.latent_dim,
             batch_size=1
             )
+            # if server_round % self.num_chunks == 0 or server_round == 1:
+            #     net = Net().to(self.device)
+            #     set_weights(net, aggregated_ndarrays)
+            #     checkpoint = {
+            #         'epoch': int(server_round/self.num_chunks)+1,  # número da última época concluída
+            #         'alvo_state_dict': net.state_dict(),
+            #         'optimizer_alvo_state_dict': [optim.state_dict() for optim in optims],
+            #         'gen_state_dict': gen.state_dict(),
+            #         'optim_G_state_dict': optim_G.state_dict(),
+            #         'discs_state_dict': [model.state_dict() for model in models],
+            #         'optim_Ds_state_dict:': [optim_d.state_dict() for optim_d in optim_Ds]
+            #     }
+            #     checkpoint_file = f"checkpoint_epoch{epoch+1}.pth"
+            #     torch.save(checkpoint, checkpoint_file)
+            #     print(f"Checkpoint saved to {checkpoint_file}")
 
-            model_path = f"modelo_gen_round_{server_round}_mnist.pt"
-            save_path = f"{self.folder}/{model_path}"
-            torch.save(self.gen.state_dict(), save_path)
-            checkpoint = {
-                'epoch': epoch+1,  # número da última época concluída
-                'alvo_state_dict': global_net.state_dict(),
-                'optimizer_alvo_state_dict': [optim.state_dict() for optim in optims],
-                'gen_state_dict': gen.state_dict(),
-                'optim_G_state_dict': optim_G.state_dict(),
-                'discs_state_dict': [model.state_dict() for model in models],
-                'optim_Ds_state_dict:': [optim_d.state_dict() for optim_d in optim_Ds]
-            }
-            checkpoint_file = f"checkpoint_epoch{epoch+1}.pth"
-            torch.save(checkpoint, checkpoint_file)
-            print(f"Checkpoint saved to {checkpoint_file}")
 
-            if server_round % 100 == 0:
-                figura = generate_plot(net=self.gen, device=self.device, round_number=server_round/100, server=True, latent_dim=self.latent_dim)
-                figura.savefig(f"{self.folder}/mnist_CGAN_e{server_round/100}_{1}b_{self.latent_dim}z_4c_{self.lr_gen}lr_niid_01dir_f2u.png")
+            # self.metrics_dict["net_loss_chunk"].append()
+                
+
+
+                
 
             return parameters_aggregated, metrics_aggregated
 
@@ -388,6 +393,11 @@ class GeraFed(Strategy):
 
         # Aggregate custom metrics if aggregation fn was provided
         metrics_aggregated = {"loss": loss_aggregated, "accuracy": accuracy_aggregated}
+
+        # if server_round % self.freq_save == 0 or server_round in (1, self.num_chunks):
+        #     figura = generate_plot(net=self.gen, device=self.device, round_number=server_round/100, server=True, latent_dim=self.latent_dim)
+        #         figura.savefig(f"{self.folder}/mnist_CGAN_e{server_round/100}_{1}b_{self.latent_dim}z_4c_{self.lr_gen}lr_niid_01dir_f2u.png")
+
     
         return loss_aggregated, metrics_aggregated
 

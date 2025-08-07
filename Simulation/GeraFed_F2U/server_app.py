@@ -32,6 +32,7 @@ def server_fn(context: Context):
     gan_arq = context.run_config["gan_arq"]
     teste = context.run_config["teste"]
     folder = context.run_config["Exp_name_folder"]
+    num_chunks = context.run_config["num_chunks"]
     os.makedirs(folder, exist_ok=True)
     
     # Initialize model parameters
@@ -59,7 +60,8 @@ def server_fn(context: Context):
         latent_dim=latent_dim,
         gan_arq=gan_arq,
         teste=teste,
-        folder=folder
+        folder=folder,
+        num_chunks=num_chunks
     )
     config = ServerConfig(num_rounds=num_rounds)
 
