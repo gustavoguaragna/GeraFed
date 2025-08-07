@@ -376,13 +376,19 @@ class GeraFed(Strategy):
                 for _, evaluate_res in results
             ]
         )
-        accuracies = [
-            evaluate_res.metrics["accuracy"] * evaluate_res.num_examples
-            for _, evaluate_res in results
-        ]
-        examples = [evaluate_res.num_examples for _, evaluate_res in results]
-        accuracy_aggregated = (
-            sum(accuracies) / sum(examples) if sum(examples) != 0 else 0
+        # accuracies = [
+        #     evaluate_res.metrics["accuracy"] * evaluate_res.num_examples
+        #     for _, evaluate_res in results
+        # ]
+        # examples = [evaluate_res.num_examples for _, evaluate_res in results]
+        # accuracy_aggregated = (
+        #     sum(accuracies) / sum(examples) if sum(examples) != 0 else 0
+        # )
+        accuracy_aggregated = weighted_loss_avg(
+            [
+                (evaluate_res.num_examples, evaluate_res.metrics["accuracy"])
+                for _, evaluate_res in results
+            ]
         )
 
         loss_file = f"Log_files/losses.txt"
