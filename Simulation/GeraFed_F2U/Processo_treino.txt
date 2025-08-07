@@ -11,10 +11,12 @@
 11. Um dos clientes testa o desempenho do modelo classificador no conjunto de teste global e salva os resultados.
 
 COISAS QUE ESTOU DEIXANDO PARA DEPOIS:
+ajeitar nome ao salvar imagem sintetica encorporada ao dataset
  Adicionar calculo dos tempos de computacao e por rodada.
  Salvar todos os logs, tempo, loss classificador, loss gen e disc, acc global e local
  Parametrizar epocas extra gen
  Handling de batch size 1.
+ separar classe de gerador e discriminador ja que estao sempre desconectadas, assim reduz parametros enviados na rede
  Corrigir erros Pylance
  Docstrings para funcoes
  padronizar lingua

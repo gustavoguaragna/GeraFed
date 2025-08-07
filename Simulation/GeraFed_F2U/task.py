@@ -822,6 +822,7 @@ def set_weights(net, parameters):
     state_dict = OrderedDict({k: torch.tensor(v).to(device) for k, v in params_dict})
     net.load_state_dict(state_dict, strict=True)
 
+
 # FID
 
 def _inception_v3(*args, **kwargs):

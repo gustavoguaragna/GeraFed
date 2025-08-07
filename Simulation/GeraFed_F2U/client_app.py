@@ -167,7 +167,7 @@ class FlowerClient(NumPyClient):
         self.client_state.parameters_records["net_parameters"] = p_record
 
 
-        disc_params = get_weights_gen(self.net_disc)
+        disc_params = get_weights(self.net_disc)
         
         return (
         get_weights(self.net_alvo),

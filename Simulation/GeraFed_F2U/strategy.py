@@ -19,7 +19,15 @@ from flwr.server.client_proxy import ClientProxy
 
 from flwr.server.strategy.aggregate import aggregate, aggregate_inplace, weighted_loss_avg
 
-from Simulation.GeraFed_F2U.task import Net, CGAN, F2U_GAN, set_weights, train_G, get_weights, generate_plot
+from Simulation.GeraFed_F2U.task import (
+    Net,
+    CGAN,
+    F2U_GAN,
+    set_weights,
+    train_G,
+    get_weights,
+    generate_plot
+)
 import torch
 import pickle
 
@@ -301,7 +309,7 @@ class GeraFed(Strategy):
             print(f"Modelo alvo salvo em {save_path}")
 
             # Define os pesos do modelo
-            disc_ndarrays = [parameters_to_ndarrays(pickle.loads(fit_res.metrics["disc"])) for _, fit_res in results]
+            disc_ndarrays = [pickle.loads(fit_res.metrics["disc"]) for _, fit_res in results]
             if self.gan_arq == "simple_cnn":
                 discs = [CGAN().to(self.device) for _ in range(len(disc_ndarrays))]
             elif self.gan_arq == "f2u_gan":
