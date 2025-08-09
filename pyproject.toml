@@ -23,30 +23,31 @@ packages = ["."]
 publisher = "gustavoguaragna"
 
 [tool.flwr.app.components]
-serverapp = "Simulation.server_app:app"
-clientapp = "Simulation.client_app:app"
+serverapp = "Simulation.GeraFed_F2U.server_app:app"
+clientapp = "Simulation.GeraFed_F2U.client_app:app"
 
 [tool.flwr.app.config]
-num_rodadas = 10000
-fraction_fit_alvo = 1.0
-fraction_fit_gen = 1.0
-tam_ruido = 128
-tam_batch = 32
-tam_img = 28
-epocas_alvo = 1
-epocas_gen = 1
-learn_rate_alvo = 0.001
-learn_rate_gen = 0.0002
-dataset = "mnist"
-partitioner = "Dir" # 'Dir', 'IID' (IID no else)
-alpha_dir = 0.1
-agg = "f2a" # 'disc', 'full', 'f2a', 'none'
-num_chunks = 100 
-model = "both" # 'alvo', 'gen', 'both'
-gan_arq = "f2u_gan" # 'simple_cnn'
-fid = false
-teste = false
-Exp_name_folder = "Experimentos/F2U_4c_NIID01Dir"
+agg                  = "full"        # 'disc', 'full', 'f2a', 'none'
+alpha_dir            = 0.1
+dataset              = "mnist"
+epocas_alvo          = 1
+epocas_gen           = 1
+Exp_name_folder      = "Experimentos/Flwr_run/GeraFed_F2U_4c_NIID_Class"
+fid                  = false
+fraction_fit_alvo    = 1.0
+fraction_fit_gen     = 1.0
+gan_arq              = "f2u_gan"    # 'simple_cnn'
+learn_rate_alvo      = 0.001
+learn_rate_gen       = 0.0002
+model                = "both"       # 'alvo', 'gen', 'both'
+num_chunks           = 2
+num_rodadas          = 4
+partitioner          = "Class"        # 'Class', 'Dir', 'IID' (IID no else)
+tam_batch            = 32
+tam_img              = 28
+tam_ruido            = 128
+teste                = true
+
 xgb_params.objective = "binary:logistic"
 xgb_params.eta = 0.1 # Learning rate
 xgb_params.max-depth = 8
@@ -61,6 +62,6 @@ default = "local-simulation"
 
 [tool.flwr.federations.local-simulation]
 options.num-supernodes = 4
-options.backend.client-resources.num-cpus = 1
-options.backend.client-resources.num-gpus = 0.25
+options.backend.client-resources.num-cpus = 4
+options.backend.client-resources.num-gpus = 0
 

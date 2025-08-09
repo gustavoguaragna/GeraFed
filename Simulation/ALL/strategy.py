@@ -26,6 +26,7 @@ from Simulation.task import Net, CGAN, F2U_GAN, set_weights, train_G, get_weight
 import torch
 import numpy as np
 import json
+import pickle
 
 WARNING_MIN_AVAILABLE_CLIENTS_TOO_LOW = """
     Setting `min_available_clients` lower than `min_fit_clients` or
@@ -109,6 +110,7 @@ class GeraFed(Strategy):
         teste: bool = False,
         lr_gen: float = 0.0001,
         folder: str = ".",
+        save_local_resources: bool = True
     ) -> None:
         super().__init__()
 
@@ -155,6 +157,14 @@ class GeraFed(Strategy):
             self.gen = F2U_GAN(dataset=self.dataset,
                             img_size=self.img_size,
                             latent_dim=self.latent_dim).to(self.device)
+        self.metrics_dict = {
+                        "g_losses_chunk": [],
+                        "d_losses_chunk": [],
+                        "net_loss_chunk": [],
+                        "net_acc_chunk": [],
+                        "time_chunk": []
+                        }
+        self.save_local_resources = save_local_resources
             
     def __repr__(self) -> str:
         """Compute a string representation of the strategy."""
@@ -211,7 +221,6 @@ class GeraFed(Strategy):
         self, server_round: int, parameters: Parameters, client_manager: ClientManager
     ) -> list[tuple[ClientProxy, FitIns]]:
         """Configure the next round of training."""
-        config = {}
         if self.on_fit_config_fn is not None:
             # Custom fit config function provided
             config = self.on_fit_config_fn(server_round)
@@ -228,10 +237,14 @@ class GeraFed(Strategy):
         fids = []
         if self.model == "both":
             print("MODEL BOTH")
-            sorted_clients = sorted(clients, key=lambda c: self.client_counter[c])
-            metade = len(clients) // 2
-            conjunto_gen = sorted_clients[:metade]
-            conjunto_alvo = sorted_clients[metade:]
+            if self.save_local_resources:
+                sorted_clients = sorted(clients, key=lambda c: self.client_counter[c])
+                metade = len(clients) // 2
+                conjunto_gen = sorted_clients[:metade]
+                conjunto_alvo = sorted_clients[metade:]
+            else:
+                conjunto_alvo = clients
+                conjunto_gen = clients
             
             # Calcula FID
             if self.fid:
@@ -287,7 +300,7 @@ class GeraFed(Strategy):
         self.client_counter.update(conjunto_gen)
 
         fit_instructions = []
-        config_alvo = {"modelo": "alvo", "round": server_round}
+        config_alvo = {"modelo": "alvo", "round": server_round, "gan": pickle.dumps(self.gen)}
         config_gen = {"modelo": "gen", "round": server_round, "fids": json.dumps(fids)}
         
         fit_ins_alvo = FitIns(parameters=self.parameters_alvo, config=config_alvo)
@@ -461,7 +474,9 @@ class GeraFed(Strategy):
                 # Salva o modelo após a agregaçãO
                 ndarrays = parameters_to_ndarrays(parameters_aggregated_gen)
                 # Cria uma instância do modelo
-                model = self.gen.__class__()
+                model = CGAN(dataset=self.dataset,
+                            img_size=self.img_size,
+                            latent_dim=self.latent_dim)
                 # Define os pesos do modelo
                 set_weights(model, ndarrays)
                 # Salva o modelo no disco com o nome específico do dataset
@@ -470,6 +485,7 @@ class GeraFed(Strategy):
                 torch.save(model.state_dict(), save_path)
                 print(f"Modelo gen salvo em {save_path}")
             elif self.agg == "f2a":
+                self.net
                 # Define os pesos do modelo
                 disc_ndarrays = [parameters_to_ndarrays(fit_res.parameters) for _, fit_res in results_gen]
                 if self.gan_arq == "simple_cnn":
