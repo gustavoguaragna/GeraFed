@@ -1,31 +1,78 @@
-import os
 import json
+import time
 import torch
+import argparse
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, random_split, Subset
 from torchvision.transforms import Compose, ToTensor, Normalize
-from task import F2U_GAN, generate_plot, ClassPartitioner
+from task import F2U_GAN, F2U_GAN_CIFAR, ClassPartitioner, generate_plot
+from flwr_datasets.partitioner import DirichletPartitioner
 from flwr_datasets import FederatedDataset
 from collections import Counter
 from tqdm import tqdm
 import random
 import math
-import time
+import os
 
+parser = argparse.ArgumentParser(description="F2U Federated GAN Training")
 
+parser.add_argument("--dataset", type=str, choices=["mnist", "cifar10"], default="mnist")
+
+args = parser.parse_args()
+
+dataset = args.dataset
+
+print("Selected dataset:", dataset)
 
 num_partitions = 4
 alpha_dir = 0.1
 
-partitioner = ClassPartitioner(num_partitions=num_partitions, seed=42, label_column="label")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+if dataset == "mnist":
+    partitioner = ClassPartitioner(num_partitions=num_partitions, seed=42, label_column="label")
+    
+    image = "image"
+    
+    pytorch_transforms = Compose([
+    ToTensor(),
+    Normalize((0.5,), (0.5,))
+])
+    models = [F2U_GAN(condition=True, seed=42) for _ in range(num_partitions)]
+    gen = F2U_GAN(condition=True, seed=42).to(device)
+
+elif dataset == "cifar10":
+    partitioner = DirichletPartitioner(
+        num_partitions=num_partitions,
+        partition_by="label",
+        alpha=alpha_dir,
+    min_partition_size=0,
+    self_balancing=False
+)
+    
+    image = "img"
+
+    pytorch_transforms = Compose([
+    ToTensor(),
+    Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+])
+    models = [F2U_GAN_CIFAR(condition=True, seed=42) for _ in range(num_partitions)]
+    gen = F2U_GAN_CIFAR(condition=True, seed=42).to(device)
+
+optim_G = torch.optim.Adam(gen.generator.parameters(), lr=0.0002, betas=(0.5, 0.999))
+optim_Ds = [
+    torch.optim.Adam(model.discriminator.parameters(), lr=0.0002, betas=(0.5, 0.999))
+    for model in models
+]
 
 fds = FederatedDataset(
-    dataset="mnist",
+    dataset=dataset,
     partitioners={"train": partitioner}
 )
 
 train_partitions = [fds.load_partition(i, split="train") for i in range(num_partitions)]
 
+# REDUCE_DATASET
 # num_samples = [int(len(train_partition)/100) for train_partition in train_partitions]
 # train_partitions = [train_partition.select(range(n)) for train_partition, n in zip(train_partitions, num_samples)]
 
@@ -39,13 +86,8 @@ for idx, ds in enumerate(train_partitions):
         if cnt / len(ds) >= min_lbl_count:
             label_to_client[class_labels.int2str(label)].append(idx)
 
-pytorch_transforms = Compose([
-    ToTensor(),
-    Normalize((0.5,), (0.5,))
-])
-
 def apply_transforms(batch):
-    batch["image"] = [pytorch_transforms(img) for img in batch["image"]]
+    batch[image] = [pytorch_transforms(img) for img in batch[image]]
     return batch
 
 train_partitions = [train_partition.with_transform(apply_transforms) for train_partition in train_partitions]
@@ -73,25 +115,13 @@ for train_part in train_partitions:
         "test":  client_test,
     })
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-for num_chunks in [1, 10, 50, 100, 500, 1000, 5000]:
-    seed = 42 
-
-    models = [F2U_GAN(condition=True, seed=seed) for i in range(num_partitions)]
-    gen = F2U_GAN(condition=True, seed=seed).to(device)
-    optim_G = torch.optim.Adam(gen.generator.parameters(), lr=0.0002, betas=(0.5, 0.999))
-
-    optim_Ds = [
-        torch.optim.Adam(model.discriminator.parameters(), lr=0.0002, betas=(0.5, 0.999))
-        for model in models
-    ]
-    
+for num_chunks in [10, 50, 100, 500]:
+    seed = 42  # escolha qualquer inteiro para reprodutibilidade
     client_chunks = []
 
     for train_partition in client_datasets:
-        dataset = train_partition["train"]
-        n = len(dataset)
+        dts = train_partition["train"]
+        n = len(dts)
 
         # 1) embaralha os índices com seed fixa
         indices = list(range(n))
@@ -107,7 +137,7 @@ for num_chunks in [1, 10, 50, 100, 500, 1000, 5000]:
             start = i * chunk_size
             end = min((i + 1) * chunk_size, n)
             chunk_indices = indices[start:end]
-            chunks.append(Subset(dataset, chunk_indices))
+            chunks.append(Subset(dts, chunk_indices))
 
         client_chunks.append(chunks)
 
@@ -136,7 +166,7 @@ for num_chunks in [1, 10, 50, 100, 500, 1000, 5000]:
     latent_dim = 128
     num_classes = 10
  
-    folder = f"num_chunks{num_chunks}"
+    folder = f"{dataset}_numchunks{num_chunks}"
     os.makedirs(folder, exist_ok=True)
     loss_filename = f"{folder}/losses.json"
     dmax_mismatch_log = f"{folder}/dmax_mismatch.txt"
@@ -168,7 +198,7 @@ for num_chunks in [1, 10, 50, 100, 500, 1000, 5000]:
                 # Carregar o bloco atual do cliente
                 chunk_dataset = chunks[chunk_idx]
                 if len(chunk_dataset) == 0:
-                    tqdm.write(f"Chunk {chunk_idx} for client {cliente} is empty, skipping.")
+                    print(f"Chunk {chunk_idx} for client {cliente} is empty, skipping.")
                     continue
                 chunk_loader = DataLoader(chunk_dataset, batch_size=batch_tam, shuffle=True)
 
@@ -180,10 +210,10 @@ for num_chunks in [1, 10, 50, 100, 500, 1000, 5000]:
 
                 start_disc_time = time.time()
                 for batch in chunk_loader:
-                    images, labels = batch["image"].to(device), batch["label"].to(device)
+                    images, labels = batch[image].to(device), batch["label"].to(device)
                     batch_size = images.size(0)
                     if batch_size == 1:
-                        tqdm.write("Batch size is 1, skipping batch")
+                        print("Batch size is 1, skipping batch")
                         continue
 
                     real_ident = torch.full((batch_size, 1), 1., device=device)
@@ -358,7 +388,7 @@ for num_chunks in [1, 10, 50, 100, 500, 1000, 5000]:
                 }
             checkpoint_file = f"{folder}/checkpoint_epoch{epoch+1}.pth"
             torch.save(checkpoint, checkpoint_file)
-            tqdm.write(f"Global net saved to {checkpoint_file}")
+            print(f"Global net saved to {checkpoint_file}")
 
             if f2a:
                 current_lambda_star = lambda_star.item()
@@ -367,7 +397,7 @@ for num_chunks in [1, 10, 50, 100, 500, 1000, 5000]:
                 with open(lambda_log, "a") as f:
                  f.write(f"{current_lambda_star},{current_lam}\n")
 
-        tqdm.write(f"Época {epoch+1} completa")
+        print(f"Época {epoch+1} completa")
         generate_plot(gen, "cpu", epoch+1, latent_dim=128, folder=folder)
         gen.to(device)
 
@@ -376,6 +406,6 @@ for num_chunks in [1, 10, 50, 100, 500, 1000, 5000]:
         try:
             with open(loss_filename, 'w', encoding='utf-8') as f:
                 json.dump(losses_dict, f, ensure_ascii=False, indent=4) # indent makes it readable
-            tqdm.write(f"Losses dict successfully saved to {loss_filename}")
+            print(f"Losses dict successfully saved to {loss_filename}")
         except Exception as e:
-            tqdm.write(f"Error saving losses dict to JSON: {e}")
+            print(f"Error saving losses dict to JSON: {e}")

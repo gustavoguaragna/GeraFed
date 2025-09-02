@@ -29,7 +29,27 @@ class Net(nn.Module):
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
         return x
+    
+class Net_Cifar(nn.Module):
+    def __init__(self,seed=None):
+        if seed is not None:
+          torch.manual_seed(seed)
+        super().__init__()
+        self.conv1 = nn.Conv2d(3, 6, 5)
+        self.pool = nn.MaxPool2d(2, 2)
+        self.conv2 = nn.Conv2d(6, 16, 5)
+        self.fc1 = nn.Linear(16 * 5 * 5, 120)
+        self.fc2 = nn.Linear(120, 84)
+        self.fc3 = nn.Linear(84, 10)
 
+    def forward(self, x):
+        x = self.pool(F.relu(self.conv1(x)))
+        x = self.pool(F.relu(self.conv2(x)))
+        x = torch.flatten(x, 1) # flatten all dimensions except batch
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
+        return x
 
 class F2U_GAN(nn.Module):
     def __init__(self, dataset="mnist", img_size=28, latent_dim=128, condition=True, seed=None):
@@ -116,6 +136,112 @@ class F2U_GAN(nn.Module):
 
     def loss(self, output, label):
         return self.adv_loss(output, label)
+    
+class F2U_GAN_CIFAR(nn.Module):
+    def __init__(self, img_size=32, latent_dim=128, condition=True, seed=None):
+        if seed is not None:
+          torch.manual_seed(seed)
+        super(F2U_GAN_CIFAR, self).__init__()
+        self.img_size = img_size
+        self.latent_dim = latent_dim
+        self.classes = 10
+        self.channels = 3
+        self.condition = condition
+
+        # Embedding para condicionamento
+        self.label_embedding = nn.Embedding(self.classes, self.classes) if self.condition else None
+
+        # Shapes de entrada
+        self.input_shape_gen = self.latent_dim + (self.classes if self.condition else 0)
+        self.input_shape_disc = self.channels + (self.classes if self.condition else 0)
+
+        # -----------------
+        #  Generator
+        # -----------------
+        self.generator = nn.Sequential(
+            nn.Linear(self.input_shape_gen, 512 * 4 * 4),
+            nn.ReLU(inplace=True),
+            nn.Unflatten(1, (512, 4, 4)),                  # → (512,4,4)
+
+            nn.ConvTranspose2d(512, 256, kernel_size=4, stride=2, padding=1),  # → (256,8,8)
+            nn.BatchNorm2d(256, momentum=0.1),
+            nn.ReLU(inplace=True),
+
+            nn.ConvTranspose2d(256, 128, kernel_size=4, stride=2, padding=1),  # → (128,16,16)
+            nn.BatchNorm2d(128, momentum=0.1),
+            nn.ReLU(inplace=True),
+
+            nn.ConvTranspose2d(128,  64, kernel_size=4, stride=2, padding=1),  # → ( 64,32,32)
+            nn.BatchNorm2d(64,  momentum=0.1),
+            nn.ReLU(inplace=True),
+
+            nn.ConvTranspose2d( 64,   self.channels, kernel_size=3, stride=1, padding=1),  # → (3,32,32)
+            nn.Tanh()
+        )
+
+        # -----------------
+        #  Discriminator
+        # -----------------
+        layers = []
+        in_ch = self.input_shape_disc
+        cfg = [
+            ( 64, 3, 1),  # → spatial stays 32
+            ( 64, 4, 2),  # → 16
+            (128, 3, 1),  # → 16
+            (128, 4, 2),  # → 8
+            (256, 4, 2),  # → 4
+        ]
+        for out_ch, k, s in cfg:
+            layers += [
+                nn.utils.spectral_norm(
+                    nn.Conv2d(in_ch, out_ch, kernel_size=k, stride=s, padding=1)
+                ),
+                nn.LeakyReLU(0.1, inplace=True)
+            ]
+            in_ch = out_ch
+
+        layers += [
+            nn.Flatten(),
+            nn.utils.spectral_norm(
+                nn.Linear(256 * 4 * 4, 1)
+            )
+        ]
+        self.discriminator = nn.Sequential(*layers)
+
+        # adversarial loss
+        self.adv_loss = nn.BCEWithLogitsLoss()
+
+    def forward(self, input, labels=None):
+        # Generator pass
+        if input.dim() == 2 and input.size(1) == self.latent_dim:
+            if self.condition:
+                if labels is None:
+                    raise ValueError("Labels must be provided for conditional generation")
+                embedded = self.label_embedding(labels)
+                gen_input = torch.cat((input, embedded), dim=1)
+            else:
+                gen_input = input
+            img = self.generator(gen_input)
+            return img
+
+        # Discriminator pass
+        elif input.dim() == 4 and input.size(1) == self.channels:
+            x = input
+            if self.condition:
+                if labels is None:
+                    raise ValueError("Labels must be provided for conditional discrimination")
+                embedded = self.label_embedding(labels)
+                # criar mapa de labels e concatenar
+                lbl_map = embedded.view(-1, self.classes, 1, 1).expand(-1, self.classes, self.img_size, self.img_size)
+                x = torch.cat((x, lbl_map), dim=1)
+            return self.discriminator(x)
+
+        else:
+            raise ValueError("Input shape not recognized")
+
+    def loss(self, logits, targets):
+        return self.adv_loss(logits.view(-1), targets.float().view(-1))
+
 
 class GeneratedDataset(torch.utils.data.Dataset):
     def __init__(self,
