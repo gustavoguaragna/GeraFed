@@ -2,39 +2,64 @@ import torch
 from torch.utils.data import DataLoader
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
-from task import Net, GeneratedDataset, F2U_GAN
+from task import Net, Net_Cifar, GeneratedDataset, F2U_GAN, F2U_GAN_CIFAR
+import argparse
 import json
+
+parser = argparse.ArgumentParser(description='Train and evaluate model on generated data')
+
+parser.add_argument('--epochs', type=int, default=50, help='number of epochs to train')
+parser.add_argument('--dataset', type=str, default='mnist', choices=['mnist', 'cifar10'])
+parser.add_argument('--num_chunks_list', nargs="+", type=int, default=[1, 10, 50, 100, 500, 1000, 5000])
+parser.add_argument('--epoch_list', nargs="+", type=int, default=[10, 50, 100])
+parser.add_argument('--num_samples', type=int, default=10000)
+
+args = parser.parse_args()
+
+dataset = args.dataset
+num_chunks_list = args.num_chunks_list
+epoch_list = args.epoch_list
+num_samples = args.num_samples
+epochs = args.epochs
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Define a transform to normalize the data
-transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
-# Load the training and test datasets
-testset = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
+if dataset == 'mnist':
+    # Define a transform to normalize the data
+    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
+    # Load the training and test datasets
+    testset = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
+elif dataset == 'cifar10':
+    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+    testset = datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
+
 # Create data loader
 testloader = DataLoader(testset, batch_size=128)
 
 acc_dict = {}
-acc_file = "acc_results.json"
+acc_file = f"chunk_analysis/{dataset}/acc_results_100.json"
 
-for num_chunks in [1, 10, 50, 100, 500, 1000, 5000]:
-    for epoch in [10, 50, 100]:
+for num_chunks in num_chunks_list:
+    for epoch in epoch_list:
         # Initialize the network, optimizer, and loss function
-        net = Net().to(device)
+        if dataset == 'mnist':
+            net = Net().to(device)
+            gen = F2U_GAN()
+        elif dataset == 'cifar10':
+            net = Net_Cifar().to(device)
+            gen = F2U_GAN_CIFAR()
         optim = torch.optim.Adam(net.parameters(), lr=0.01)
         criterion = torch.nn.CrossEntropyLoss()
 
-        num_samples = 10000
         latent_dim = 128
 
-        checkpoint_loaded = torch.load(f"./num_chunks{num_chunks}/checkpoint_epoch{epoch}.pth")
-        gen = F2U_GAN()
+        checkpoint_loaded = torch.load(f"./chunk_analysis/{dataset}/num_chunks{num_chunks}/checkpoint_epoch{epoch}.pth")
         gen.load_state_dict(checkpoint_loaded["gen_state_dict"])
 
         generated_dataset = GeneratedDataset(generator=gen.to("cpu"), num_samples=num_samples, latent_dim=latent_dim, num_classes=10, device="cpu")
         generated_dataloader = DataLoader(generated_dataset, batch_size=64, shuffle=True)
 
-        for _ in range(50):
+        for _ in range(epochs):
             for data in generated_dataloader:
                 inputs, labels = data["image"].to(device), data["label"].to(device)
                 optim.zero_grad()
