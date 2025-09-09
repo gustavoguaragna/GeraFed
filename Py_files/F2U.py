@@ -17,16 +17,26 @@ import os
 parser = argparse.ArgumentParser(description="F2U Federated GAN Training")
 
 parser.add_argument("--dataset", type=str, choices=["mnist", "cifar10"], default="mnist")
+parser.add_argument("--num_chunks_list", nargs="+", type=int, default=[1, 10, 50, 100, 500, 1000, 5000])
+parser.add_argument("--test_mode", action="store_true")
+parser.add_argument("--checkpoint_epoch", type=int, default=None)
+parser.add_argument("--epochs", type=int, default=100)
 
 args = parser.parse_args()
 
 dataset = args.dataset
+num_chunks_list = args.num_chunks_list
+checkpoint_epoch = args.checkpoint_epoch
+
 
 print("Selected dataset:", dataset)
 
 num_partitions = 4
 alpha_dir = 0.1
-
+start_epoch = 0
+epochs = args.epochs
+extra_g_e = 20
+    
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 if dataset == "mnist":
@@ -72,9 +82,13 @@ fds = FederatedDataset(
 
 train_partitions = [fds.load_partition(i, split="train") for i in range(num_partitions)]
 
-# REDUCE_DATASET
-# num_samples = [int(len(train_partition)/100) for train_partition in train_partitions]
-# train_partitions = [train_partition.select(range(n)) for train_partition, n in zip(train_partitions, num_samples)]
+# Test Mode
+if args.test_mode:
+    num_samples = [int(len(train_partition)/100) for train_partition in train_partitions]
+    train_partitions = [train_partition.select(range(n)) for train_partition, n in zip(train_partitions, num_samples)]
+    epochs = 2
+    extra_g_e = 2
+    num_chunks_list = [1, 10]
 
 min_lbl_count = 0.05
 class_labels = train_partitions[0].info.features["label"]
@@ -115,10 +129,22 @@ for train_part in train_partitions:
         "test":  client_test,
     })
 
-for num_chunks in [10, 50, 100, 500]:
+for num_chunks in num_chunks_list:
+    if checkpoint_epoch:
+        checkpoint_loaded = torch.load(f"chunk_analysis/{dataset}/num_chunks{num_chunks}/checkpoint_epoch{checkpoint_epoch}.pth")
+
+        gen.load_state_dict(checkpoint_loaded["gen_state_dict"])
+        gen.to(device)
+        optim_G.load_state_dict(checkpoint_loaded["optim_G_state_dict"])
+
+        for model, optim_d, state_model, state_optim in zip(models, optim_Ds, checkpoint_loaded["discs_state_dict"], checkpoint_loaded["optim_Ds_state_dict:"]):
+            model.load_state_dict(state_model)
+            model.to(device)
+            optim_d.load_state_dict(state_optim)
+        start_epoch = checkpoint_epoch
+
     seed = 42  # escolha qualquer inteiro para reprodutibilidade
     client_chunks = []
-
     for train_partition in client_datasets:
         dts = train_partition["train"]
         n = len(dts)
@@ -146,7 +172,6 @@ for num_chunks in [10, 50, 100, 500]:
 
     wgan = False
     f2a = False
-    epochs = 10
     losses_dict = {"g_losses_chunk": [],
                 "d_losses_chunk": [],
                 "g_losses_round": [],
@@ -158,11 +183,10 @@ for num_chunks in [10, 50, 100, 500]:
                 "track_mismatch_time": []
                 }
 
-    epoch_bar = tqdm(range(0, epochs), desc="Treinamento", leave=True, position=0)
+    epoch_bar = tqdm(range(start_epoch, epochs), desc="Treinamento", leave=True, position=0)
 
     batch_size_gen = 1
     batch_tam = 32
-    extra_g_e = 20
     latent_dim = 128
     num_classes = 10
  
