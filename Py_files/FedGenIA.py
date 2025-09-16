@@ -5,7 +5,7 @@ from collections import OrderedDict, defaultdict
 import torch
 from torchvision.transforms import Compose, ToTensor, Normalize
 from torch.utils.data import DataLoader, random_split, Subset, ConcatDataset
-from aux import F2U_GAN, F2U_GAN_CIFAR, ClassPartitioner, GeneratedDataset, generate_plot, Net, Net_Cifar
+from Py_files.task import F2U_GAN, F2U_GAN_CIFAR, ClassPartitioner, GeneratedDataset, generate_plot, Net, Net_Cifar
 from flwr.common import FitRes, Status, Code, ndarrays_to_parameters
 from flwr.server.strategy.aggregate import aggregate_inplace
 from flwr_datasets.partitioner import DirichletPartitioner
