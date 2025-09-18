@@ -5,7 +5,7 @@ import argparse
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, random_split, Subset
 from torchvision.transforms import Compose, ToTensor, Normalize
-from task import F2U_GAN, F2U_GAN_CIFAR, ClassPartitioner, generate_plot
+from Py_files.task import F2U_GAN, F2U_GAN_CIFAR, ClassPartitioner, generate_plot
 from flwr_datasets.partitioner import DirichletPartitioner
 from flwr_datasets import FederatedDataset
 from collections import Counter
