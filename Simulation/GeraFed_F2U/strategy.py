@@ -30,6 +30,8 @@ from Simulation.GeraFed_F2U.task import (
 )
 import torch
 import pickle
+import time
+import json
 
 WARNING_MIN_AVAILABLE_CLIENTS_TOO_LOW = """
     Setting `min_available_clients` lower than `min_fit_clients` or
@@ -107,9 +109,10 @@ class GeraFed(Strategy):
         latent_dim: int = 100,
         gan_arq: str = "simple_cnn",
         teste: bool = False,
-        lr_gen: float = 0.0001,
+        lr_gen: float = 0.0002,
         folder: str = ".",
-        num_chunks: int = 1
+        num_chunks: int = 1,
+        optim_G = None
     ) -> None:
         super().__init__()
 
@@ -152,15 +155,19 @@ class GeraFed(Strategy):
             self.gen = F2U_GAN(dataset=self.dataset,
                             img_size=self.img_size,
                             latent_dim=self.latent_dim).to(self.device)
+        set_weights(self.gen, self.parameters_gen)
+        self.optim_G = optim_G if optim_G else torch.optim.Adam(self.gen.parameters(), lr=self.lr_gen, betas=(0.5, 0.999))
+        self.optimG_state_dict = self.optim_G.state_dict()
         self.metrics_dict = {
-                        "g_losses_chunk": [],
-                        "d_losses_chunk": [],
+                        "g_loss_chunk": [],
+                        "d_loss_chunk": [],
                         "net_loss_chunk": [],
                         "net_acc_chunk": [],
                         "time_chunk": []
                         }
         self.num_chunks = num_chunks
         self.freq_save = self.num_chunks // 10 if self.num_chunks >= 10 else 1
+
             
     def __repr__(self) -> str:
         """Compute a string representation of the strategy."""
@@ -208,6 +215,7 @@ class GeraFed(Strategy):
         self, server_round: int, parameters: Parameters, client_manager: ClientManager
     ) -> list[tuple[ClientProxy, FitIns]]:
         """Configure the next round of training."""
+        self.init_round_time = time.time()
         if self.on_fit_config_fn is not None:
             # Custom fit config function provided
             config = self.on_fit_config_fn(server_round)
@@ -295,6 +303,8 @@ class GeraFed(Strategy):
         if self.fit_metrics_aggregation_fn:
             fit_metrics = [(res.num_examples, res.metrics) for _, res in results]
             metrics_aggregated = self.fit_metrics_aggregation_fn(fit_metrics)
+            self.metrics_dict["d_loss_chunk"].append(metrics_aggregated["d_loss_chunk"])
+            self.metrics_dict["net_loss_chunk"].append(metrics_aggregated["net_loss_chunk"])
         elif server_round == 1:  # Only log this warning once
             log(WARNING, "No fit_metrics_aggregation_fn provided")
 
@@ -302,33 +312,32 @@ class GeraFed(Strategy):
         if parameters_aggregated is not None:
             # Salva o modelo após a agregação
             # Cria uma instância do modelo
-            model = Net()
+            self.classifier = Net()
             # Define os pesos do modelo
-            set_weights(model, aggregated_ndarrays)
-            # Salva o modelo no disco com o nome específico do dataset
-            model_path = f"modelo_alvo_round_{server_round}_mnist.pt"
-            save_path = f"{self.folder}/{model_path}"
-            torch.save(model.state_dict(), save_path)
-            print(f"Modelo alvo salvo em {save_path}")
+            set_weights(self.classifier, aggregated_ndarrays)
 
             # Define os pesos do modelo
             disc_ndarrays = [pickle.loads(fit_res.metrics["disc"]) for _, fit_res in results]
             if self.gan_arq == "simple_cnn":
-                discs = [CGAN().to(self.device) for _ in range(len(disc_ndarrays))]
+                self.discs = [CGAN().to(self.device) for _ in range(len(disc_ndarrays))]
             elif self.gan_arq == "f2u_gan":
-                discs = [F2U_GAN().to(self.device) for _ in range(len(disc_ndarrays))]
-            for i, disc in enumerate(discs):
+                self.discs = [F2U_GAN().to(self.device) for _ in range(len(disc_ndarrays))]
+            for i, disc in enumerate(self.discs):
                 set_weights(disc, disc_ndarrays[i])
 
-            train_G(
+            g_loss, self.optimG_state_dict = train_G(
             net=self.gen,
-            discs=discs,
+            discs=self.discs,
             epochs=20,
             lr=self.lr_gen,
             device=self.device,
             latent_dim=self.latent_dim,
-            batch_size=1
+            batch_size=1,
+            optim_state_dict=self.optimG_state_dict
             )
+
+            self.metrics_dict["g_loss_chunk"].append(g_loss)
+
             # if server_round % self.num_chunks == 0 or server_round == 1:
             #     net = Net().to(self.device)
             #     set_weights(net, aggregated_ndarrays)
@@ -345,16 +354,23 @@ class GeraFed(Strategy):
             #     torch.save(checkpoint, checkpoint_file)
             #     print(f"Checkpoint saved to {checkpoint_file}")
 
-
             # self.metrics_dict["net_loss_chunk"].append()
-                
 
+            optim_Ds = [pickle.loads(fit_res.metrics["optimD_state_dict"]) for _, fit_res in results]
 
-                
+            if server_round % self.num_chunks == 0:
+                checkpoint = {
+                        'classifier_state_dict': self.classifier.state_dict(),
+                        'gen_state_dict': self.gen.state_dict(),
+                        'optim_G_state_dict': self.optimG_state_dict,
+                        'discs_state_dict': [disc.state_dict() for disc in self.discs],
+                        'optim_Ds_state_dict:': [optimD_state_dict for optimD_state_dict in optim_Ds]
+                    }
+                checkpoint_file = f"{self.folder}/checkpoint_epoch{int(server_round/self.num_chunks)}.pth"
+                torch.save(checkpoint, checkpoint_file)
+                print(f"Global net saved to {checkpoint_file}")
 
             return parameters_aggregated, metrics_aggregated
-
-
 
     def aggregate_evaluate(
         self,
@@ -391,19 +407,25 @@ class GeraFed(Strategy):
             ]
         )
 
-        loss_file = f"Log_files/losses.txt"
-        with open(loss_file, "a") as f:
-            f.write(f"Rodada {server_round}, Perda: {loss_aggregated}, Acuracia: {accuracy_aggregated}\n")
-        print(f"Perda da rodada {server_round} salva em {loss_file}")
+        self.metrics_dict["net_acc_chunk"].append(accuracy_aggregated)
 
 
         # Aggregate custom metrics if aggregation fn was provided
         metrics_aggregated = {"loss": loss_aggregated, "accuracy": accuracy_aggregated}
 
-        # if server_round % self.freq_save == 0 or server_round in (1, self.num_chunks):
-        #     figura = generate_plot(net=self.gen, device=self.device, round_number=server_round/100, server=True, latent_dim=self.latent_dim)
-        #         figura.savefig(f"{self.folder}/mnist_CGAN_e{server_round/100}_{1}b_{self.latent_dim}z_4c_{self.lr_gen}lr_niid_01dir_f2u.png")
+        if server_round % self.num_chunks == 0:
+            figura = generate_plot(net=self.gen, device=self.device, round_number=int(server_round/self.num_chunks), server=True, latent_dim=self.latent_dim)
+            figura.savefig(f"{self.folder}/mnistF2U_r{int(server_round/self.num_chunks)}.png")
 
-    
+        round_time = time.time() - self.init_round_time
+        self.metrics_dict["time_chunk"].append(round_time)
+        metrics_filename = f"{self.folder}/metrics.json"
+        try:
+            with open(metrics_filename, 'w', encoding='utf-8') as f:
+                json.dump(self.metrics_dict, f, ensure_ascii=False, indent=4) # indent makes it readable
+            print(f"Losses dict successfully saved to {metrics_filename}")
+        except Exception as e:
+            print(f"Error saving losses dict to JSON: {e}")
+
         return loss_aggregated, metrics_aggregated
 

@@ -277,17 +277,3 @@ Rodada 18, Perda: 0.40, Acuracia: 0.93
 Rodada 19, Perda: 0.70, Acuracia: 0.92
 Rodada 20, Perda: 0.53, Acuracia: 0.90
 Rodada 21, Perda: 0.40, Acuracia: 0.90
-Rodada 1, Perda: 2.387120539387956, Acuracia: 0.1008
-Rodada 2, Perda: 3.4801246053494586, Acuracia: 0.1443
-Rodada 3, Perda: 4.5267560619134874, Acuracia: 0.1269
-Rodada 4, Perda: 5.584326850720488, Acuracia: 0.1614
-Rodada 5, Perda: 6.3965271136250355, Acuracia: 0.1291
-Rodada 6, Perda: 7.383755490421867, Acuracia: 0.1086
-Rodada 7, Perda: 7.289515729910269, Acuracia: 0.1035
-Rodada 8, Perda: 8.350580814166571, Acuracia: 0.105
-Rodada 9, Perda: 7.207213244879969, Acuracia: 0.0974
-Rodada 10, Perda: 7.763995044147625, Acuracia: 0.1009
-Rodada 1, Perda: 5.580343182475422, Acuracia: 0.1009
-Rodada 2, Perda: 5.653555831970118, Acuracia: 0.1032
-Rodada 3, Perda: 7.718905552507589, Acuracia: 0.1009
-Rodada 4, Perda: 8.649033209767204, Acuracia: 0.1039

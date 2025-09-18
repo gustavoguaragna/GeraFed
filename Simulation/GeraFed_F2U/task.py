@@ -27,15 +27,15 @@ import time
 
 os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
-SEED = 42
-random.seed(SEED)
-np.random.seed(SEED)
-torch.manual_seed(SEED)
-if torch.cuda.is_available():
-    torch.cuda.manual_seed_all(SEED)
-    # Para garantir determinismo total em operações com CUDA
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+# SEED = 42
+# random.seed(SEED)
+# np.random.seed(SEED)
+# torch.manual_seed(SEED)
+# if torch.cuda.is_available():
+#     torch.cuda.manual_seed_all(SEED)
+#     # Para garantir determinismo total em operações com CUDA
+#     torch.backends.cudnn.deterministic = True
+#     torch.backends.cudnn.benchmark = False
 
 
 class Net(nn.Module):
@@ -451,7 +451,7 @@ def load_data(partition_id: int,
             )
         elif partitioner_type == "Class":
             print("Dados por classe")
-            partitioner = ClassPartitioner(num_partitions=num_partitions, seed=42)
+            partitioner = ClassPartitioner(num_partitions=num_partitions, seed=42) ## Here the seed controls the partition
         else:
             print("Dados IID")
             partitioner = IidPartitioner(num_partitions=num_partitions)
@@ -475,10 +475,10 @@ def load_data(partition_id: int,
         num_samples = int(len(train_partition)/10)
         train_partition = train_partition.select(range(num_samples))
 
-    if filter_classes is not None:
-        print("filtrando classes no dataset")
-        train_partition = train_partition.filter(lambda x: x["label"] in filter_classes)
-        print(f"selecionadas classes: {filter_classes}")
+    # if filter_classes is not None:
+    #     print("filtrando classes no dataset")
+    #     train_partition = train_partition.filter(lambda x: x["label"] in filter_classes)
+    #     print(f"selecionadas classes: {filter_classes}")
     
     pytorch_transforms = Compose([
         ToTensor(),
@@ -528,7 +528,6 @@ def load_data(partition_id: int,
             sample = generated_dataset[idx]
             img = sample["image"]       # tensor C×H×W
             lbl = sample["label"]       # inteiro
-            # Aqui você pode incluir qualquer informação no nome do arquivo
             filename = f"syn_samples/r{round}_img_{i:02d}_lbl{lbl}.png"
             save_image(img, filename)
 
@@ -581,7 +580,7 @@ def train_alvo(net, trainloader, epochs, lr, device):
     """Train the model on the training set."""
     net.to(device)  # move model to GPU if available
     criterion = torch.nn.CrossEntropyLoss().to(device)
-    optimizer = torch.optim.Adam(net.parameters(), lr=lr)
+    optimizer = torch.optim.SGD(net.parameters(), lr=lr)
     net.train()
     #treinou = False
     running_loss = 0.0
@@ -602,7 +601,7 @@ def train_alvo(net, trainloader, epochs, lr, device):
     avg_trainloss = running_loss / (len(trainloader) * epochs)
     return avg_trainloss
 
-def train_gen(gen, disc, trainloader, epochs, lr, device, dataset="mnist", latent_dim=128):
+def train_disc(gen, disc, trainloader, epochs, device, optim, dataset="mnist", latent_dim=128):
     """Train the network on the training set."""
     if dataset == "mnist":
       imagem = "image"
@@ -611,7 +610,6 @@ def train_gen(gen, disc, trainloader, epochs, lr, device, dataset="mnist", laten
     
     gen.to(device)  # move model to GPU if available
     disc.to(device)  # move model to GPU if available
-    optim_D = torch.optim.Adam(disc.discriminator.parameters(), lr=lr, betas=(0.5, 0.999))
 
     d_losses = []
 
@@ -624,7 +622,7 @@ def train_gen(gen, disc, trainloader, epochs, lr, device, dataset="mnist", laten
             fake_ident = torch.full((batch_size, 1), 0., device=device)
 
             # Train D
-            optim_D.zero_grad()
+            optim.zero_grad()
 
             # Dados reais
             y_real = disc(images, labels)
@@ -639,7 +637,7 @@ def train_gen(gen, disc, trainloader, epochs, lr, device, dataset="mnist", laten
 
             d_loss = (d_real_loss + d_fake_loss) / 2
             d_loss.backward()
-            optim_D.step()
+            optim.step()
 
             d_losses.append(d_loss.item())
 
@@ -651,11 +649,15 @@ def train_gen(gen, disc, trainloader, epochs, lr, device, dataset="mnist", laten
     return avg_d_loss            
         
                 
-def train_G(net: nn.Module, discs: list, device: str, lr: float, epochs: int, batch_size: int, latent_dim: int):
+def train_G(net: nn.Module, discs: list, device: str, lr: float, epochs: int, batch_size: int, latent_dim: int, optim_state_dict):
     net.to(device)  # move model to GPU if available
     optim_G = torch.optim.Adam(net.generator.parameters(), lr=lr, betas=(0.5, 0.999))
+    optim_G.load_state_dict(optim_state_dict)
+
     
-    for epoch in range(epochs):
+    g_losses = []
+
+    for _ in range(epochs):
         # Train G
         net.zero_grad()
 
@@ -677,6 +679,10 @@ def train_G(net: nn.Module, discs: list, device: str, lr: float, epochs: int, ba
         g_loss = net.loss(y_fake_g, real_ident)
         g_loss.backward()
         optim_G.step()
+
+        g_losses.append(g_loss.item())
+
+    return np.mean(g_losses), optim_G.state_dict()
 
 def test(net, testloader, device, model):
     """Validate the model on the test set."""
@@ -783,7 +789,7 @@ def local_test(net: nn.Module,
 
         # Save to txt file
         with open(acc_filepath, "a") as f:
-            f.write(f"Epoch {epoch + 1} - Client {cliente}\n")
+            f.write(f"Epoch {epoch} - Client {cliente}\n")
             # Header with fixed widths
             f.write("{:<10} {:<10} {:<10} {:<10}\n".format(
                 "Class", "Accuracy", "Samples", "Predictions"))

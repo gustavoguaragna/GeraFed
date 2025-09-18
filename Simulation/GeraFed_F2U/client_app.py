@@ -12,25 +12,25 @@ from Simulation.GeraFed_F2U.task import (
     set_weights, 
     test, 
     train_alvo, 
-    train_gen,
+    train_disc,
     local_test
 )
-import random
-import numpy as np
+# import random
+# import numpy as np
 import math
 from flwr.common.typing import UserConfigValue
 ##import time
 import pickle
 
-SEED = 42
-random.seed(SEED)
-np.random.seed(SEED)
-torch.manual_seed(SEED)
-if torch.cuda.is_available():
-    torch.cuda.manual_seed_all(SEED)
-    # Para garantir determinismo total em operações com CUDA
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+# SEED = 42
+# random.seed(SEED)
+# np.random.seed(SEED)
+# torch.manual_seed(SEED)
+# if torch.cuda.is_available():
+#     torch.cuda.manual_seed_all(SEED)
+#     # Para garantir determinismo total em operações com CUDA
+#     torch.backends.cudnn.deterministic = True
+#     torch.backends.cudnn.benchmark = False
 
 # Define Flower Client and client_fn
 class FlowerClient(NumPyClient):
@@ -63,10 +63,11 @@ class FlowerClient(NumPyClient):
         self.local_epochs_gen = local_epochs_gen
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.net_alvo.to(self.device)
-        self.net_gen.to(self.device)
-        self.dataset = dataset
         self.lr_alvo = lr_alvo
+        self.net_gen.to(self.device)
         self.lr_gen = lr_gen
+        self.optimD = torch.optim.Adam(self.net_gen.discriminator.parameters(), lr=self.lr_gen, betas=(0.5, 0.999))
+        self.dataset = dataset
         self.latent_dim = latent_dim
         self.client_state = (
             context.state
@@ -136,7 +137,19 @@ class FlowerClient(NumPyClient):
                 state_dict[k] = torch.from_numpy(v.numpy())
 
             # Apply state dict to disc
+
             self.net_disc.load_state_dict(state_dict)
+
+        # Load optimizer state for the discriminator
+        if "optim_parameter0" in self.client_state.parameters_records:
+
+            for p in self.optimD.state_dict()['state'].keys():
+                # Carrega parametros do estado do parametro p do optim da disc
+                optim_record = self.client_state.parameters_records[f"optim_parameter{p}"]
+
+                # Deserialize arrays and substitute for current value
+                for _, v in optim_record.items():
+                   self.optimD.state_dict()['state'][p] = torch.from_numpy(v.numpy())
 
         # Define o dataloader
         if isinstance(trainloader_real, list):
@@ -147,15 +160,15 @@ class FlowerClient(NumPyClient):
 
         ##train_gen_start_time = time.time()
         # Treina o modelo generativo
-        avg_d_loss = train_gen(
+        avg_d_loss = train_disc(
         disc=self.net_disc,
         gen=self.net_gen,
         trainloader=trainloader_real_chunk,
         epochs=self.local_epochs_gen,
-        lr=self.lr_gen,
         device=self.device,
         dataset=self.dataset,
-        latent_dim=self.latent_dim
+        latent_dim=self.latent_dim,
+        optim=self.optimD
         )
         ##train_gen_time = time.time() - train_gen_start_time
 
@@ -167,6 +180,16 @@ class FlowerClient(NumPyClient):
         # Add to a context
         self.client_state.parameters_records["net_parameters"] = p_record
 
+        # Save all elements of the optim.state_dict into a single RecordSet
+        
+        optim_records = [ParametersRecord() for _ in self.optimD.state_dict()['state'].keys()]
+        for p in self.optimD.state_dict()['state'].keys():
+            for k, v in self.optimD.state_dict()['state'][p].items():
+                # Convert to NumPy, then to Array. Add to record
+                optim_records[p][k] = array_from_numpy(v.detach().cpu().numpy())
+            # Add to a context
+            self.client_state.parameters_records[f"optim_parameter{p}"] = optim_records[p]
+
 
         disc_params = get_weights(self.net_disc)
         
@@ -175,7 +198,8 @@ class FlowerClient(NumPyClient):
         len(trainloader_syn_chunk.dataset),
         {"train_loss": train_loss,
          "disc": pickle.dumps(disc_params),
-         "avg_d_loss": avg_d_loss
+         "avg_d_loss": avg_d_loss,
+         "optimD_state_dict": pickle.dumps(self.optimD.state_dict())
          ##"tempo_treino_alvo": train_classifier_time,
          ##"tempo_treino_gen": train_gen_time
         },
@@ -198,7 +222,7 @@ class FlowerClient(NumPyClient):
         ##test_time = time.time() - test_time_start
 
 
-        test_local = config["round"] % self.num_chunks == 0 or config["round"] == 1
+        test_local = config["round"] % self.num_chunks == 0
         if test_local:
             ##local_test_start_time = time.time()
             # Avalia o modelo classificador localmente
@@ -222,15 +246,18 @@ class FlowerClient(NumPyClient):
 def client_fn(context: Context):
     """Client function to be used in the Flower ClientApp."""
     # Load model and data
+    continue_epoch     = context.run_config["continue_epoch"]
     dataset            = context.run_config["dataset"]
     gan_arq            = context.run_config["gan_arq"]
-
     if gan_arq == "simple_cnn":
         # Use a simple CNN architecture for the generator
-        net_gan        = CGAN()
+        gans       = [CGAN() for _ in num_partitions]
     elif gan_arq == "f2u_gan":
-        net_gan        = F2U_GAN()
-
+        gans        = [F2U_GAN() for _ in num_partitions]
+    if continue_epoch != 0:
+        checkpoint = torch.load(f"{folder}/checkpoint_epoch{continue_epoch}.pth")
+        gans.load_state_dict(checkpoint['gen_state_dict'])
+        optim_D.load_state_dict(checkpoint['optim_G_state_dict'])
     net_alvo           = Net()
     partition_id       = context.node_config["partition-id"]
     num_partitions     = context.node_config["num-partitions"]
@@ -259,7 +286,7 @@ def client_fn(context: Context):
     # Return Client instance
     return FlowerClient(cid=partition_id,
                         net_alvo=net_alvo, 
-                        net_gan=net_gan,  
+                        net_gan=gan,  
                         local_epochs_alvo=local_epochs_alvo, 
                         local_epochs_gen=local_epochs_gen,
                         dataset=dataset,
