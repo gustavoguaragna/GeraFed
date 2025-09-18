@@ -161,6 +161,10 @@ class FlowerClient(NumPyClient):
         else:
             trainloader_real_chunk = trainloader_real
 
+        print("PRETREINO")
+
+        print(f"CLIENTE {self.cid}, DISC_p {self.net_disc.state_dict()['discriminator.2.bias'][4]}, optim: {self.optim_D.state_dict()['state'][0]['exp_avg'][1]}")
+
         ##train_gen_start_time = time.time()
         # Treina o modelo generativo
         avg_d_loss = train_disc(
@@ -193,6 +197,8 @@ class FlowerClient(NumPyClient):
             # Add to a context
             self.client_state.parameters_records[f"optim_parameter{p}"] = optim_records[p]
 
+        print(f"CLIENTE {self.cid}, DISC_p {self.net_disc.state_dict()['discriminator.2.bias'][4]}, optim: {self.optim_D.state_dict()['state'][0]['exp_avg'][1]}")
+
 
         disc_params = get_weights(self.net_disc)
         
@@ -202,7 +208,8 @@ class FlowerClient(NumPyClient):
         {"train_loss": train_loss,
          "disc": pickle.dumps(disc_params),
          "avg_d_loss": avg_d_loss,
-         "optimDs_state_dict": pickle.dumps(self.optim_D.state_dict())
+         "optimDs_state_dict": pickle.dumps(self.optim_D.state_dict()),
+         "cid": self.cid
          ##"tempo_treino_alvo": train_classifier_time,
          ##"tempo_treino_gen": train_gen_time
         },
@@ -284,6 +291,7 @@ def client_fn(context: Context):
         checkpoint = torch.load(f"{folder}/checkpoint_epoch{continue_epoch}.pth")
         gan.load_state_dict(checkpoint['discs_state_dict'][partition_id])
         optim_D.load_state_dict(checkpoint['optimDs_state_dict'][partition_id])
+    print(f"cid{partition_id} disc p {gan.state_dict()['discriminator.2.bias'][4]} optim {optim_D.state_dict()['state'][0]['exp_avg'][1]}")
 
     #os.makedirs(folder, exist_ok=True)
 

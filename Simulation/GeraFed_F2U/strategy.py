@@ -309,7 +309,7 @@ class GeraFed(Strategy):
             set_weights(self.classifier, aggregated_ndarrays)
 
             # Define os pesos do modelo
-            disc_ndarrays = [pickle.loads(fit_res.metrics["disc"]) for _, fit_res in results]
+            disc_ndarrays = {fit_res.metrics["cid"]: pickle.loads(fit_res.metrics["disc"]) for _, fit_res in results}
             if self.gan_arq == "simple_cnn":
                 self.discs = [CGAN().to(self.device) for _ in range(len(disc_ndarrays))]
             elif self.gan_arq == "f2u_gan":
@@ -348,15 +348,25 @@ class GeraFed(Strategy):
 
             # self.metrics_dict["net_loss_chunk"].append()
 
-            optim_Ds = [pickle.loads(fit_res.metrics["optimDs_state_dict"]) for _, fit_res in results]
+            discs_state_dict = {
+                cid: disc.state_dict() for cid, disc in enumerate(self.discs)
+            }
+            optimDs_state_dict = {
+                fit_res.metrics["cid"]: pickle.loads(fit_res.metrics["optimDs_state_dict"])
+                for _, fit_res in results
+            }
+
+
+            for (cid, disc), (cid2, optim) in zip(discs_state_dict.items(), optimDs_state_dict.items()):
+                print(f"cid: {cid}, disc p: {disc['discriminator.2.bias'][4]}, cid {cid2} optim {optim['state'][0]['exp_avg'][1]}")
 
             if server_round % self.num_chunks == 0:
                 checkpoint = {
                         'classifier_state_dict': self.classifier.state_dict(),
                         'gen_state_dict': self.gen.state_dict(),
                         'optim_G_state_dict': self.optimG_state_dict,
-                        'discs_state_dict': [disc.state_dict() for disc in self.discs],
-                        'optimDs_state_dict': [optimD_state_dict for optimD_state_dict in optim_Ds]
+                        'discs_state_dict': discs_state_dict,
+                        'optimDs_state_dict': optimDs_state_dict
                     }
                 checkpoint_file = f"{self.folder}/checkpoint_epoch{int(server_round/self.num_chunks)+self.continue_epoch}.pth"
                 torch.save(checkpoint, checkpoint_file)
