@@ -47,7 +47,7 @@ tam_batch            = 32
 tam_img              = 28
 tam_ruido            = 128
 teste                = true
-continue_epoch       = 0 
+continue_epoch       = 4
 
 xgb_params.objective = "binary:logistic"
 xgb_params.eta = 0.1 # Learning rate

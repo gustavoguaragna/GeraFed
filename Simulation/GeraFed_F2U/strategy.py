@@ -100,7 +100,6 @@ class GeraFed(Strategy):
         on_evaluate_config_fn: Optional[Callable[[int], dict[str, Scalar]]] = None,
         accept_failures: bool = True,
         initial_parameters_alvo: Optional[Parameters] = None,
-        initial_parameters_gen: Optional[Parameters] = None,
         fit_metrics_aggregation_fn: Optional[MetricsAggregationFn] = None,
         evaluate_metrics_aggregation_fn: Optional[MetricsAggregationFn] = None,
         inplace: bool = True,
@@ -112,7 +111,9 @@ class GeraFed(Strategy):
         lr_gen: float = 0.0002,
         folder: str = ".",
         num_chunks: int = 1,
-        optim_G = None
+        gen,
+        optimG_state_dict = None,
+        continue_epoch:int = 0
     ) -> None:
         super().__init__()
 
@@ -135,7 +136,6 @@ class GeraFed(Strategy):
         self.accept_failures = accept_failures
         self.initial_parameters_alvo = initial_parameters_alvo
         self.parameters_alvo = initial_parameters_alvo
-        self.parameters_gen = initial_parameters_gen
         self.fit_metrics_aggregation_fn = fit_metrics_aggregation_fn
         self.evaluate_metrics_aggregation_fn = evaluate_metrics_aggregation_fn
         self.inplace = inplace
@@ -147,17 +147,8 @@ class GeraFed(Strategy):
         self.lr_gen = lr_gen
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.folder = folder
-        if self.gan_arq == "simple_cnn":
-            self.gen = CGAN(dataset=self.dataset,
-                            img_size=self.img_size,
-                            latent_dim=self.latent_dim).to(self.device)
-        elif self.gan_arq == "f2u_gan":
-            self.gen = F2U_GAN(dataset=self.dataset,
-                            img_size=self.img_size,
-                            latent_dim=self.latent_dim).to(self.device)
-        set_weights(self.gen, self.parameters_gen)
-        self.optim_G = optim_G if optim_G else torch.optim.Adam(self.gen.parameters(), lr=self.lr_gen, betas=(0.5, 0.999))
-        self.optimG_state_dict = self.optim_G.state_dict()
+        self.gen = gen.to(self.device)
+        self.optimG_state_dict = optimG_state_dict if optimG_state_dict else None
         self.metrics_dict = {
                         "g_loss_chunk": [],
                         "d_loss_chunk": [],
@@ -167,6 +158,7 @@ class GeraFed(Strategy):
                         }
         self.num_chunks = num_chunks
         self.freq_save = self.num_chunks // 10 if self.num_chunks >= 10 else 1
+        self.continue_epoch = continue_epoch
 
             
     def __repr__(self) -> str:
@@ -356,7 +348,7 @@ class GeraFed(Strategy):
 
             # self.metrics_dict["net_loss_chunk"].append()
 
-            optim_Ds = [pickle.loads(fit_res.metrics["optimD_state_dict"]) for _, fit_res in results]
+            optim_Ds = [pickle.loads(fit_res.metrics["optimDs_state_dict"]) for _, fit_res in results]
 
             if server_round % self.num_chunks == 0:
                 checkpoint = {
@@ -364,9 +356,9 @@ class GeraFed(Strategy):
                         'gen_state_dict': self.gen.state_dict(),
                         'optim_G_state_dict': self.optimG_state_dict,
                         'discs_state_dict': [disc.state_dict() for disc in self.discs],
-                        'optim_Ds_state_dict:': [optimD_state_dict for optimD_state_dict in optim_Ds]
+                        'optimDs_state_dict': [optimD_state_dict for optimD_state_dict in optim_Ds]
                     }
-                checkpoint_file = f"{self.folder}/checkpoint_epoch{int(server_round/self.num_chunks)}.pth"
+                checkpoint_file = f"{self.folder}/checkpoint_epoch{int(server_round/self.num_chunks)+self.continue_epoch}.pth"
                 torch.save(checkpoint, checkpoint_file)
                 print(f"Global net saved to {checkpoint_file}")
 
@@ -415,14 +407,35 @@ class GeraFed(Strategy):
 
         if server_round % self.num_chunks == 0:
             figura = generate_plot(net=self.gen, device=self.device, round_number=int(server_round/self.num_chunks), server=True, latent_dim=self.latent_dim)
-            figura.savefig(f"{self.folder}/mnistF2U_r{int(server_round/self.num_chunks)}.png")
+            figura.savefig(f"{self.folder}/mnistF2U_r{int(server_round/self.num_chunks)+self.continue_epoch}.png")
 
         round_time = time.time() - self.init_round_time
         self.metrics_dict["time_chunk"].append(round_time)
         metrics_filename = f"{self.folder}/metrics.json"
+
+        try:
+            with open(metrics_filename, 'r', encoding='utf-8') as f:
+                # Load the dictionary from the JSON file
+                existing_metrics = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            # If the file is not found or is not valid JSON, we start fresh
+            existing_metrics = {}
+            print("Metrics file not found or invalid. A new one will be created.")
+            print(metrics_filename)
+
+        for key, new_values in self.metrics_dict.items():
+            # Get the list that already exists for this key, or an empty list if the key is new
+            existing_list = existing_metrics.get(key, [])
+            
+            # Use .extend() to add the new items to the existing list
+            existing_list.extend(new_values)
+            
+            # Update the dictionary with the newly extended list
+            existing_metrics[key] = existing_list
+
         try:
             with open(metrics_filename, 'w', encoding='utf-8') as f:
-                json.dump(self.metrics_dict, f, ensure_ascii=False, indent=4) # indent makes it readable
+                json.dump(existing_metrics, f, ensure_ascii=False, indent=4) # indent makes it readable
             print(f"Losses dict successfully saved to {metrics_filename}")
         except Exception as e:
             print(f"Error saving losses dict to JSON: {e}")

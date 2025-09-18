@@ -37,7 +37,8 @@ class FlowerClient(NumPyClient):
     def __init__(self,
                 cid: UserConfigValue, 
                 net_alvo,
-                net_gan, 
+                net_gan,
+                optim_D,
                 local_epochs_alvo: UserConfigValue, 
                 local_epochs_gen: UserConfigValue, 
                 dataset: UserConfigValue, 
@@ -54,11 +55,13 @@ class FlowerClient(NumPyClient):
                 teste: UserConfigValue,
                 folder: UserConfigValue = ".",
                 num_chunks: UserConfigValue = 1,
-                partitioner: UserConfigValue = "Class"):
+                partitioner: UserConfigValue = "Class",
+                continue_epoch: UserConfigValue = 0):
         self.cid=cid
         self.net_alvo = net_alvo
         self.net_gen = net_gan
         self.net_disc = net_gan
+        self.optim_D = optim_D
         self.local_epochs_alvo = local_epochs_alvo
         self.local_epochs_gen = local_epochs_gen
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -66,7 +69,6 @@ class FlowerClient(NumPyClient):
         self.lr_alvo = lr_alvo
         self.net_gen.to(self.device)
         self.lr_gen = lr_gen
-        self.optimD = torch.optim.Adam(self.net_gen.discriminator.parameters(), lr=self.lr_gen, betas=(0.5, 0.999))
         self.dataset = dataset
         self.latent_dim = latent_dim
         self.client_state = (
@@ -82,6 +84,7 @@ class FlowerClient(NumPyClient):
         self.folder = folder
         self.num_chunks = num_chunks
         self.partitioner = partitioner
+        self.continue_epoch = continue_epoch
   
 
     def fit(self, parameters, config):
@@ -143,13 +146,13 @@ class FlowerClient(NumPyClient):
         # Load optimizer state for the discriminator
         if "optim_parameter0" in self.client_state.parameters_records:
 
-            for p in self.optimD.state_dict()['state'].keys():
+            for p in self.optim_D.state_dict()['state'].keys():
                 # Carrega parametros do estado do parametro p do optim da disc
                 optim_record = self.client_state.parameters_records[f"optim_parameter{p}"]
 
                 # Deserialize arrays and substitute for current value
                 for _, v in optim_record.items():
-                   self.optimD.state_dict()['state'][p] = torch.from_numpy(v.numpy())
+                   self.optim_D.state_dict()['state'][p] = torch.from_numpy(v.numpy())
 
         # Define o dataloader
         if isinstance(trainloader_real, list):
@@ -168,7 +171,7 @@ class FlowerClient(NumPyClient):
         device=self.device,
         dataset=self.dataset,
         latent_dim=self.latent_dim,
-        optim=self.optimD
+        optim=self.optim_D
         )
         ##train_gen_time = time.time() - train_gen_start_time
 
@@ -182,9 +185,9 @@ class FlowerClient(NumPyClient):
 
         # Save all elements of the optim.state_dict into a single RecordSet
         
-        optim_records = [ParametersRecord() for _ in self.optimD.state_dict()['state'].keys()]
-        for p in self.optimD.state_dict()['state'].keys():
-            for k, v in self.optimD.state_dict()['state'][p].items():
+        optim_records = [ParametersRecord() for _ in self.optim_D.state_dict()['state'].keys()]
+        for p in self.optim_D.state_dict()['state'].keys():
+            for k, v in self.optim_D.state_dict()['state'][p].items():
                 # Convert to NumPy, then to Array. Add to record
                 optim_records[p][k] = array_from_numpy(v.detach().cpu().numpy())
             # Add to a context
@@ -199,7 +202,7 @@ class FlowerClient(NumPyClient):
         {"train_loss": train_loss,
          "disc": pickle.dumps(disc_params),
          "avg_d_loss": avg_d_loss,
-         "optimD_state_dict": pickle.dumps(self.optimD.state_dict())
+         "optimDs_state_dict": pickle.dumps(self.optim_D.state_dict())
          ##"tempo_treino_alvo": train_classifier_time,
          ##"tempo_treino_gen": train_gen_time
         },
@@ -231,7 +234,8 @@ class FlowerClient(NumPyClient):
                     device=self.device,
                     acc_filepath=f"{self.folder}/accuracy_report.txt",
                     epoch=int(config["round"]/self.num_chunks),
-                    cliente=self.cid)
+                    cliente=self.cid,
+                    continue_epoch=self.continue_epoch)
             ##local_test_time = time.time() - local_test_start_time
 
         return (loss,
@@ -246,18 +250,6 @@ class FlowerClient(NumPyClient):
 def client_fn(context: Context):
     """Client function to be used in the Flower ClientApp."""
     # Load model and data
-    continue_epoch     = context.run_config["continue_epoch"]
-    dataset            = context.run_config["dataset"]
-    gan_arq            = context.run_config["gan_arq"]
-    if gan_arq == "simple_cnn":
-        # Use a simple CNN architecture for the generator
-        gans       = [CGAN() for _ in num_partitions]
-    elif gan_arq == "f2u_gan":
-        gans        = [F2U_GAN() for _ in num_partitions]
-    if continue_epoch != 0:
-        checkpoint = torch.load(f"{folder}/checkpoint_epoch{continue_epoch}.pth")
-        gans.load_state_dict(checkpoint['gen_state_dict'])
-        optim_D.load_state_dict(checkpoint['optim_G_state_dict'])
     net_alvo           = Net()
     partition_id       = context.node_config["partition-id"]
     num_partitions     = context.node_config["num-partitions"]
@@ -266,9 +258,9 @@ def client_fn(context: Context):
     batch_size         = context.run_config["tam_batch"]
     teste              = context.run_config["teste"]
     num_chunks         = context.run_config["num_chunks"]
-
-    # pretrained_cgan  = CGAN()
-    # pretrained_cgan.load_state_dict(torch.load("model_round_10_mnist.pt"))
+    continue_epoch     = context.run_config["continue_epoch"]
+    dataset            = context.run_config["dataset"]
+    gan_arq            = context.run_config["gan_arq"]
 
     local_epochs_alvo  = context.run_config["epocas_alvo"]
     local_epochs_gen   = context.run_config["epocas_gen"]
@@ -280,6 +272,19 @@ def client_fn(context: Context):
     niid               = False if partitioner == "IID" else True 
     folder             = context.run_config["Exp_name_folder"]
 
+    if gan_arq == "simple_cnn":
+        # Use a simple CNN architecture for the generator
+        gan = CGAN()
+    elif gan_arq == "f2u_gan":
+        gan = F2U_GAN()
+
+    optim_D = torch.optim.Adam(gan.discriminator.parameters(), lr=lr_gen, betas=(0.5, 0.999))
+
+    if continue_epoch != 0:
+        checkpoint = torch.load(f"{folder}/checkpoint_epoch{continue_epoch}.pth")
+        gan.load_state_dict(checkpoint['discs_state_dict'][partition_id])
+        optim_D.load_state_dict(checkpoint['optimDs_state_dict'][partition_id])
+
     #os.makedirs(folder, exist_ok=True)
 
 
@@ -287,6 +292,7 @@ def client_fn(context: Context):
     return FlowerClient(cid=partition_id,
                         net_alvo=net_alvo, 
                         net_gan=gan,  
+                        optim_D=optim_D,
                         local_epochs_alvo=local_epochs_alvo, 
                         local_epochs_gen=local_epochs_gen,
                         dataset=dataset,
@@ -303,7 +309,8 @@ def client_fn(context: Context):
                         teste=teste,
                         folder=folder,
                         num_chunks=num_chunks,
-                        partitioner=partitioner).to_client()
+                        partitioner=partitioner,
+                        continue_epoch=continue_epoch).to_client()
 
 
 # Flower ClientApp

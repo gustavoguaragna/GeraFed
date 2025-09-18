@@ -649,10 +649,11 @@ def train_disc(gen, disc, trainloader, epochs, device, optim, dataset="mnist", l
     return avg_d_loss            
         
                 
-def train_G(net: nn.Module, discs: list, device: str, lr: float, epochs: int, batch_size: int, latent_dim: int, optim_state_dict):
+def train_G(net: nn.Module, discs: list, device: str, lr: float, epochs: int, batch_size: int, latent_dim: int, optim_state_dict = None):
     net.to(device)  # move model to GPU if available
     optim_G = torch.optim.Adam(net.generator.parameters(), lr=lr, betas=(0.5, 0.999))
-    optim_G.load_state_dict(optim_state_dict)
+    if optim_state_dict:
+        optim_G.load_state_dict(optim_state_dict)
 
     
     g_losses = []
@@ -741,7 +742,8 @@ def local_test(net: nn.Module,
                acc_filepath: str,
                epoch: int,
                cliente: str,
-               num_classes: int = 10):
+               num_classes: int = 10,
+               continue_epoch: int = 0):
     client_eval_time = time.time()
     # Evaluation in client test
     # Initialize counters
@@ -789,7 +791,7 @@ def local_test(net: nn.Module,
 
         # Save to txt file
         with open(acc_filepath, "a") as f:
-            f.write(f"Epoch {epoch} - Client {cliente}\n")
+            f.write(f"Epoch {epoch+continue_epoch} - Client {cliente}\n")
             # Header with fixed widths
             f.write("{:<10} {:<10} {:<10} {:<10}\n".format(
                 "Class", "Accuracy", "Samples", "Predictions"))

@@ -51,7 +51,6 @@ def server_fn(context: Context):
     num_chunks = context.run_config["num_chunks"]
     os.makedirs(folder, exist_ok=True)
     continue_epoch = context.run_config["continue_epoch"]
-    lr_gen = context.run_config["learn_rate_gen"]
     
     # Initialize model parameters
     classifier = Net()
@@ -61,27 +60,28 @@ def server_fn(context: Context):
                 dataset=dataset,
                 img_size=img_size,
                 latent_dim=latent_dim
-            )
+                )
     elif gan_arq == "f2u_gan":
-       gen = F2U_GAN(
-            dataset=dataset,
-            img_size=img_size,
-            latent_dim=latent_dim
-            )
-    optim_G = torch.optim.Adam(params=gen.parameters(), lr=lr_gen, betas=(0.5, 0.999))   
-    
+        gen = F2U_GAN(
+                dataset=dataset,
+                img_size=img_size,
+                latent_dim=latent_dim
+                )
+        
+    optimGstate_dict = None
+
     if continue_epoch != 0:
         checkpoint = torch.load(f"{folder}/checkpoint_epoch{continue_epoch}.pth")
         classifier.load_state_dict(checkpoint['classifier_state_dict'])
         gen.load_state_dict(checkpoint['gen_state_dict'])
-        optim_G.load_state_dict(checkpoint['optim_G_state_dict'])
+        optimGstate_dict = checkpoint['optim_G_state_dict']
 
-
+    
 
     ndarrays_alvo = get_weights(classifier)
-    ndarrays_gen  = get_weights(gen)
+    # ndarrays_gen  = get_weights(gen)
     parameters_alvo = ndarrays_to_parameters(ndarrays_alvo)
-    parameters_gen = ndarrays_to_parameters(ndarrays_gen)
+    # parameters_gen = ndarrays_to_parameters(ndarrays_gen)
 
     # Define strategy
     strategy = GeraFed(
@@ -89,8 +89,8 @@ def server_fn(context: Context):
         fraction_fit_gen=fraction_fit_gen,
         fraction_evaluate_alvo=1.0,
         initial_parameters_alvo=parameters_alvo,
-        initial_parameters_gen=parameters_gen,
-        optim_G=optim_G
+        gen=gen,
+        optimG_state_dict=optimGstate_dict,
         dataset=dataset,
         img_size=img_size,
         latent_dim=latent_dim,
@@ -98,7 +98,8 @@ def server_fn(context: Context):
         teste=teste,
         folder=folder,
         num_chunks=num_chunks,
-        fit_metrics_aggregation_fn=weighted_average
+        fit_metrics_aggregation_fn=weighted_average,
+        continue_epoch=continue_epoch
     )
     config = ServerConfig(num_rounds=num_rounds)
 
