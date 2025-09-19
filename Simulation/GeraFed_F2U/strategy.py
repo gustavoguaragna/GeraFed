@@ -149,13 +149,6 @@ class GeraFed(Strategy):
         self.folder = folder
         self.gen = gen.to(self.device)
         self.optimG_state_dict = optimG_state_dict if optimG_state_dict else None
-        self.metrics_dict = {
-                        "g_loss_chunk": [],
-                        "d_loss_chunk": [],
-                        "net_loss_chunk": [],
-                        "net_acc_chunk": [],
-                        "time_chunk": []
-                        }
         self.num_chunks = num_chunks
         self.freq_save = self.num_chunks // 10 if self.num_chunks >= 10 else 1
         self.continue_epoch = continue_epoch
@@ -208,6 +201,13 @@ class GeraFed(Strategy):
     ) -> list[tuple[ClientProxy, FitIns]]:
         """Configure the next round of training."""
         self.init_round_time = time.time()
+        self.metrics_dict = {
+                        "g_loss_chunk": [],
+                        "d_loss_chunk": [],
+                        "net_loss_chunk": [],
+                        "net_acc_chunk": [],
+                        "time_chunk": []
+                        }
         if self.on_fit_config_fn is not None:
             # Custom fit config function provided
             config = self.on_fit_config_fn(server_round)
@@ -356,9 +356,10 @@ class GeraFed(Strategy):
                 for _, fit_res in results
             }
 
-
-            for (cid, disc), (cid2, optim) in zip(discs_state_dict.items(), optimDs_state_dict.items()):
-                print(f"cid: {cid}, disc p: {disc['discriminator.2.bias'][4]}, cid {cid2} optim {optim['state'][0]['exp_avg'][1]}")
+            
+            print(f"server_round: {server_round}")
+            print(f"num_chunks: {self.num_chunks}")
+            print(f"checkpoint_epoch: {int(server_round/self.num_chunks)+self.continue_epoch}")
 
             if server_round % self.num_chunks == 0:
                 checkpoint = {

@@ -21,6 +21,7 @@ import math
 from flwr.common.typing import UserConfigValue
 ##import time
 import pickle
+import copy
 
 # SEED = 42
 # random.seed(SEED)
@@ -59,8 +60,8 @@ class FlowerClient(NumPyClient):
                 continue_epoch: UserConfigValue = 0):
         self.cid=cid
         self.net_alvo = net_alvo
-        self.net_gen = net_gan
-        self.net_disc = net_gan
+        self.net_gen = copy.deepcopy(net_gan)
+        self.net_disc = copy.deepcopy(net_gan)
         self.optim_D = optim_D
         self.local_epochs_alvo = local_epochs_alvo
         self.local_epochs_gen = local_epochs_gen
@@ -85,7 +86,6 @@ class FlowerClient(NumPyClient):
         self.num_chunks = num_chunks
         self.partitioner = partitioner
         self.continue_epoch = continue_epoch
-  
 
     def fit(self, parameters, config):
         
@@ -94,6 +94,7 @@ class FlowerClient(NumPyClient):
 
         # Calcula numero de amostras sinteticas
         num_syn = int(13 * (math.exp(0.01*config["round"]) - 1) / (math.exp(0.01*50) - 1)) * 10
+
 
         # Carrega dados
         trainloader_real, trainloader_syn, _, _ = load_data(partition_id=self.cid,
@@ -107,9 +108,11 @@ class FlowerClient(NumPyClient):
                                 gan=self.net_gen,
                                 round=config["round"],
                                 folder=self.folder)
+    
 
         # Atualiza pesos do modelo classificador
         set_weights(self.net_alvo, parameters)
+
 
         # Define o dataloader
         if isinstance(trainloader_syn, list):
@@ -140,6 +143,7 @@ class FlowerClient(NumPyClient):
                 state_dict[k] = torch.from_numpy(v.numpy())
 
             # Apply state dict to disc
+            print("duvido entrar aqui de prima")
 
             self.net_disc.load_state_dict(state_dict)
 
@@ -160,10 +164,6 @@ class FlowerClient(NumPyClient):
             trainloader_real_chunk = trainloader_real[chunk_idx]
         else:
             trainloader_real_chunk = trainloader_real
-
-        print("PRETREINO")
-
-        print(f"CLIENTE {self.cid}, DISC_p {self.net_disc.state_dict()['discriminator.2.bias'][4]}, optim: {self.optim_D.state_dict()['state'][0]['exp_avg'][1]}")
 
         ##train_gen_start_time = time.time()
         # Treina o modelo generativo
@@ -196,8 +196,6 @@ class FlowerClient(NumPyClient):
                 optim_records[p][k] = array_from_numpy(v.detach().cpu().numpy())
             # Add to a context
             self.client_state.parameters_records[f"optim_parameter{p}"] = optim_records[p]
-
-        print(f"CLIENTE {self.cid}, DISC_p {self.net_disc.state_dict()['discriminator.2.bias'][4]}, optim: {self.optim_D.state_dict()['state'][0]['exp_avg'][1]}")
 
 
         disc_params = get_weights(self.net_disc)
@@ -287,13 +285,12 @@ def client_fn(context: Context):
 
     optim_D = torch.optim.Adam(gan.discriminator.parameters(), lr=lr_gen, betas=(0.5, 0.999))
 
+
+
     if continue_epoch != 0:
         checkpoint = torch.load(f"{folder}/checkpoint_epoch{continue_epoch}.pth")
         gan.load_state_dict(checkpoint['discs_state_dict'][partition_id])
         optim_D.load_state_dict(checkpoint['optimDs_state_dict'][partition_id])
-    print(f"cid{partition_id} disc p {gan.state_dict()['discriminator.2.bias'][4]} optim {optim_D.state_dict()['state'][0]['exp_avg'][1]}")
-
-    #os.makedirs(folder, exist_ok=True)
 
 
     # Return Client instance
