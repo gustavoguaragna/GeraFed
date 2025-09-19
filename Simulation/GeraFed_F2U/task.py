@@ -528,7 +528,7 @@ def load_data(partition_id: int,
             sample = generated_dataset[idx]
             img = sample["image"]       # tensor C×H×W
             lbl = sample["label"]       # inteiro
-            filename = f"syn_samples/r{round}_img_{i:02d}_lbl{lbl}.png"
+            filename = f"{folder}/syn_samples/r{round}_img_{i:02d}_lbl{lbl}.png"
             save_image(img, filename)
 
         train_partition = ConcatDataset([client_dataset["train"], generated_dataset])

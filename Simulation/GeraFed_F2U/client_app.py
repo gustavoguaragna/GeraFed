@@ -57,7 +57,8 @@ class FlowerClient(NumPyClient):
                 folder: UserConfigValue = ".",
                 num_chunks: UserConfigValue = 1,
                 partitioner: UserConfigValue = "Class",
-                continue_epoch: UserConfigValue = 0):
+                continue_epoch: UserConfigValue = 0,
+                num_epochs: UserConfigValue = 100):
         self.cid=cid
         self.net_alvo = net_alvo
         self.net_gen = copy.deepcopy(net_gan)
@@ -86,6 +87,7 @@ class FlowerClient(NumPyClient):
         self.num_chunks = num_chunks
         self.partitioner = partitioner
         self.continue_epoch = continue_epoch
+        self.num_epochs = num_epochs
 
     def fit(self, parameters, config):
         
@@ -93,7 +95,7 @@ class FlowerClient(NumPyClient):
         set_weights(net=self.net_gen, parameters=pickle.loads(config["gan"]))
 
         # Calcula numero de amostras sinteticas
-        num_syn = int(13 * (math.exp(0.01*config["round"]) - 1) / (math.exp(0.01*50) - 1)) * 10
+        num_syn = int(13 * (math.exp(0.01*config["round"]) - 1) / (math.exp(0.01*self.num_epochs/2) - 1)) * 10
 
 
         # Carrega dados
@@ -276,6 +278,7 @@ def client_fn(context: Context):
     model              = context.run_config["model"]
     niid               = False if partitioner == "IID" else True 
     folder             = context.run_config["Exp_name_folder"]
+    num_epochs         = context.run_config["num_rodadas"]/num_chunks
 
     if gan_arq == "simple_cnn":
         # Use a simple CNN architecture for the generator
@@ -315,7 +318,8 @@ def client_fn(context: Context):
                         folder=folder,
                         num_chunks=num_chunks,
                         partitioner=partitioner,
-                        continue_epoch=continue_epoch).to_client()
+                        continue_epoch=continue_epoch,
+                        num_epochs=num_epochs).to_client()
 
 
 # Flower ClientApp

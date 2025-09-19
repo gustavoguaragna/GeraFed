@@ -41,13 +41,13 @@ learn_rate_alvo      = 0.001
 learn_rate_gen       = 0.0002
 model                = "both"       # 'alvo', 'gen', 'both'
 num_chunks           = 2
-num_rodadas          = 4
+num_rodadas          = 100
 partitioner          = "Class"        # 'Class', 'Dir', 'IID' (IID no else)
 tam_batch            = 32
 tam_img              = 28
 tam_ruido            = 128
 teste                = true
-continue_epoch       = 1
+continue_epoch       = 0
 
 xgb_params.objective = "binary:logistic"
 xgb_params.eta = 0.1 # Learning rate
