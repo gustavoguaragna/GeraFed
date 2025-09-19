@@ -518,7 +518,7 @@ def load_data(partition_id: int,
             image_col_name="image"
         )
 
-        if round % num_chunks in (0,20):
+        if round % num_chunks in (0,1,20):
             # Cria a pasta de saída se não existir
             os.makedirs(f"{folder}/syn_samples", exist_ok=True)
             # Escolhe até 5 índices aleatórios dentro do tamanho do dataset

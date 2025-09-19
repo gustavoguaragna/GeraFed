@@ -145,8 +145,6 @@ class FlowerClient(NumPyClient):
                 state_dict[k] = torch.from_numpy(v.numpy())
 
             # Apply state dict to disc
-            print("duvido entrar aqui de prima")
-
             self.net_disc.load_state_dict(state_dict)
 
         # Load optimizer state for the discriminator

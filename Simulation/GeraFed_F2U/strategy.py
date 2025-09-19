@@ -356,10 +356,6 @@ class GeraFed(Strategy):
                 for _, fit_res in results
             }
 
-            
-            print(f"server_round: {server_round}")
-            print(f"num_chunks: {self.num_chunks}")
-            print(f"checkpoint_epoch: {int(server_round/self.num_chunks)+self.continue_epoch}")
 
             if server_round % self.num_chunks == 0:
                 checkpoint = {
