@@ -518,18 +518,19 @@ def load_data(partition_id: int,
             image_col_name="image"
         )
 
-        # Cria a pasta de saída se não existir
-        os.makedirs(f"{folder}/syn_samples", exist_ok=True)
-        # Escolhe até 5 índices aleatórios dentro do tamanho do dataset
-        num_to_save = min(5, len(generated_dataset))
-        sample_idxs = random.sample(range(len(generated_dataset)), num_to_save)
+        if round % num_chunks in (0,20):
+            # Cria a pasta de saída se não existir
+            os.makedirs(f"{folder}/syn_samples", exist_ok=True)
+            # Escolhe até 5 índices aleatórios dentro do tamanho do dataset
+            num_to_save = min(5, len(generated_dataset))
+            sample_idxs = random.sample(range(len(generated_dataset)), num_to_save)
 
-        for i, idx in enumerate(sample_idxs, start=1):
-            sample = generated_dataset[idx]
-            img = sample["image"]       # tensor C×H×W
-            lbl = sample["label"]       # inteiro
-            filename = f"{folder}/syn_samples/r{round}_img_{i:02d}_lbl{lbl}.png"
-            save_image(img, filename)
+            for i, idx in enumerate(sample_idxs, start=1):
+                sample = generated_dataset[idx]
+                img = sample["image"]       # tensor C×H×W
+                lbl = sample["label"]       # inteiro
+                filename = f"{folder}/syn_samples/r{round}_img_{i:02d}_lbl{lbl}.png"
+                save_image(img, filename)
 
         train_partition = ConcatDataset([client_dataset["train"], generated_dataset])
 
