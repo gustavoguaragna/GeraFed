@@ -106,10 +106,6 @@ class FlowerClient(NumPyClient):
         set_weights(net=self.net_gen, parameters=pickle.loads(config["gan"]))
 
 
-        # Calcula numero de amostras sinteticas
-        num_syn = int(13 * (math.exp(0.01*config["round"]) - 1) / (math.exp(0.01*self.num_epochs/2) - 1)) * 10
-    
-
         # Atualiza pesos do modelo classificador
         set_weights(self.net_alvo, parameters)
 
@@ -120,6 +116,10 @@ class FlowerClient(NumPyClient):
             trainloader_chunk = self.trainloader[chunk_idx]
         else:
             trainloader_chunk = self.trainloader
+
+        # Calcula numero de amostras sinteticas
+        num_syn = int(math.ceil(len(trainloader_chunk.dataset)) * (math.exp(0.01*config["round"]) - 1) / (math.exp(0.01*self.num_epochs/2) - 1))
+    
 
         if num_syn > 0:
             trainloader_syn = syn_input(
