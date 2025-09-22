@@ -19,7 +19,7 @@ from scipy import linalg
 from tqdm import tqdm
 from flwr.common import parameters_to_ndarrays
 from collections import defaultdict, OrderedDict
-from typing import Optional, List
+from typing import Optional, List, Union
 import math
 from torchvision.utils import save_image
 import datasets
@@ -463,17 +463,13 @@ fds = None  # Cache FederatedDataset
 gen_img_part = None # Cache GeneratedDataset
 
 def load_data(partition_id: int, 
-              num_partitions: int,  
-              alpha_dir: float, 
+              num_partitions: int,
               batch_size: int,
-              folder : str = ".",
               dataset: str = "mnist",
               teste: bool = False,
               partitioner_type: str = "IID",
-              num_chunks: int = 1,
-              syn_samples: int = 0,
-              gan: Optional[nn.Module] = None,
-              round: int = 0) -> tuple[DataLoader, Optional[DataLoader], DataLoader, DataLoader]:
+              alpha_dir: float = 0.1, 
+              num_chunks: int = 1) -> tuple[Union[DataLoader, List], DataLoader, DataLoader]:
     
     """Carrega MNIST com splits de treino e teste separados. Se syn_samples > 0, inclui dados gerados."""
    
@@ -555,73 +551,77 @@ def load_data(partition_id: int,
         "test":  client_test,
     }
 
-    if gan and syn_samples > 0:
-        generated_dataset = GeneratedDataset(
-            generator=gan.to("cpu"),  # Move GAN to CPU for generation
-            num_samples=syn_samples,
-            latent_dim=gan.latent_dim,
-            device="cpu",  # Use CPU for generation
-            image_col_name=image
-        )
-
-        if round % num_chunks in (0,1,20):
-            # Cria a pasta de saída se não existir
-            os.makedirs(f"{folder}/syn_samples", exist_ok=True)
-            # Escolhe até 5 índices aleatórios dentro do tamanho do dataset
-            num_to_save = min(5, len(generated_dataset))
-            sample_idxs = random.sample(range(len(generated_dataset)), num_to_save)
-
-            for i, idx in enumerate(sample_idxs, start=1):
-                sample = generated_dataset[idx]
-                img = sample[image]       # tensor C×H×W
-                lbl = sample["label"]       # inteiro
-                filename = f"{folder}/syn_samples/r{round}_client{partition_id}_img{i:02d}_lbl{lbl}.png"
-                save_image(img, filename)
-
-        train_partition = ConcatDataset([client_dataset["train"], generated_dataset])
 
     if num_chunks > 1:
-        n_gen = len(train_partition)
         n_real = len(client_dataset["train"])
 
         # 1) embaralha os índices com seed fixa
-        indices_gen = list(range(n_gen))
         indices_real = list(range(n_real))
         random.seed(42)
-        random.shuffle(indices_gen)
         random.shuffle(indices_real)
 
         # 2) calcula tamanho aproximado de cada chunk
-        chunk_size_gen = math.ceil(n_gen / num_chunks)
         chunk_size_real = math.ceil(n_real / num_chunks)
 
         # 3) divide em chunks usando fatias dos índices embaralhados
-        chunks_gen = []
         chunks_real = []
         for i in range(num_chunks):
-            start = i * chunk_size_gen
-            end = min((i + 1) * chunk_size_gen, n_gen)
-            chunk_indices = indices_gen[start:end]
-            chunks_gen.append(Subset(train_partition, chunk_indices))
-
             start = i * chunk_size_real
             end = min((i + 1) * chunk_size_real, n_real)
             chunk_indices = indices_real[start:end]
             chunks_real.append(Subset(client_dataset["train"], chunk_indices))
 
-
-        trainloader_syn = [DataLoader(chunk, batch_size=batch_size, shuffle=True) for chunk in chunks_gen if len(chunk) > 0]
         trainloader_real = [DataLoader(chunk, batch_size=batch_size, shuffle=True) for chunk in chunks_real if len(chunk) > 0]
 
     else:
         trainloader_real = DataLoader(client_dataset["train"], batch_size=batch_size, shuffle=True)
-        trainloader_syn = DataLoader(train_partition, batch_size=batch_size, shuffle=True)
 
     testloader = DataLoader(test_partition, batch_size=batch_size, shuffle=True)
     testloader_local = DataLoader(client_dataset["test"], batch_size=batch_size, shuffle=True)
 
-    return trainloader_real, trainloader_syn, testloader, testloader_local
+    return trainloader_real, testloader, testloader_local
 
+    ############ Função para adicionar dados sintéticos ############
+def syn_input(num_samples: int, 
+              gan: nn.Module, 
+              round: int, 
+              num_chunks: int, 
+              folder: str, 
+              dataloader: DataLoader, 
+              partition_id: int, 
+              dataset: str = "mnist"):
+    if dataset == "mnist":
+        image = "image"
+    elif dataset == "cifar10":
+        image = "img"
+    else:
+        raise ValueError(f"{dataset} nao identificado")
+    
+    generated_dataset = GeneratedDataset(
+        generator=gan.to("cpu"),  # Move GAN to CPU for generation
+        num_samples=num_samples,
+        latent_dim=gan.latent_dim,
+        device="cpu",  # Use CPU for generation
+        image_col_name=image
+    )
+
+    if round % num_chunks in (0,1,20):
+        # Cria a pasta de saída se não existir
+        os.makedirs(f"{folder}/syn_samples", exist_ok=True)
+        # Escolhe até 5 índices aleatórios dentro do tamanho do dataset
+        num_to_save = min(5, len(generated_dataset))
+        sample_idxs = random.sample(range(len(generated_dataset)), num_to_save)
+
+        for i, idx in enumerate(sample_idxs, start=1):
+            sample = generated_dataset[idx]
+            img = sample[image]       # tensor C×H×W
+            lbl = sample["label"]       # inteiro
+            filename = f"{folder}/syn_samples/r{round}_client{partition_id}_img{i:02d}_lbl{lbl}.png"
+            save_image(img, filename)
+
+    train_partition = ConcatDataset([dataloader.dataset, generated_dataset])
+    trainloader = DataLoader(train_partition, batch_size=dataloader.batch_size, shuffle=True)
+    return trainloader
 
 def train_alvo(net, trainloader, epochs, lr, device, dataset):
     """Train the model on the training set."""
