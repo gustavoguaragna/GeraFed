@@ -3,7 +3,7 @@
 import os
 from flwr.common import Context, ndarrays_to_parameters
 from flwr.server import ServerApp, ServerAppComponents, ServerConfig
-from Simulation.GeraFed_F2U.task import Net, CGAN, F2U_GAN, get_weights
+from Simulation.GeraFed_F2U.task import Net, Net_CIFAR, CGAN, F2U_GAN, F2U_GAN_CIFAR, get_weights
 from Simulation.GeraFed_F2U.strategy import GeraFed
 from typing import List, Tuple
 from flwr.common.typing import Metrics
@@ -47,27 +47,34 @@ def server_fn(context: Context):
     latent_dim = context.run_config["tam_ruido"]
     gan_arq = context.run_config["gan_arq"]
     teste = context.run_config["teste"]
-    folder = context.run_config["Exp_name_folder"]
+    num_partitions = context.run_config["num_clients"]
+    partitioner = context.run_config["partitioner"]
+    folder = f"{context.run_config['Exp_name_folder']}FedGenIA_F2U_{num_partitions}clients/{dataset}/{partitioner}"
     num_chunks = context.run_config["num_chunks"]
     os.makedirs(folder, exist_ok=True)
     continue_epoch = context.run_config["continue_epoch"]
     
     # Initialize model parameters
-    classifier = Net()
+    if dataset == "mnist":
+        classifier = Net()
+        if gan_arq == "simple_cnn":
+            gen = CGAN(
+                    dataset=dataset,
+                    img_size=img_size,
+                    latent_dim=latent_dim
+                    )
+        elif gan_arq == "f2u_gan":
+            gen = F2U_GAN(
+                    img_size=img_size,
+                    latent_dim=latent_dim
+                    )
+    elif dataset == "cifar10":
+        classifier = Net_CIFAR()
+        gen = F2U_GAN_CIFAR(
+            img_size=img_size,
+            latent_dim=latent_dim
+        )
 
-    if gan_arq == "simple_cnn":
-        gen = CGAN(
-                dataset=dataset,
-                img_size=img_size,
-                latent_dim=latent_dim
-                )
-    elif gan_arq == "f2u_gan":
-        gen = F2U_GAN(
-                dataset=dataset,
-                img_size=img_size,
-                latent_dim=latent_dim
-                )
-        
     optimGstate_dict = None
 
     if continue_epoch != 0:

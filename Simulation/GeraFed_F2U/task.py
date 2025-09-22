@@ -59,6 +59,27 @@ class Net(nn.Module):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         return self.fc3(x)
+    
+class Net_CIFAR(nn.Module):
+    def __init__(self,seed=None):
+        if seed is not None:
+          torch.manual_seed(seed)
+        super().__init__()
+        self.conv1 = nn.Conv2d(3, 6, 5)
+        self.pool = nn.MaxPool2d(2, 2)
+        self.conv2 = nn.Conv2d(6, 16, 5)
+        self.fc1 = nn.Linear(16 * 5 * 5, 120)
+        self.fc2 = nn.Linear(120, 84)
+        self.fc3 = nn.Linear(84, 10)
+
+    def forward(self, x):
+        x = self.pool(F.relu(self.conv1(x)))
+        x = self.pool(F.relu(self.conv2(x)))
+        x = torch.flatten(x, 1) # flatten all dimensions except batch
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
+        return x
 
 
 # Define the GAN model
@@ -135,15 +156,12 @@ class CGAN(nn.Module):
         return self.adv_loss(output, label)
     
 class F2U_GAN(nn.Module):
-    def __init__(self, dataset="mnist", img_size=28, latent_dim=128, condition=True, seed=42):
+    def __init__(self, img_size=28, latent_dim=128, condition=True, seed=42):
         if seed is not None:
           torch.manual_seed(seed)
         super(F2U_GAN, self).__init__()
-        if dataset == "mnist":
-            self.classes = 10
-            self.channels = 1
-        else:
-            raise NotImplementedError("Only MNIST is supported")
+        self.classes = 10
+        self.channels = 1
 
         self.condition = condition
         self.label_embedding = nn.Embedding(self.classes, self.classes) if condition else None
@@ -220,88 +238,111 @@ class F2U_GAN(nn.Module):
     def loss(self, output, label):
         return self.adv_loss(output, label)
 
+class F2U_GAN_CIFAR(nn.Module):
+    def __init__(self, img_size=32, latent_dim=128, condition=True, seed=None):
+        if seed is not None:
+          torch.manual_seed(seed)
+        super(F2U_GAN_CIFAR, self).__init__()
+        self.img_size = img_size
+        self.latent_dim = latent_dim
+        self.classes = 10
+        self.channels = 3
+        self.condition = condition
 
-# def generate_images(cgan, examples_per_class):
-#     cgan.eval()
-#     device = next(cgan.parameters()).device
-#     latent_dim = cgan.latent_dim
-#     classes = cgan.classes
-    
-#     # Cria um vetor de rótulos balanceado
-#     labels = torch.tensor([i for i in range(classes) for _ in range(examples_per_class)], device=device)
-#     # Número total de imagens geradas
-#     num_samples = examples_per_class * classes
-#     # Gera vetores latentes aleatórios
-#     z = torch.randn(num_samples, latent_dim, device=device)
+        # Embedding para condicionamento
+        self.label_embedding = nn.Embedding(self.classes, self.classes) if self.condition else None
 
-#     with torch.no_grad():
-#         cgan.eval()
-#         gen_imgs = cgan(z, labels)  # [N, C, H, W]
+        # Shapes de entrada
+        self.input_shape_gen = self.latent_dim + (self.classes if self.condition else 0)
+        self.input_shape_disc = self.channels + (self.classes if self.condition else 0)
 
-#     # Retorna como lista para aplicar transforms depois
-#     # Convertendo para CPU para aplicar transforms com PIL, se necessário
-#     gen_imgs_list = [img.cpu() for img in gen_imgs]
-#     gen_labels_list = labels.cpu().tolist()
+        # -----------------
+        #  Generator
+        # -----------------
+        self.generator = nn.Sequential(
+            nn.Linear(self.input_shape_gen, 512 * 4 * 4),
+            nn.ReLU(inplace=True),
+            nn.Unflatten(1, (512, 4, 4)),                  # → (512,4,4)
 
-#     #converte para PIL
-#     gen_imgs_pil = [to_pil_image((img * 0.5 + 0.5).clamp(0,1)) for img in gen_imgs_list]
+            nn.ConvTranspose2d(512, 256, kernel_size=4, stride=2, padding=1),  # → (256,8,8)
+            nn.BatchNorm2d(256, momentum=0.1),
+            nn.ReLU(inplace=True),
 
-#     #Monta dataset como do FederatedDataset
-#     features = Features({
-#     "image": Image(),
-#     "label": ClassLabel(names=[str(i) for i in range(classes)])
-#     })
+            nn.ConvTranspose2d(256, 128, kernel_size=4, stride=2, padding=1),  # → (128,16,16)
+            nn.BatchNorm2d(128, momentum=0.1),
+            nn.ReLU(inplace=True),
 
-#     # Cria um dicionário com os dados
-#     gen_dict = {"image": gen_imgs_pil, "label": gen_labels_list}
+            nn.ConvTranspose2d(128,  64, kernel_size=4, stride=2, padding=1),  # → ( 64,32,32)
+            nn.BatchNorm2d(64,  momentum=0.1),
+            nn.ReLU(inplace=True),
 
-#     # Cria o dataset Hugging Face
-#     gen_dataset_hf = datasets.Dataset.from_dict(gen_dict, features=features)
-#     return gen_dataset_hf
+            nn.ConvTranspose2d( 64,   self.channels, kernel_size=3, stride=1, padding=1),  # → (3,32,32)
+            nn.Tanh()
+        )
 
-# def split_balanced(gen_dataset_hf, num_clientes):
-#     # Identificar as classes
-#     class_label = gen_dataset_hf.features["label"]
-#     num_classes = class_label.num_classes
-    
-#     # Cria um mapeamento classe -> índices
-#     class_to_indices = {c: [] for c in range(num_classes)}
-#     for i in range(len(gen_dataset_hf)):
-#         lbl = gen_dataset_hf[i]["label"]
-#         class_to_indices[lbl].append(i)
-    
-#     # Verifica quantos exemplos por classe temos
-#     examples_per_class = len(class_to_indices[0])
-#     # Garantir que o número de exemplos por classe seja divisível por num_clientes 
-#     # (ou lidar com o resto de alguma forma)
-#     if examples_per_class % num_clientes != 0:
-#         raise ValueError("O número de exemplos por classe não é divisível igualmente pelo número de clientes.")
-        
-#     # Número de exemplos por classe por cliente
-#     examples_per_class_per_client = examples_per_class // num_clientes
+        # -----------------
+        #  Discriminator
+        # -----------------
+        layers = []
+        in_ch = self.input_shape_disc
+        cfg = [
+            ( 64, 3, 1),  # → spatial stays 32
+            ( 64, 4, 2),  # → 16
+            (128, 3, 1),  # → 16
+            (128, 4, 2),  # → 8
+            (256, 4, 2),  # → 4
+        ]
+        for out_ch, k, s in cfg:
+            layers += [
+                nn.utils.spectral_norm(
+                    nn.Conv2d(in_ch, out_ch, kernel_size=k, stride=s, padding=1)
+                ),
+                nn.LeakyReLU(0.1, inplace=True)
+            ]
+            in_ch = out_ch
 
-#     # Agora, distribui igualmente os índices para cada cliente
-#     client_indices = [[] for _ in range(num_clientes)]
-#     for c in range(num_classes):
-#         # Índices dessa classe
-#         idxs = class_to_indices[c]
-#         # Divide em partes iguais
-#         for i in range(num_clientes):
-#             start = i * examples_per_class_per_client
-#             end = (i+1) * examples_per_class_per_client
-#             client_indices[i].extend(idxs[start:end])
-    
-#     # Agora criamos um DatasetDict com um subset para cada cliente
-#     # Cada cliente terá a mesma quantidade total de exemplos (classes * examples_per_class_per_client)
-#     client_datasets = {}
-#     for i in range(num_clientes):
-#         # Ordena os índices do cliente (opcional, mas pode manter a ordem)
-#         client_indices[i].sort()
-#         # Seleciona os exemplos
-#         client_subset = gen_dataset_hf.select(client_indices[i])
-#         client_datasets[i] = client_subset
-    
-#     return client_datasets
+        layers += [
+            nn.Flatten(),
+            nn.utils.spectral_norm(
+                nn.Linear(256 * 4 * 4, 1)
+            )
+        ]
+        self.discriminator = nn.Sequential(*layers)
+
+        # adversarial loss
+        self.adv_loss = nn.BCEWithLogitsLoss()
+
+    def forward(self, input, labels=None):
+        # Generator pass
+        if input.dim() == 2 and input.size(1) == self.latent_dim:
+            if self.condition:
+                if labels is None:
+                    raise ValueError("Labels must be provided for conditional generation")
+                embedded = self.label_embedding(labels)
+                gen_input = torch.cat((input, embedded), dim=1)
+            else:
+                gen_input = input
+            img = self.generator(gen_input)
+            return img
+
+        # Discriminator pass
+        elif input.dim() == 4 and input.size(1) == self.channels:
+            x = input
+            if self.condition:
+                if labels is None:
+                    raise ValueError("Labels must be provided for conditional discrimination")
+                embedded = self.label_embedding(labels)
+                # criar mapa de labels e concatenar
+                lbl_map = embedded.view(-1, self.classes, 1, 1).expand(-1, self.classes, self.img_size, self.img_size)
+                x = torch.cat((x, lbl_map), dim=1)
+            return self.discriminator(x)
+
+        else:
+            raise ValueError("Input shape not recognized")
+
+    def loss(self, logits, targets):
+        return self.adv_loss(logits.view(-1), targets.float().view(-1))
+
 
 
 #######################################################################################
@@ -426,7 +467,7 @@ def load_data(partition_id: int,
               alpha_dir: float, 
               batch_size: int,
               folder : str = ".",
-              filter_classes=None,
+              dataset: str = "mnist",
               teste: bool = False,
               partitioner_type: str = "IID",
               num_chunks: int = 1,
@@ -439,7 +480,7 @@ def load_data(partition_id: int,
     global fds
 
     if fds is None:
-        print("Carregamento dos Dados")
+        print(f"Carregamento dos Dados - {dataset}")
         if partitioner_type == "Dir":
             print("Dados por Dirichlet")
             partitioner = DirichletPartitioner(
@@ -457,7 +498,7 @@ def load_data(partition_id: int,
             partitioner = IidPartitioner(num_partitions=num_partitions)
 
         fds = FederatedDataset(
-            dataset="mnist",
+            dataset=dataset,
             partitioners={"train": partitioner}
         )
 
@@ -475,18 +516,23 @@ def load_data(partition_id: int,
         num_samples = int(len(train_partition)/10)
         train_partition = train_partition.select(range(num_samples))
 
-    # if filter_classes is not None:
-    #     print("filtrando classes no dataset")
-    #     train_partition = train_partition.filter(lambda x: x["label"] in filter_classes)
-    #     print(f"selecionadas classes: {filter_classes}")
+    if dataset == "mnist":
+        pytorch_transforms = Compose([
+            ToTensor(),
+            Normalize((0.5,), (0.5,))
+        ])
+        image = "image"
+    elif dataset == "cifar10":
+        pytorch_transforms = Compose([
+            ToTensor(),
+            Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        ])
+        image = "img"
+    else:
+        raise ValueError(f"{dataset} not identified")
     
-    pytorch_transforms = Compose([
-        ToTensor(),
-        Normalize((0.5,), (0.5,))
-    ])
-
     def apply_transforms(batch):
-        batch["image"] = [pytorch_transforms(img) for img in batch["image"]]
+        batch[image] = [pytorch_transforms(img) for img in batch[image]]
         return batch
 
     train_partition = train_partition.with_transform(apply_transforms)
@@ -515,7 +561,7 @@ def load_data(partition_id: int,
             num_samples=syn_samples,
             latent_dim=gan.latent_dim,
             device="cpu",  # Use CPU for generation
-            image_col_name="image"
+            image_col_name=image
         )
 
         if round % num_chunks in (0,1,20):
@@ -527,9 +573,9 @@ def load_data(partition_id: int,
 
             for i, idx in enumerate(sample_idxs, start=1):
                 sample = generated_dataset[idx]
-                img = sample["image"]       # tensor C×H×W
+                img = sample[image]       # tensor C×H×W
                 lbl = sample["label"]       # inteiro
-                filename = f"{folder}/syn_samples/r{round}_img_{i:02d}_lbl{lbl}.png"
+                filename = f"{folder}/syn_samples/r{round}_client{partition_id}_img{i:02d}_lbl{lbl}.png"
                 save_image(img, filename)
 
         train_partition = ConcatDataset([client_dataset["train"], generated_dataset])
@@ -577,17 +623,24 @@ def load_data(partition_id: int,
     return trainloader_real, trainloader_syn, testloader, testloader_local
 
 
-def train_alvo(net, trainloader, epochs, lr, device):
+def train_alvo(net, trainloader, epochs, lr, device, dataset):
     """Train the model on the training set."""
     net.to(device)  # move model to GPU if available
     criterion = torch.nn.CrossEntropyLoss().to(device)
     optimizer = torch.optim.SGD(net.parameters(), lr=lr)
     net.train()
+    if dataset == "mnist":
+        image = "image"
+    elif dataset == "cifar10":
+        image = "img"
+    else:
+        raise ValueError(f"{dataset} nao identificado")
+    
     #treinou = False
     running_loss = 0.0
     for _ in range(epochs):
         for batch in trainloader:
-            images = batch["image"]
+            images = batch[image]
             labels = batch["label"]
             # if images.size(0) == 1:
             #     print("Batch size is 1, skipping batch")
@@ -605,9 +658,11 @@ def train_alvo(net, trainloader, epochs, lr, device):
 def train_disc(gen, disc, trainloader, epochs, device, optim, dataset="mnist", latent_dim=128):
     """Train the network on the training set."""
     if dataset == "mnist":
-      imagem = "image"
+      image = "image"
     elif dataset == "cifar10":
-      imagem = "img"
+      image = "img"
+    else:
+        raise ValueError(f"{dataset} nao identificado")
     
     gen.to(device)  # move model to GPU if available
     disc.to(device)  # move model to GPU if available
@@ -617,7 +672,7 @@ def train_disc(gen, disc, trainloader, epochs, device, optim, dataset="mnist", l
 
     for epoch in range(epochs):
         for batch_idx, batch in enumerate(trainloader):
-            images, labels = batch[imagem].to(device), batch["label"].to(device)
+            images, labels = batch[image].to(device), batch["label"].to(device)
             batch_size = images.size(0)
             real_ident = torch.full((batch_size, 1), 1., device=device)
             fake_ident = torch.full((batch_size, 1), 0., device=device)
@@ -686,16 +741,21 @@ def train_G(net: nn.Module, discs: list, device: str, lr: float, epochs: int, ba
 
     return np.mean(g_losses), optim_G.state_dict()
 
-def test(net, testloader, device, model):
+def test(net, testloader, device, model, dataset):
     """Validate the model on the test set."""
     net.to(device)
+    if dataset == "mnist":
+        image = "image"
+    elif dataset == "cifar10":
+        image = "img"
+    else:
+        raise ValueError(f"dataset nao identificado")
     if model == "gen":
-        imagem = "image"
         g_losses = []
         d_losses = []
         with torch.no_grad():
             for batch_idx, batch in enumerate(testloader):
-                images, labels = batch[imagem].to(device), batch["label"].to(device)
+                images, labels = batch[image].to(device), batch["label"].to(device)
                 batch_size = images.size(0)
                 real_ident = torch.full((batch_size, 1), 1., device=device)
                 fake_ident = torch.full((batch_size, 1), 0., device=device)
@@ -728,7 +788,7 @@ def test(net, testloader, device, model):
         correct, loss = 0, 0.0
         with torch.no_grad():
             for batch in testloader:
-                images = batch["image"].to(device)
+                images = batch[image].to(device)
                 labels = batch["label"].to(device)
                 outputs = net(images)
                 loss += criterion(outputs, labels).item()
@@ -744,7 +804,8 @@ def local_test(net: nn.Module,
                epoch: int,
                cliente: str,
                num_classes: int = 10,
-               continue_epoch: int = 0):
+               continue_epoch: int = 0,
+               dataset: str = "mnist"):
     client_eval_time = time.time()
     # Evaluation in client test
     # Initialize counters
@@ -753,9 +814,17 @@ def local_test(net: nn.Module,
     predictions_counter = defaultdict(int)
 
     net.eval()
+
+    if dataset == "mnist":
+        image = "image"
+    elif dataset == "cifar10":
+        image = "img"
+    else:
+        raise ValueError(f"dataset nao identificado")
+    
     with torch.no_grad():
         for batch in testloader:
-            images, labels = batch["image"].to(device), batch["label"].to(device)
+            images, labels = batch[image].to(device), batch["label"].to(device)
             outputs = net(images)
             _, predicted = torch.max(outputs, 1)
 

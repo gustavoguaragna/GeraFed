@@ -21,8 +21,10 @@ from flwr.server.strategy.aggregate import aggregate, aggregate_inplace, weighte
 
 from Simulation.GeraFed_F2U.task import (
     Net,
+    Net_CIFAR,
     CGAN,
     F2U_GAN,
+    F2U_GAN_CIFAR,
     set_weights,
     train_G,
     get_weights,
@@ -304,7 +306,12 @@ class GeraFed(Strategy):
         if parameters_aggregated is not None:
             # Salva o modelo após a agregação
             # Cria uma instância do modelo
-            self.classifier = Net()
+            if self.dataset == "mnist":
+                self.classifier = Net()
+            elif self.dataset == "cifar10":
+                self.classifier = Net_CIFAR()
+            else:
+                raise ValueError(f"{self.dataset} nao identificado")
             # Define os pesos do modelo
             set_weights(self.classifier, aggregated_ndarrays)
 
@@ -313,7 +320,10 @@ class GeraFed(Strategy):
             if self.gan_arq == "simple_cnn":
                 self.discs = [CGAN().to(self.device) for _ in range(len(disc_ndarrays))]
             elif self.gan_arq == "f2u_gan":
-                self.discs = [F2U_GAN().to(self.device) for _ in range(len(disc_ndarrays))]
+                if self.dataset == "mnist":
+                    self.discs = [F2U_GAN().to(self.device) for _ in range(len(disc_ndarrays))]
+                elif self.dataset == "cifar10":
+                    self.discs = [F2U_GAN_CIFAR().to(self.device) for _ in range(len(disc_ndarrays))] 
             for i, disc in enumerate(self.discs):
                 set_weights(disc, disc_ndarrays[i])
 
@@ -329,24 +339,6 @@ class GeraFed(Strategy):
             )
 
             self.metrics_dict["g_loss_chunk"].append(g_loss)
-
-            # if server_round % self.num_chunks == 0 or server_round == 1:
-            #     net = Net().to(self.device)
-            #     set_weights(net, aggregated_ndarrays)
-            #     checkpoint = {
-            #         'epoch': int(server_round/self.num_chunks)+1,  # número da última época concluída
-            #         'alvo_state_dict': net.state_dict(),
-            #         'optimizer_alvo_state_dict': [optim.state_dict() for optim in optims],
-            #         'gen_state_dict': gen.state_dict(),
-            #         'optim_G_state_dict': optim_G.state_dict(),
-            #         'discs_state_dict': [model.state_dict() for model in models],
-            #         'optim_Ds_state_dict:': [optim_d.state_dict() for optim_d in optim_Ds]
-            #     }
-            #     checkpoint_file = f"checkpoint_epoch{epoch+1}.pth"
-            #     torch.save(checkpoint, checkpoint_file)
-            #     print(f"Checkpoint saved to {checkpoint_file}")
-
-            # self.metrics_dict["net_loss_chunk"].append()
 
             discs_state_dict = {
                 cid: disc.state_dict() for cid, disc in enumerate(self.discs)

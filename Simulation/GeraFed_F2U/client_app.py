@@ -4,9 +4,11 @@ import torch
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import Context, ParametersRecord, array_from_numpy
 from Simulation.GeraFed_F2U.task import (
-    Net, 
+    Net,
+    Net_CIFAR,
     CGAN, 
     F2U_GAN,
+    F2U_GAN_CIFAR,
     get_weights,
     load_data, 
     set_weights, 
@@ -99,8 +101,9 @@ class FlowerClient(NumPyClient):
 
 
         # Carrega dados
-        trainloader_real, trainloader_syn, _, _ = load_data(partition_id=self.cid,
-                                num_partitions=self.num_partitions,
+        trainloader_real, trainloader_syn, _, _ = load_data(
+                                partition_id    = self.cid,
+                                num_partitions  = self.num_partitions,
                                 partitioner_type=self.partitioner,
                                 alpha_dir=self.alpha_dir,
                                 batch_size=self.batch_size,
@@ -109,7 +112,9 @@ class FlowerClient(NumPyClient):
                                 syn_samples=num_syn,
                                 gan=self.net_gen,
                                 round=config["round"],
-                                folder=self.folder)
+                                folder=self.folder,
+                                dataset=self.dataset
+                                )
     
 
         # Atualiza pesos do modelo classificador
@@ -131,6 +136,7 @@ class FlowerClient(NumPyClient):
             epochs=self.local_epochs_alvo,
             lr=self.lr_alvo,
             device=self.device,
+            dataset=self.dataset
         )
         ##train_classifier_time  = time.time() - train_alvo_start_time
 
@@ -221,12 +227,13 @@ class FlowerClient(NumPyClient):
                                 partitioner_type=self.partitioner,
                                 alpha_dir=self.alpha_dir,
                                 batch_size=self.batch_size,
-                                teste=self.teste)
+                                teste=self.teste,
+                                dataset=self.dataset)
 
         set_weights(self.net_alvo, parameters)
         ##test_time_start = time.time()
         # Avalia o modelo classificador
-        loss, accuracy = test(self.net_alvo, testloader, self.device, model=self.model)
+        loss, accuracy = test(self.net_alvo, testloader, self.device, model=self.model, dataset=self.dataset)
         ##test_time = time.time() - test_time_start
 
 
@@ -240,7 +247,8 @@ class FlowerClient(NumPyClient):
                     acc_filepath=f"{self.folder}/accuracy_report.txt",
                     epoch=int(config["round"]/self.num_chunks),
                     cliente=self.cid,
-                    continue_epoch=self.continue_epoch)
+                    continue_epoch=self.continue_epoch,
+                    dataset=self.dataset)
             ##local_test_time = time.time() - local_test_start_time
 
         return (loss,
@@ -255,7 +263,6 @@ class FlowerClient(NumPyClient):
 def client_fn(context: Context):
     """Client function to be used in the Flower ClientApp."""
     # Load model and data
-    net_alvo           = Net()
     partition_id       = context.node_config["partition-id"]
     num_partitions     = context.node_config["num-partitions"]
     partitioner        = context.run_config["partitioner"]
@@ -270,21 +277,33 @@ def client_fn(context: Context):
     local_epochs_alvo  = context.run_config["epocas_alvo"]
     local_epochs_gen   = context.run_config["epocas_gen"]
     lr_gen             = context.run_config["learn_rate_gen"]
+    lr_disc            = context.run_config["learn_rate_disc"]
     lr_alvo            = context.run_config["learn_rate_alvo"]
     latent_dim         = context.run_config["tam_ruido"]
     agg                = context.run_config["agg"]
     model              = context.run_config["model"]
     niid               = False if partitioner == "IID" else True 
-    folder             = context.run_config["Exp_name_folder"]
+    folder             = f"{context.run_config['Exp_name_folder']}FedGenIA_F2U_{num_partitions}clients/{dataset}/{partitioner}"
     num_epochs         = context.run_config["num_rodadas"]/num_chunks
+    
+    if dataset == "mnist":
+        net_alvo = Net()
+        if gan_arq == "simple_cnn":
+            # Use a simple CNN architecture for the generator
+            gan = CGAN()
+        elif gan_arq == "f2u_gan":
+            gan = F2U_GAN()
+    elif dataset == "cifar10":
+        net_alvo = Net_CIFAR()
+        if gan_arq == "simple_cnn":
+            # Use a simple CNN architecture for the generator
+            raise ValueError(f"cGAN nao implementada para CIFAR10")
+        elif gan_arq == "f2u_gan":
+            gan = F2U_GAN_CIFAR()
+    else:
+        raise ValueError(f"{dataset} nao identificado")
 
-    if gan_arq == "simple_cnn":
-        # Use a simple CNN architecture for the generator
-        gan = CGAN()
-    elif gan_arq == "f2u_gan":
-        gan = F2U_GAN()
-
-    optim_D = torch.optim.Adam(gan.discriminator.parameters(), lr=lr_gen, betas=(0.5, 0.999))
+    optim_D = torch.optim.Adam(gan.discriminator.parameters(), lr=lr_disc, betas=(0.5, 0.999))
 
 
 
