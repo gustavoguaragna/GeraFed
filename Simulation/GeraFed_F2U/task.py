@@ -589,7 +589,8 @@ def syn_input(num_samples: int,
               folder: str, 
               dataloader: DataLoader, 
               partition_id: int, 
-              dataset: str = "mnist"):
+              dataset: str = "mnist",
+              continue_epoch: int = 0):
     if dataset == "mnist":
         image = "image"
     elif dataset == "cifar10":
@@ -616,7 +617,7 @@ def syn_input(num_samples: int,
             sample = generated_dataset[idx]
             img = sample[image]       # tensor C×H×W
             lbl = sample["label"]       # inteiro
-            filename = f"{folder}/syn_samples/r{round}_client{partition_id}_img{i:02d}_lbl{lbl}.png"
+            filename = f"{folder}/syn_samples/r{round+continue_epoch}_client{partition_id}_img{i:02d}_lbl{lbl}.png"
             save_image(img, filename)
 
     train_partition = ConcatDataset([dataloader.dataset, generated_dataset])

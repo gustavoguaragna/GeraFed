@@ -78,7 +78,7 @@ def server_fn(context: Context):
     optimGstate_dict = None
 
     if continue_epoch != 0:
-        checkpoint = torch.load(f"{folder}/checkpoint_epoch{continue_epoch}.pth")
+        checkpoint = torch.load(f"{folder}/checkpoint_epoch{continue_epoch}.pth", map_location=torch.device("cuda:0" if torch.cuda.is_available() else "cpu"))
         classifier.load_state_dict(checkpoint['classifier_state_dict'])
         gen.load_state_dict(checkpoint['gen_state_dict'])
         optimGstate_dict = checkpoint['optim_G_state_dict']

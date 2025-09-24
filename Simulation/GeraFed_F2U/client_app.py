@@ -130,7 +130,8 @@ class FlowerClient(NumPyClient):
                                     folder=self.folder,
                                     dataloader=trainloader_chunk,
                                     partition_id=self.cid,
-                                    dataset=self.dataset
+                                    dataset=self.dataset,
+                                    continue_epoch=self.continue_epoch
                                     )
 
         # Treina o modelo classificador
@@ -299,7 +300,7 @@ def client_fn(context: Context):
 
 
     if continue_epoch != 0:
-        checkpoint = torch.load(f"{folder}/checkpoint_epoch{continue_epoch}.pth")
+        checkpoint = torch.load(f"{folder}/checkpoint_epoch{continue_epoch}.pth", map_location=torch.device("cuda:0" if torch.cuda.is_available() else "cpu"))
         gan.load_state_dict(checkpoint['discs_state_dict'][partition_id])
         optim_D.load_state_dict(checkpoint['optimDs_state_dict'][partition_id])
 
