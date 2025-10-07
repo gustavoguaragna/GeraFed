@@ -5,7 +5,7 @@ import argparse
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, random_split, Subset
 from torchvision.transforms import Compose, ToTensor, Normalize
-from Py_files.task import F2U_GAN, F2U_GAN_CIFAR, ClassPartitioner, generate_plot
+from Py_files.task import F2U_GAN, F2U_GAN_SlowDisc, F2U_GAN_CIFAR, ClassPartitioner, generate_plot
 from flwr_datasets.partitioner import DirichletPartitioner
 from flwr_datasets import FederatedDataset
 from collections import Counter
@@ -22,6 +22,8 @@ parser.add_argument("--test_mode", action="store_true")
 parser.add_argument("--checkpoint_epoch", type=int, default=None)
 parser.add_argument("--epochs", type=int, default=100)
 parser.add_argument("--d_lr", type=float, default=0.0002)
+parser.add_argument("--batch_tam", type=int, default=32)
+parser.add_argument("--extra_g_e", type=int, default=20)
 
 args = parser.parse_args()
 
@@ -29,6 +31,8 @@ dataset = args.dataset
 num_chunks_list = args.num_chunks_list
 checkpoint_epoch = args.checkpoint_epoch
 d_lr = args.d_lr
+batch_tam = args.batch_tam
+extra_g_e = args.extra_g_e
 
 
 print("Selected dataset:", dataset)
@@ -37,7 +41,7 @@ num_partitions = 4
 alpha_dir = 0.1
 start_epoch = 0
 epochs = args.epochs
-extra_g_e = 20
+
     
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -50,7 +54,7 @@ if dataset == "mnist":
     ToTensor(),
     Normalize((0.5,), (0.5,))
 ])
-    models = [F2U_GAN(condition=True, seed=42) for _ in range(num_partitions)]
+    models = [F2U_GAN_SlowDisc(condition=True, seed=42) for _ in range(num_partitions)]
     gen = F2U_GAN(condition=True, seed=42).to(device)
 
 elif dataset == "cifar10":
@@ -188,7 +192,6 @@ for num_chunks in num_chunks_list:
     epoch_bar = tqdm(range(start_epoch, epochs), desc="Treinamento", leave=True, position=0)
 
     batch_size_gen = 1
-    batch_tam = 32
     latent_dim = 128
     num_classes = 10
  
@@ -424,7 +427,7 @@ for num_chunks in num_chunks_list:
                  f.write(f"{current_lambda_star},{current_lam}\n")
 
         print(f"Época {epoch+1} completa")
-        generate_plot(gen, "cpu", epoch+1, latent_dim=128, folder=folder)
+        generate_plot(net=gen, device="cpu", round_number=epoch+1, latent_dim=128, folder=folder)
         gen.to(device)
 
         losses_dict["time_round"].append(time.time() - epoch_start_time)
