@@ -5,7 +5,7 @@ from collections import OrderedDict, defaultdict
 import torch
 from torchvision.transforms import Compose, ToTensor, Normalize
 from torch.utils.data import DataLoader, random_split, Subset, ConcatDataset
-from Py_files.task import F2U_GAN, F2U_GAN_CIFAR, ClassPartitioner, GeneratedDataset, generate_plot, Net, Net_Cifar
+from task import F2U_GAN, F2U_GAN_CIFAR, ClassPartitioner, GeneratedDataset, generate_plot, Net, Net_Cifar
 from flwr.common import FitRes, Status, Code, ndarrays_to_parameters
 from flwr.server.strategy.aggregate import aggregate_inplace
 from flwr_datasets.partitioner import DirichletPartitioner
@@ -61,6 +61,15 @@ extra_g_e = args.extra_g_e
 seed = args.seed
 start_epoch = 0
 
+if args.test_mode:
+    print("Test Mode")
+    num_chunks = 10
+    epochs = 2
+    extra_g_e = 2
+
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 print(f"""
 Epochs: {epochs}
 Checkpoint Epoch: {checkpoint_epoch}
@@ -68,22 +77,17 @@ Dataset: {dataset}
 Num Chunks: {num_chunks}
 Num Partitions: {num_partitions}
 Partitioner: {partitioner}
+Device: {device}
 """)
+
 if partitioner == "Dirichlet":
     print(f"Alpha (for Dirichlet): {alpha_dir}")
-if args.test_mode:
-    print("Test Mode")
-
-    
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-if partitioner == "Dirichlet":
     partitioner = DirichletPartitioner(
         num_partitions=num_partitions,
         partition_by="label",
         alpha=alpha_dir,
-    min_partition_size=0,
-    self_balancing=False
+    	min_partition_size=0,
+    	self_balancing=False
 )
 else:
     partitioner = ClassPartitioner(num_partitions=num_partitions, seed=seed, label_column="label")
@@ -135,9 +139,6 @@ train_partitions = [fds.load_partition(i, split="train") for i in range(num_part
 if args.test_mode:
     num_samples = [int(len(train_partition)/100) for train_partition in train_partitions]
     train_partitions = [train_partition.select(range(n)) for train_partition, n in zip(train_partitions, num_samples)]
-    epochs = 2
-    extra_g_e = 2
-    num_chunks_list = [1, 10]
 
 # min_lbl_count = 0.05
 # class_labels = train_partitions[0].info.features["label"]
@@ -177,8 +178,11 @@ for train_part in train_partitions:
         "test":  client_test,
     })
 
+
+folder = f"{dataset}_numchunks{num_chunks}"
+
 if checkpoint_epoch:
-    checkpoint_loaded = torch.load(f"chunk_analysis/{dataset}/num_chunks{num_chunks}/checkpoint_epoch{checkpoint_epoch}.pth")
+    checkpoint_loaded = torch.load(f"{folder}/checkpoint_epoch{checkpoint_epoch}.pth")
 
     global_net.load_state_dict(checkpoint_loaded['alvo_state_dict'])
     global_net.to(device)
@@ -242,7 +246,6 @@ batch_tam = 32
 latent_dim = 128
 num_classes = 10
 
-folder = f"{dataset}_numchunks{num_chunks}"
 os.makedirs(folder, exist_ok=True)
 loss_filename = f"{folder}/losses.json"
 acc_filename = f"{folder}/accuracy_report.txt"
@@ -583,11 +586,11 @@ for epoch in epoch_bar:
         checkpoint = {
                 'epoch': epoch+1,
                 'alvo_state_dict': global_net.state_dict(),
-                'optimizer_alvo_state_dict': [optim.state_dict() for optim in optims],
+                'optim_alvo_state_dict': [optim.state_dict() for optim in optims],
                 'gen_state_dict': gen.state_dict(),
                 'optim_G_state_dict': optim_G.state_dict(),
                 'discs_state_dict': [model.state_dict() for model in models],
-                'optim_Ds_state_dict:': [optim_d.state_dict() for optim_d in optim_Ds]
+                'optim_Ds_state_dict': [optim_d.state_dict() for optim_d in optim_Ds]
             }
         checkpoint_file = f"{folder}/checkpoint_epoch{epoch+1}.pth"
         torch.save(checkpoint, checkpoint_file)

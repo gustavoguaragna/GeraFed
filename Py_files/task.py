@@ -241,6 +241,103 @@ class F2U_GAN_CIFAR(nn.Module):
 
     def loss(self, logits, targets):
         return self.adv_loss(logits.view(-1), targets.float().view(-1))
+    
+class WGAN(nn.Module):
+    def __init__(self, num_channels=3, latent_dim=128, seed=None):
+        if seed is not None:
+            torch.manual_seed(seed)
+        super(WGAN, self).__init__()
+        self.num_channels = num_channels
+        self.latent_dim = latent_dim
+        self.num_classes = 10
+
+        # Camada de Convolução para o Discriminador
+        def conv_block(in_channels, out_channels, kernel_size=5, stride=2, padding=2, use_bn=False):
+            layers = [nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)]
+            if use_bn:
+                layers.append(nn.BatchNorm2d(out_channels))
+            layers.append(nn.LeakyReLU(0.2, inplace=True))
+            return nn.Sequential(*layers)
+        
+        # Discriminator
+        self.discriminator = nn.Sequential(
+            # Camada 1: (batch, num_channels, 32, 32) -> (batch, 64, 16, 16)
+            conv_block(self.num_channels + self.num_classes, 64),
+            # Camada 2: (batch, 64, 16, 16) -> (batch, 128, 8, 8)
+            conv_block(64, 128, use_bn=True),
+            # Camada 3: (batch, 128, 8, 8) -> (batch, 256, 4, 4)
+            conv_block(128, 256, use_bn=True),
+            # Camada 4: (batch, 256, 4, 4) -> (batch, 512, 2, 2)
+            conv_block(256, 512, use_bn=True),
+            nn.Flatten(),
+            # Camada Final: (batch, 512*2*2) -> (batch, 1)
+            nn.Linear(512 * 2 * 2, 1)
+        ) 
+
+        # Camada de upsample para o Gerador
+        def upsample_block(in_channels, out_channels, kernel_size=3, stride=1, padding=1, use_bn=True):
+            layers = [
+                nn.Upsample(scale_factor=2),
+                nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding),
+                nn.BatchNorm2d(out_channels) if use_bn else nn.Identity(),
+                nn.LeakyReLU(0.2, inplace=True)
+            ]
+            return nn.Sequential(*layers)
+
+        # Generator
+        self.generator = nn.Sequential(
+            # Camada Inicial: (batch, latent_dim + num_classes) -> (batch, 4*4*256)
+            nn.Linear(self.latent_dim + self.num_classes, 4*4*256),
+            nn.BatchNorm1d(4 * 4 * 256),
+            nn.LeakyReLU(0.2, inplace=True),
+            # Reshape para (batch, 256, 4, 4)
+            nn.Unflatten(1, (256, 4, 4)),
+            # Camada 1: (batch, 256, 4, 4) -> (batch, 128, 8, 8)
+            upsample_block(256, 128),
+            # Camada 2: (batch, 128, 8, 8) -> (batch, 64, 16, 16)
+            upsample_block(128, 64),
+            # Camada 3: (batch, 64, 16, 16) -> (batch, 32, 32, 32)
+            upsample_block(64, 32),
+            # Camada Final: (batch, 32, 32, 32) -> (batch, num_channels, 32, 32)
+            nn.Conv2d(32, self.num_channels, kernel_size=3, stride=1, padding=1),
+            nn.Tanh()
+        )  
+
+    def forward(self, x, labels):
+        if x.dim() == 2:
+            # Generator forward pass
+            labels = torch.nn.functional.one_hot(labels, self.num_classes).float()
+            input = torch.cat((x, labels), dim =1)
+            img = self.generator(input)
+            return img
+        
+        elif x.dim() == 4:
+            # Discriminator forward pass
+            labels = torch.nn.functional.one_hot(labels, self.num_classes).float()
+            # criar mapa de labels e concatenar
+            lbl_map = labels.view(-1, self.num_classes, 1, 1).expand(-1, self.num_classes, x.size(2), x.size(3))
+            x = torch.cat((x, lbl_map), dim=1)
+            logits = self.discriminator(x)
+            return logits
+    
+    
+ # Função de perda Wasserstein
+def discriminator_loss(real_output, fake_output):
+    return fake_output.mean() - real_output.mean()
+
+def generator_loss(fake_output):
+    return -fake_output.mean()
+
+# Função para calcular Gradient Penalty
+def gradient_penalty(D, real_samples, fake_samples, labels):
+    alpha = torch.rand(real_samples.size(0), 1, 1, 1, device=device)
+    interpolated = (alpha * real_samples + (1 - alpha) * fake_samples).requires_grad_(True)
+    d_interpolated = D(interpolated, labels)
+    gradients = torch.autograd.grad(outputs=d_interpolated, inputs=interpolated,
+                                    grad_outputs=torch.ones_like(d_interpolated),
+                                    create_graph=True, retain_graph=True)[0]
+    gradients = gradients.view(gradients.size(0), -1)
+    return ((gradients.norm(2, dim=1) - 1) ** 2).mean()
 
 
 class GeneratedDataset(torch.utils.data.Dataset):
@@ -407,24 +504,20 @@ class GeneratedDataset(torch.utils.data.Dataset):
             self.label_col_name: int(self.labels[idx]) # Return label as standard Python int
         }
     
-def generate_plot(net, device, round_number, client_id = None, examples_per_class: int=5, classes: int=10, latent_dim: int=100, folder: str="."):
+def generate_plot(net, round_number, device: str="cpu", client_id = None, examples_per_class: int=5, classes: int=10, latent_dim: int=128, folder: str="."):
     """Gera plot de imagens de cada classe"""
 
     net_type = type(net).__name__
     net.to(device)
     net.eval()
     batch_size = examples_per_class * classes
-    dataset = "mnist" if  not net_type == "F2U_GAN_CIFAR" else "cifar10"
+    dataset = "mnist" if not net_type in ["F2U_GAN_CIFAR", "WGAN"] else "cifar10"
 
     latent_vectors = torch.randn(batch_size, latent_dim, device=device)
     labels = torch.tensor([i for i in range(classes) for _ in range(examples_per_class)], device=device)
 
     with torch.no_grad():
-        if net_type == "Generator":
-            labels_one_hot = torch.nn.functional.one_hot(labels, 10).float().to(device)
-            generated_images = net(torch.cat([latent_vectors, labels_one_hot], dim=1))
-        else:
-            generated_images = net(latent_vectors, labels)
+        generated_images = net(latent_vectors, labels)
 
     # Criar uma figura com 10 linhas e 5 colunas de subplots
     fig, axes = plt.subplots(classes, examples_per_class, figsize=(5, 9))
