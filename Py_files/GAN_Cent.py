@@ -2,14 +2,14 @@ import os
 import torch
 from torchvision import datasets, transforms
 from torch.utils.data import random_split, DataLoader
-from Py_files.task import F2U_GAN_CIFAR, WGAN, generate_plot, discriminator_loss, generator_loss, gradient_penalty
+from task import F2U_GAN_CIFAR, WGAN, generate_plot, discriminator_loss, generator_loss, gradient_penalty, F2U_Discriminator_CIFAR, F2U_Generator_CIFAR
 from tqdm import tqdm
 import argparse
 import json
 import time
 
 def main(test_mode: bool, gan_arq: str, freq_save: int):
-    epochs = 4
+    epochs = 50
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -19,12 +19,16 @@ def main(test_mode: bool, gan_arq: str, freq_save: int):
 
     # Start model
     if gan_arq == 'F2U_CIFAR':
-        gan = F2U_GAN_CIFAR().to(device)
+        gen = F2U_GAN_CIFAR().to(device)
+        gen = F2U_Generator_CIFAR().to(device)
+        disc = F2U_Discriminator_CIFAR().to(device)
     elif gan_arq == 'WGAN':
-        gan = WGAN().to(device)
+        gen = WGAN().to(device)
 
-    optim_G = torch.optim.Adam(gan.generator.parameters(), lr=0.0002, betas=(0.5, 0.999))
-    optim_D = torch.optim.Adam(gan.discriminator.parameters(), lr=0.0002, betas=(0.5, 0.999))
+    optim_G = torch.optim.Adam(gen.parameters(), lr=0.0002, betas=(0.5, 0.999))
+    optim_D = torch.optim.Adam(disc.parameters(), lr=0.0002, betas=(0.5, 0.999))
+
+    criterion = torch.nn.BCEWithLogitsLoss()
 
     # Load data
     transform = transforms.Compose([
@@ -50,7 +54,8 @@ def main(test_mode: bool, gan_arq: str, freq_save: int):
     # Training loop
     initial_time = time.time()
     for epoch in range(epochs):
-        gan.train()
+        gen.train()
+        disc.train()
         D_epoch_loss = 0.0
         G_epoch_loss = 0.0
 
@@ -65,18 +70,20 @@ def main(test_mode: bool, gan_arq: str, freq_save: int):
             # Train Discriminator
             optim_D.zero_grad()
 
-            real_logits = gan(images, labels)
+            real_logits = disc(images, labels)
 
             z = torch.randn(batch_size, 128).to(device)
-            fake_images = gan(z, labels)
-            fake_logits = gan(fake_images.detach(), labels)
+            fake_images = gen(z, labels)
+            fake_logits = disc(fake_images.detach(), labels)
 
             if gan_arq == 'F2U_CIFAR':
-                real_loss = gan.loss(real_logits, real_targets)
-                fake_loss = gan.loss(fake_logits, fake_targets)
+                # real_loss = gen.loss(real_logits, real_targets)
+                real_loss = criterion(real_logits, real_targets)
+                # fake_loss = gen.loss(fake_logits, fake_targets)
+                fake_loss = criterion(fake_logits, fake_targets)
                 D_loss = (real_loss + fake_loss) / 2
             elif gan_arq == 'WGAN':
-                D_loss = discriminator_loss(real_logits, fake_logits) + 10 * gradient_penalty(gan, images, fake_images, labels)
+                D_loss = discriminator_loss(real_logits, fake_logits) + 10 * gradient_penalty(gen, images, fake_images, labels, device=device)
 
             D_loss.backward()
             optim_D.step()
@@ -85,11 +92,12 @@ def main(test_mode: bool, gan_arq: str, freq_save: int):
             optim_G.zero_grad()
 
             z = torch.randn(batch_size, 128).to(device)
-            fake_images = gan(z, labels)
-            fake_logits = gan(fake_images, labels)
+            fake_images = gen(z, labels)
+            fake_logits = disc(fake_images, labels)
 
             if gan_arq == 'F2U_CIFAR':
-                G_loss = gan.loss(fake_logits, real_targets)
+                # G_loss = gen.loss(fake_logits, real_targets)
+                G_loss = criterion(fake_logits, real_targets)
             elif gan_arq == 'WGAN':
                 G_loss = generator_loss(fake_logits)
 
@@ -109,12 +117,13 @@ def main(test_mode: bool, gan_arq: str, freq_save: int):
         if (epoch + 1) % freq_save == 0 or (epoch + 1) == epochs or epoch == 0:
             checkpoint = {
                 'epoch': epoch + 1,
-                'gan_state_dict': gan.state_dict(),
+                'gen_state_dict': gen.state_dict(),
+                'disc_state_dict': disc.state_dict(),
                 'optim_G_state_dict': optim_G.state_dict(),
                 'optim_D_state_dict': optim_D.state_dict(),
             }
             torch.save(checkpoint, os.path.join(folder, f'checkpoint_epoch{epoch+1}.pth'))
-            generate_plot(net=gan, device=device, round_number=epoch+1, folder=folder)
+            generate_plot(net=gen, device=device, round_number=epoch+1, folder=folder)
 
             try:
                 with open(metrics_filename, 'w', encoding='utf-8') as f:
@@ -142,4 +151,4 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    main()
+    main(args.test_mode, args.gan_arq, args.freq_save)

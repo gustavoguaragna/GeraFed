@@ -21,12 +21,14 @@ parser.add_argument("--num_chunks_list", nargs="+", type=int, default=[1, 10, 50
 parser.add_argument("--test_mode", action="store_true")
 parser.add_argument("--checkpoint_epoch", type=int, default=None)
 parser.add_argument("--epochs", type=int, default=100)
+parser.add_argument("--d_lr", type=float, default=0.0002)
 
 args = parser.parse_args()
 
 dataset = args.dataset
 num_chunks_list = args.num_chunks_list
 checkpoint_epoch = args.checkpoint_epoch
+d_lr = args.d_lr
 
 
 print("Selected dataset:", dataset)
@@ -71,7 +73,7 @@ elif dataset == "cifar10":
 
 optim_G = torch.optim.Adam(gen.generator.parameters(), lr=0.0002, betas=(0.5, 0.999))
 optim_Ds = [
-    torch.optim.Adam(model.discriminator.parameters(), lr=0.0002, betas=(0.5, 0.999))
+    torch.optim.Adam(model.discriminator.parameters(), lr=d_lr, betas=(0.5, 0.999))
     for model in models
 ]
 
