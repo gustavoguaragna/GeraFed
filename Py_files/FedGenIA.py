@@ -15,6 +15,9 @@ import argparse
 import random
 import math
 
+
+def main():
+
 parser = argparse.ArgumentParser(description="F2U Federated GAN Training")
 
 parser.add_argument("--alpha", type=float, default=0.1)
@@ -617,7 +620,7 @@ for epoch in epoch_bar:
     losses_dict["net_acc_round"].append(accuracy)
 
     print(f"Época {epoch+1} completa")
-    generate_plot(gen, "cpu", epoch+1, latent_dim=128, folder=folder)
+        generate_plot(net=gen, device="cpu", round_number=epoch+1, latent_dim=128, folder=folder)
     gen.to(device)
 
     losses_dict["time_round"].append(time.time() - epoch_start_time)
@@ -628,3 +631,6 @@ for epoch in epoch_bar:
         print(f"Losses dict successfully saved to {loss_filename}")
     except Exception as e:
         print(f"Error saving losses dict to JSON: {e}")
+
+if __name__ == "__main__":
+    main()
