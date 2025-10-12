@@ -22,6 +22,12 @@ parser.add_argument("--test_mode", action="store_true")
 parser.add_argument("--checkpoint_epoch", type=int, default=None)
 parser.add_argument("--epochs", type=int, default=100)
 parser.add_argument("--d_lr", type=float, default=0.0002)
+parser.add_argument("--g_lr", type=float, default=0.0002)
+parser.add_argument("--beta1_d", type=float, default=0.5)
+parser.add_argument("--beta2_d", type=float, default=0.999)
+parser.add_argument("--wd_d", type=float, default=0)
+parser.add_argument("--beta1_g", type=float, default=0.5)
+parser.add_argument("--beta2_g", type=float, default=0.999)
 parser.add_argument("--batch_tam", type=int, default=32)
 parser.add_argument("--extra_g_e", type=int, default=20)
 
@@ -30,9 +36,17 @@ args = parser.parse_args()
 dataset = args.dataset
 num_chunks = args.num_chunks
 checkpoint_epoch = args.checkpoint_epoch
-d_lr = args.d_lr
 batch_tam = args.batch_tam
 extra_g_e = args.extra_g_e
+
+d_lr = args.d_lr
+g_lr = args.g_lr
+beta1_d = args.beta1_d
+beta2_d = args.beta2_d
+wd_d = args.wd_d
+beta1_g = args.beta1_g
+beta2_g = args.beta2_g
+
 
 
 print("Selected dataset:", dataset)
@@ -54,7 +68,7 @@ if dataset == "mnist":
     ToTensor(),
     Normalize((0.5,), (0.5,))
 ])
-    models = [F2U_GAN_SlowDisc(condition=True, seed=42) for _ in range(num_partitions)]
+    models = [F2U_GAN(condition=True, seed=42) for _ in range(num_partitions)]
     gen = F2U_GAN(condition=True, seed=42).to(device)
 
 elif dataset == "cifar10":
@@ -75,9 +89,9 @@ elif dataset == "cifar10":
     models = [F2U_GAN_CIFAR(condition=True, seed=42) for _ in range(num_partitions)]
     gen = F2U_GAN_CIFAR(condition=True, seed=42).to(device)
 
-optim_G = torch.optim.Adam(gen.generator.parameters(), lr=0.0002, betas=(0.5, 0.999))
+optim_G = torch.optim.Adam(gen.generator.parameters(), lr=g_lr, betas=(beta1_g, beta2_g))
 optim_Ds = [
-    torch.optim.Adam(model.discriminator.parameters(), lr=d_lr, betas=(0.5, 0.999))
+    torch.optim.Adam(model.discriminator.parameters(), lr=d_lr, betas=(beta1_d, beta2_d ), weight_decay=wd_d)
     for model in models
 ]
 

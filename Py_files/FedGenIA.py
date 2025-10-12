@@ -15,25 +15,24 @@ import argparse
 import random
 import math
 
-
 def main():
 
-    parser = argparse.ArgumentParser(description="F2U Federated GAN Training")
+        parser = argparse.ArgumentParser(description="F2U Federated GAN Training")
 
-    parser.add_argument("--alpha", type=float, default=0.1)
-    parser.add_argument("--batch_size", type=int, default=64)
-    parser.add_argument("--dataset", type=str, choices=["mnist", "cifar10"], default="mnist")
-    parser.add_argument("--local_test_frac", type=float, default=0.2)
-    parser.add_argument("--num_chunks", type=int, default=100)
-    parser.add_argument("--num_partitions", type=int, default=4)
-    parser.add_argument("--partitioner", type=str, choices=["ClassPartitioner", "Dirichlet"], default="ClassPartitioner")
+        parser.add_argument("--alpha", type=float, default=0.1)
+        parser.add_argument("--batch_size", type=int, default=64)
+        parser.add_argument("--dataset", type=str, choices=["mnist", "cifar10"], default="mnist")
+        parser.add_argument("--local_test_frac", type=float, default=0.2)
+        parser.add_argument("--num_chunks", type=int, default=100)
+        parser.add_argument("--num_partitions", type=int, default=4)
+        parser.add_argument("--partitioner", type=str, choices=["ClassPartitioner", "Dirichlet"], default="ClassPartitioner")
 
-    parser.add_argument("--beta1_disc", type=float, default=0.5)
-    parser.add_argument("--beta1_gen", type=float, default=0.5)
-    parser.add_argument("--beta2_disc", type=float, default=0.999)
-    parser.add_argument("--beta2_gen", type=float, default=0.999)
-    parser.add_argument("--lr_disc", type=float, default=0.0002)
-    parser.add_argument("--lr_gen", type=float, default=0.0002)
+        parser.add_argument("--beta1_disc", type=float, default=0.5)
+        parser.add_argument("--beta1_gen", type=float, default=0.5)
+        parser.add_argument("--beta2_disc", type=float, default=0.999)
+        parser.add_argument("--beta2_gen", type=float, default=0.999)
+        parser.add_argument("--lr_disc", type=float, default=0.0002)
+        parser.add_argument("--lr_gen", type=float, default=0.0002)
 
     parser.add_argument("--checkpoint_epoch", type=int, default=None)
     parser.add_argument("--epochs", type=int, default=100)
@@ -43,6 +42,7 @@ def main():
     parser.add_argument("--test_mode", action="store_true")
 
     args = parser.parse_args()
+    args = parser.parse_args()
 
     alpha_dir = args.alpha
     batch_size = args.batch_size
@@ -51,7 +51,20 @@ def main():
     num_chunks = args.num_chunks
     num_partitions = args.num_partitions
     partitioner = args.partitioner
+    alpha_dir = args.alpha
+    batch_size = args.batch_size
+    dataset = args.dataset
+    local_test_frac = args.local_test_frac
+    num_chunks = args.num_chunks
+    num_partitions = args.num_partitions
+    partitioner = args.partitioner
 
+    beta1_disc = args.beta1_disc
+    beta1_gen = args.beta1_gen
+    beta2_disc = args.beta2_disc
+    beta2_gen = args.beta2_gen
+    lr_disc = args.lr_disc
+    lr_gen = args.lr_gen
     beta1_disc = args.beta1_disc
     beta1_gen = args.beta1_gen
     beta2_disc = args.beta2_disc
@@ -68,11 +81,11 @@ def main():
 
     test_mode = args.test_mode
 
-    if test_mode:
-        print("Test Mode")
-        num_chunks = 10
-        epochs = 2
-        extra_g_e = 2
+        if test_mode:
+            print("Test Mode")
+            num_chunks = 10
+            epochs = 2
+            extra_g_e = 2
 
     IN_COLAB = False
     try:
@@ -106,7 +119,27 @@ def main():
     Partitioner: {partitioner}
     Device: {device}
     """)
+    print(f"""
+    Epochs: {epochs}
+    Checkpoint Epoch: {checkpoint_epoch}
+    Dataset: {dataset}
+    Num Chunks: {num_chunks}
+    Num Partitions: {num_partitions}
+    Partitioner: {partitioner}
+    Device: {device}
+    """)
 
+    if partitioner == "Dirichlet":
+        print(f"Alpha (for Dirichlet): {alpha_dir}")
+        partitioner = DirichletPartitioner(
+            num_partitions=num_partitions,
+            partition_by="label",
+            alpha=alpha_dir,
+            min_partition_size=0,
+            self_balancing=False
+    )
+    else:
+        partitioner = ClassPartitioner(num_partitions=num_partitions, seed=seed, label_column="label")
     if partitioner == "Dirichlet":
         print(f"Alpha (for Dirichlet): {alpha_dir}")
         partitioner = DirichletPartitioner(
@@ -131,7 +164,11 @@ def main():
 
         nets = [Net(seed).to(device) for _ in range(num_partitions)]
         global_net = Net(seed).to(device)
+        nets = [Net(seed).to(device) for _ in range(num_partitions)]
+        global_net = Net(seed).to(device)
 
+    elif dataset == "cifar10":
+        image = "img"
     elif dataset == "cifar10":
         image = "img"
 
@@ -144,7 +181,14 @@ def main():
 
         nets = [Net_Cifar(seed).to(device) for _ in range(num_partitions)]
         global_net = Net_Cifar(seed).to(device)
+        nets = [Net_Cifar(seed).to(device) for _ in range(num_partitions)]
+        global_net = Net_Cifar(seed).to(device)
 
+    optim_G = torch.optim.Adam(gen.generator.parameters(), lr=lr_gen, betas=(beta1_gen, beta2_gen))
+    optim_Ds = [
+        torch.optim.Adam(model.discriminator.parameters(), lr=lr_disc, betas=(beta1_disc, beta2_disc))
+        for model in models
+    ]
     optim_G = torch.optim.Adam(gen.generator.parameters(), lr=lr_gen, betas=(beta1_gen, beta2_gen))
     optim_Ds = [
         torch.optim.Adam(model.discriminator.parameters(), lr=lr_disc, betas=(beta1_disc, beta2_disc))
@@ -153,13 +197,20 @@ def main():
 
     optims = [torch.optim.Adam(net.parameters(), lr=0.01) for net in nets]
     criterion = torch.nn.CrossEntropyLoss()
+    optims = [torch.optim.Adam(net.parameters(), lr=0.01) for net in nets]
+    criterion = torch.nn.CrossEntropyLoss()
 
 
     fds = FederatedDataset(
         dataset=dataset,
         partitioners={"train": partitioner}
     )
+    fds = FederatedDataset(
+        dataset=dataset,
+        partitioners={"train": partitioner}
+    )
 
+    train_partitions = [fds.load_partition(i, split="train") for i in range(num_partitions)]
     train_partitions = [fds.load_partition(i, split="train") for i in range(num_partitions)]
 
     # Test Mode
@@ -176,19 +227,40 @@ def main():
     #     for label, cnt in counts.items():
     #         if cnt / len(ds) >= min_lbl_count:
     #             label_to_client[class_labels.int2str(label)].append(idx)
+    # min_lbl_count = 0.05
+    # class_labels = train_partitions[0].info.features["label"]
+    # labels_str = class_labels.names
+    # label_to_client = {lbl: [] for lbl in labels_str}
+    # for idx, ds in enumerate(train_partitions):
+    #     counts = Counter(ds['label'])
+    #     for label, cnt in counts.items():
+    #         if cnt / len(ds) >= min_lbl_count:
+    #             label_to_client[class_labels.int2str(label)].append(idx)
 
+    def apply_transforms(batch):
+        batch[image] = [pytorch_transforms(img) for img in batch[image]]
+        return batch
     def apply_transforms(batch):
         batch[image] = [pytorch_transforms(img) for img in batch[image]]
         return batch
 
     train_partitions = [train_partition.with_transform(apply_transforms) for train_partition in train_partitions]
+    train_partitions = [train_partition.with_transform(apply_transforms) for train_partition in train_partitions]
 
+    testpartition = fds.load_split("test")
+    testpartition = testpartition.with_transform(apply_transforms)
+    testloader = DataLoader(testpartition, batch_size=batch_size)
     testpartition = fds.load_split("test")
     testpartition = testpartition.with_transform(apply_transforms)
     testloader = DataLoader(testpartition, batch_size=batch_size)
 
     client_datasets = []
+    client_datasets = []
 
+    for train_part in train_partitions:
+        total     = len(train_part)
+        test_size = int(total * local_test_frac)
+        train_size = total - test_size
     for train_part in train_partitions:
         total     = len(train_part)
         test_size = int(total * local_test_frac)
@@ -199,7 +271,16 @@ def main():
             [train_size, test_size],
             generator=torch.Generator().manual_seed(seed),
         )
+        client_train, client_test = random_split(
+            train_part,
+            [train_size, test_size],
+            generator=torch.Generator().manual_seed(seed),
+        )
 
+        client_datasets.append({
+            "train": client_train,
+            "test":  client_test,
+        })
         client_datasets.append({
             "train": client_train,
             "test":  client_test,
@@ -212,12 +293,21 @@ def main():
 
     if checkpoint_epoch:
         checkpoint_loaded = torch.load(f"{folder}/checkpoint_epoch{checkpoint_epoch}.pth")
+    if checkpoint_epoch:
+        checkpoint_loaded = torch.load(f"{folder}/checkpoint_epoch{checkpoint_epoch}.pth")
 
         global_net.load_state_dict(checkpoint_loaded['alvo_state_dict'])
         global_net.to(device)
         for optim, state in zip(optims, checkpoint_loaded['optimizer_alvo_state_dict']):
             optim.load_state_dict(state)
+        global_net.load_state_dict(checkpoint_loaded['alvo_state_dict'])
+        global_net.to(device)
+        for optim, state in zip(optims, checkpoint_loaded['optimizer_alvo_state_dict']):
+            optim.load_state_dict(state)
 
+        gen.load_state_dict(checkpoint_loaded["gen_state_dict"])
+        gen.to(device)
+        optim_G.load_state_dict(checkpoint_loaded["optim_G_state_dict"])
         gen.load_state_dict(checkpoint_loaded["gen_state_dict"])
         gen.to(device)
         optim_G.load_state_dict(checkpoint_loaded["optim_G_state_dict"])
@@ -227,8 +317,14 @@ def main():
             model.to(device)
             optim_d.load_state_dict(state_optim)
         start_epoch = checkpoint_epoch
+        for model, optim_d, state_model, state_optim in zip(models, optim_Ds, checkpoint_loaded["discs_state_dict"], checkpoint_loaded["optim_Ds_state_dict:"]):
+            model.load_state_dict(state_model)
+            model.to(device)
+            optim_d.load_state_dict(state_optim)
+        start_epoch = checkpoint_epoch
 
 
+    client_test_loaders = [DataLoader(dataset=ds["test"], batch_size=batch_size, shuffle=True) for ds in client_datasets]
     client_test_loaders = [DataLoader(dataset=ds["test"], batch_size=batch_size, shuffle=True) for ds in client_datasets]
 
     losses_dict = {
@@ -254,7 +350,12 @@ def main():
     early_stop = False
 
     epoch_bar = tqdm(range(start_epoch, epochs), desc="Training", leave=True, position=0)
+    epoch_bar = tqdm(range(start_epoch, epochs), desc="Training", leave=True, position=0)
 
+    batch_size_gen = 1
+    batch_tam = 32
+    latent_dim = 128
+    num_classes = 10
     batch_size_gen = 1
     batch_tam = 32
     latent_dim = 128
@@ -312,18 +413,38 @@ def main():
         results = []
 
         chunk_bar = tqdm(range(num_chunks), desc="Chunks", leave=True, position=1)
+        chunk_bar = tqdm(range(num_chunks), desc="Chunks", leave=True, position=1)
 
+        for chunk_idx in chunk_bar:
+            chunk_start_time = time.time()
         for chunk_idx in chunk_bar:
             chunk_start_time = time.time()
 
             d_loss_b = 0
             total_chunk_samples = 0
+            d_loss_b = 0
+            total_chunk_samples = 0
 
 
             client_bar = tqdm(enumerate(zip(nets, models, client_chunks)), desc="Clients", leave=True, position=2)
+            client_bar = tqdm(enumerate(zip(nets, models, client_chunks)), desc="Clients", leave=True, position=2)
 
             for cliente, (net, disc, chunks) in client_bar:
+            for cliente, (net, disc, chunks) in client_bar:
 
+                chunk_dataset = chunks[chunk_idx]
+                if len(chunk_dataset) == 0:
+                    print(f"Chunk {chunk_idx} for client {cliente} is empty, skipping.")
+                    continue
+                chunk_loader = DataLoader(chunk_dataset, batch_size=batch_tam, shuffle=True)
+                
+                if chunk_idx == 0:
+                    client_eval_time = time.time()
+                    # Evaluation in client test
+                    # Initialize counters
+                    class_correct = defaultdict(int)
+                    class_total = defaultdict(int)
+                    predictions_counter = defaultdict(int)
                 chunk_dataset = chunks[chunk_idx]
                 if len(chunk_dataset) == 0:
                     print(f"Chunk {chunk_idx} for client {cliente} is empty, skipping.")
@@ -344,7 +465,17 @@ def main():
                             images, labels = batch[image].to(device), batch["label"].to(device)
                             outputs = global_net(images)
                             _, predicted = torch.max(outputs, 1)
+                    global_net.eval()
+                    with torch.no_grad():
+                        for batch in client_test_loaders[cliente]:
+                            images, labels = batch[image].to(device), batch["label"].to(device)
+                            outputs = global_net(images)
+                            _, predicted = torch.max(outputs, 1)
 
+                            # Update counts for each sample in batch
+                            for true_label, pred_label in zip(labels, predicted):
+                                true_idx = true_label.item()
+                                pred_idx = pred_label.item()
                             # Update counts for each sample in batch
                             for true_label, pred_label in zip(labels, predicted):
                                 true_idx = true_label.item()
@@ -352,10 +483,20 @@ def main():
 
                                 class_total[true_idx] += 1
                                 predictions_counter[pred_idx] += 1
+                                class_total[true_idx] += 1
+                                predictions_counter[pred_idx] += 1
 
                                 if true_idx == pred_idx:
                                     class_correct[true_idx] += 1
+                                if true_idx == pred_idx:
+                                    class_correct[true_idx] += 1
 
+                        # Create results dictionary
+                        results_metrics = {
+                            "class_metrics": {},
+                            "overall_accuracy": None,
+                            "prediction_distribution": dict(predictions_counter)
+                        }
                         # Create results dictionary
                         results_metrics = {
                             "class_metrics": {},
@@ -371,7 +512,18 @@ def main():
                                 "accuracy": class_correct[i] / class_total[i] if class_total[i] > 0 else "N/A"
                             }
                             results_metrics["class_metrics"][f"class_{i}"] = metrics
+                        # Calculate class-wise metrics
+                        for i in range(num_classes):
+                            metrics = {
+                                "samples": class_total[i],
+                                "predictions": predictions_counter[i],
+                                "accuracy": class_correct[i] / class_total[i] if class_total[i] > 0 else "N/A"
+                            }
+                            results_metrics["class_metrics"][f"class_{i}"] = metrics
 
+                        # Calculate overall accuracy
+                        total_samples = sum(class_total.values())
+                        results_metrics["overall_accuracy"] = sum(class_correct.values()) / total_samples
                         # Calculate overall accuracy
                         total_samples = sum(class_total.values())
                         results_metrics["overall_accuracy"] = sum(class_correct.values()) / total_samples
@@ -383,7 +535,17 @@ def main():
                             f.write("{:<10} {:<10} {:<10} {:<10}\n".format(
                                 "Class", "Accuracy", "Samples", "Predictions"))
                             f.write("-"*45 + "\n")
+                        # Save to txt file
+                        with open(acc_filename, "a") as f:
+                            f.write(f"Epoch {epoch + 1} - Client {cliente}\n")
+                            # Header with fixed widths
+                            f.write("{:<10} {:<10} {:<10} {:<10}\n".format(
+                                "Class", "Accuracy", "Samples", "Predictions"))
+                            f.write("-"*45 + "\n")
 
+                            # Class rows with consistent formatting
+                            for cls in range(num_classes):
+                                metrics = results_metrics["class_metrics"][f"class_{cls}"]
                             # Class rows with consistent formatting
                             for cls in range(num_classes):
                                 metrics = results_metrics["class_metrics"][f"class_{cls}"]
@@ -392,7 +554,17 @@ def main():
                                 accuracy = (f"{metrics['accuracy']:.4f}"
                                         if isinstance(metrics['accuracy'], float)
                                         else "  N/A  ")
+                                # Format accuracy (handle "N/A" case)
+                                accuracy = (f"{metrics['accuracy']:.4f}"
+                                        if isinstance(metrics['accuracy'], float)
+                                        else "  N/A  ")
 
+                                f.write("{:<10} {:<10} {:<10} {:<10}\n".format(
+                                    f"Class {cls}",
+                                    accuracy,
+                                    metrics['samples'],
+                                    metrics['predictions']
+                                ))
                                 f.write("{:<10} {:<10} {:<10} {:<10}\n".format(
                                     f"Class {cls}",
                                     accuracy,
@@ -407,7 +579,20 @@ def main():
                             f.write("\n{:<20} {:.4f}".format("Client Evaluation Time:", time.time() - client_eval_time))
                             f.write("\n")
                             f.write("\n")
+                            # Footer with alignment
+                            f.write("\n{:<20} {:.4f}".format("Overall Accuracy:", results_metrics["overall_accuracy"]))
+                            f.write("\n{:<20} {}".format("Total Samples:", total_samples))
+                            f.write("\n{:<20} {}".format("Total Predictions:", sum(predictions_counter.values())))
+                            f.write("\n{:<20} {:.4f}".format("Client Evaluation Time:", time.time() - client_eval_time))
+                            f.write("\n")
+                            f.write("\n")
 
+                net.load_state_dict(global_net.state_dict(), strict=True)
+                net.to(device)
+                net.train()
+                optim = optims[cliente]
+                disc.to(device)
+                optim_D = optim_Ds[cliente]
                 net.load_state_dict(global_net.state_dict(), strict=True)
                 net.to(device)
                 net.train()
@@ -422,7 +607,28 @@ def main():
                 cmb_ds = ConcatDataset([chunk_dataset, generated_dataset])
                 combined_dataloader= DataLoader(cmb_ds, batch_size=batch_tam, shuffle=True)
                 img_syn_time = time.time() - start_img_syn_time
+                start_img_syn_time = time.time()
+                num_samples = int(13 * (math.exp(0.01*epoch) - 1) / (math.exp(0.01*50) - 1)) * 10
+                generated_dataset = GeneratedDataset(generator=gen.to("cpu"), num_samples=num_samples, latent_dim=latent_dim, num_classes=10, device="cpu", image_col_name=image)
+                gen.to(device)
+                cmb_ds = ConcatDataset([chunk_dataset, generated_dataset])
+                combined_dataloader= DataLoader(cmb_ds, batch_size=batch_tam, shuffle=True)
+                img_syn_time = time.time() - start_img_syn_time
 
+                batch_bar_net = tqdm(combined_dataloader, desc="Batches", leave=True, position=3)
+                start_net_time = time.time()
+                for batch in batch_bar_net:
+                    images, labels = batch[image].to(device), batch["label"].to(device)
+                    batch_size = images.size(0)
+                    if batch_size == 1:
+                        print("Batch size is 1, skipping batch")
+                        continue
+                    optim.zero_grad()
+                    outputs = net(images)
+                    loss = criterion(outputs, labels)
+                    loss.backward()
+                    optim.step()
+                net_time = time.time() - start_net_time
                 batch_bar_net = tqdm(combined_dataloader, desc="Batches", leave=True, position=3)
                 start_net_time = time.time()
                 for batch in batch_bar_net:
@@ -636,10 +842,27 @@ def main():
             # if f2a:
             #     current_lambda_star = lambda_star.item()
             #     current_lam         = F.relu(lambda_star).item()
+            # if f2a:
+            #     current_lambda_star = lambda_star.item()
+            #     current_lam         = F.relu(lambda_star).item()
 
             #     with open(lambda_log, "a") as f:
             #      f.write(f"{current_lambda_star},{current_lam}\n")
+            #     with open(lambda_log, "a") as f:
+            #      f.write(f"{current_lambda_star},{current_lam}\n")
 
+        correct, loss = 0, 0.0
+        global_net.eval()
+        with torch.no_grad():
+            for batch in testloader:
+                images = batch[image].to(device)
+                labels = batch["label"].to(device)
+                outputs = global_net(images)
+                loss += criterion(outputs, labels).item()
+                correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
+        accuracy = correct / len(testloader.dataset)
+        losses_dict["net_loss_round"].append(loss / len(testloader))
+        losses_dict["net_acc_round"].append(accuracy)
         correct, loss = 0, 0.0
         global_net.eval()
         with torch.no_grad():
@@ -682,9 +905,17 @@ def main():
         print(f"Época {epoch+1} completa")
         generate_plot(net=gen, device="cpu", round_number=epoch+1, latent_dim=128, folder=folder)
         gen.to(device)
+        gen.to(device)
 
         losses_dict["time_round"].append(time.time() - epoch_start_time)
+        losses_dict["time_round"].append(time.time() - epoch_start_time)
 
+        try:
+            with open(loss_filename, 'w', encoding='utf-8') as f:
+                json.dump(losses_dict, f, ensure_ascii=False, indent=4)
+            print(f"Losses dict successfully saved to {loss_filename}")
+        except Exception as e:
+            print(f"Error saving losses dict to JSON: {e}")
         try:
             with open(loss_filename, 'w', encoding='utf-8') as f:
                 json.dump(losses_dict, f, ensure_ascii=False, indent=4)
