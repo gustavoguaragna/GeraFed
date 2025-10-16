@@ -4,8 +4,8 @@ import time
 from collections import OrderedDict, defaultdict
 import torch
 from torchvision.transforms import Compose, ToTensor, Normalize
-from torch.utils.data import DataLoader, random_split, Subset, ConcatDataset
-from task import F2U_GAN, F2U_GAN_CIFAR, ClassPartitioner, GeneratedDataset, generate_plot, Net, Net_Cifar
+from torch.utils.data import DataLoader, random_split, Subset
+from task import ClassPartitioner, Net, Net_Cifar
 from flwr.common import FitRes, Status, Code, ndarrays_to_parameters
 from flwr.server.strategy.aggregate import aggregate_inplace
 from flwr_datasets.partitioner import DirichletPartitioner
@@ -17,15 +17,17 @@ import math
 
 def main():
 
-    parser = argparse.ArgumentParser(description="Chunked FedAvg")
+    parser = argparse.ArgumentParser(description="Classifier Model Federated")
 
-    parser.add_argument("--alpha", type=float, default=0.1)
+    parser.add_argument("--alpha", type=float, default=0.1, help="Dirichlet parameter")
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--dataset", type=str, choices=["mnist", "cifar10"], default="mnist")
     parser.add_argument("--local_test_frac", type=float, default=0.2)
     parser.add_argument("--num_chunks", type=int, default=100)
     parser.add_argument("--num_partitions", type=int, default=4)
     parser.add_argument("--partitioner", type=str, choices=["ClassPartitioner", "Dirichlet"], default="ClassPartitioner")
+    parser.add_argument("--strategy", type=str, choices=["fedavg", "fedprox"], default="fedavg")
+    parser.add_argument("--mu", type=float, default=0.5, help="fedprox parameter")
 
     parser.add_argument("--checkpoint_epoch", type=int, default=None)
     parser.add_argument("--epochs", type=int, default=100)
@@ -43,6 +45,8 @@ def main():
     num_chunks = args.num_chunks
     num_partitions = args.num_partitions
     partition_dist = args.partitioner
+    strategy = args.strategy
+    mu = args.mu
 
     checkpoint_epoch = args.checkpoint_epoch
     epochs = args.epochs
@@ -64,6 +68,7 @@ def main():
     Num Chunks: {num_chunks}
     Num Partitions: {num_partitions}
     Partitioner: {partition_dist}
+    Strategy: {strategy}
     Device: {device}
     """)
 
@@ -105,7 +110,7 @@ def main():
     optims = [torch.optim.Adam(net.parameters(), lr=0.01) for net in nets]
     criterion = torch.nn.CrossEntropyLoss()
 
-    folder = f"{dataset}_{partition_dist}_{alpha_dir}_trial{trial}" if partition_dist == "Dirichlet" else f"{dataset}_{partition_dist}_trial{trial}"
+    folder = f"{dataset}_{partition_dist}_{alpha_dir}_{strategy}_trial{trial}" if partition_dist == "Dirichlet" else f"{dataset}_{partition_dist}_{strategy}_trial{trial}"
     os.makedirs(folder, exist_ok=True)
 
     if checkpoint_epoch:
@@ -210,8 +215,6 @@ def main():
 
             params = []
             results = []
-
-            total_chunk_samples = 0
 
             client_bar = tqdm(enumerate(zip(nets, client_chunks)), desc="Clients", leave=True, position=2)
 
@@ -321,7 +324,13 @@ def main():
                         continue
                     optim.zero_grad()
                     outputs = net(images)
-                    loss = criterion(outputs, labels)
+                    if strategy == "fedprox":
+                        proximal_term = 0
+                        for local_weights, global_weights in zip(net.parameters(), global_net.parameters()):
+                            proximal_term += (local_weights - global_weights).norm(2)
+                        loss = criterion(net(images), labels) + (mu / 2) * proximal_term
+                    else:
+                        loss = criterion(outputs, labels)
                     loss.backward()
                     optim.step()
                 net_time = time.time() - start_net_time
