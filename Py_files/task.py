@@ -1,13 +1,47 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Optional, List
+from typing import Optional, List, Tuple, Union
 from collections import defaultdict
 from flwr_datasets.partitioner.partitioner import Partitioner
 import matplotlib.pyplot as plt
 from datasets import Dataset
 import numpy as np
 import random
+from flwr.common import FitRes, parameters_to_ndarrays
+from flwr.server.client_proxy import ClientProxy
+from flwr.common.typing import NDArrays
+
+def aggregate_scaffold(
+    results: List[Tuple[ClientProxy, FitRes]],
+    global_params: NDArrays,
+    eta_g: float = 1.0,
+) -> NDArrays:
+    """Aggregate updates according to SCAFFOLD:
+    x_{t+1} = x_t + eta_g * (1/|S_t|) * sum_i (y_i - x_t)
+    """
+
+    num_clients = len(results)
+    if num_clients == 0:
+        return global_params
+
+    # Convert all client FitRes parameters to lists of ndarrays
+    client_params = [parameters_to_ndarrays(fit_res.parameters) for _, fit_res in results]
+
+    # Compute average of (y_i - x_t)
+    deltas = []
+    for params in client_params:
+        deltas.append([y - x for y, x in zip(params, global_params)])
+
+    # Compute mean delta
+    mean_delta = [
+        sum(param_deltas) / num_clients for param_deltas in zip(*deltas)
+    ]
+
+    # Apply global learning rate eta_g
+    new_params = [x + eta_g * delta for x, delta in zip(global_params, mean_delta)]
+
+    return new_params
 
 class Net(nn.Module):
     def __init__(self, seed=None):
