@@ -1,3 +1,4 @@
+import os
 import json
 import time
 from collections import OrderedDict, defaultdict
@@ -81,7 +82,6 @@ def main():
         try:
             # Tenta importar um módulo específico do Colab
             from google.colab import drive
-            import os
 
             save_dir = "/content/drive/MyDrive/GAN_Training_Results" # Ajuste o caminho como desejar
             os.makedirs(save_dir, exist_ok=True)
