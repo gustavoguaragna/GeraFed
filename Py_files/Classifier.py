@@ -5,7 +5,7 @@ from collections import OrderedDict, defaultdict
 import torch
 from torchvision.transforms import Compose, ToTensor, Normalize
 from torch.utils.data import DataLoader, random_split, Subset
-from task import ClassPartitioner, Net, Net_Cifar
+from task import ClassPartitioner, Net, Net_Cifar, aggregate_scaffold
 from flwr.common import FitRes, Status, Code, ndarrays_to_parameters
 from flwr.server.strategy.aggregate import aggregate_inplace
 from flwr_datasets.partitioner import DirichletPartitioner
@@ -14,6 +14,26 @@ from tqdm import tqdm
 import argparse
 import random
 import math
+
+def state_dict_to_vector(sd):
+    """Flatten state_dict tensors (torch) to a single vector list (list of tensors)."""
+    # Keep as list of tensors in same order as state_dict().items()
+    return [v.clone().detach() for _, v in sd.items()]
+
+def vector_subtract(vecA, vecB):
+    return [a - b for a, b in zip(vecA, vecB)]
+
+def vector_add(vecA, vecB):
+    return [a + b for a, b in zip(vecA, vecB)]
+
+def vector_scale(vec, scalar):
+    return [v * scalar for v in vec]
+
+def vector_to_state_dict(keys, vec, device):
+    return OrderedDict({k: v.to(device) for k, v in zip(keys, vec)})
+
+def vec_to_numpy_list(vec):
+    return [v.cpu().numpy() for v in vec]
 
 def main():
 
@@ -26,7 +46,7 @@ def main():
     parser.add_argument("--num_chunks", type=int, default=100)
     parser.add_argument("--num_partitions", type=int, default=4)
     parser.add_argument("--partitioner", type=str, choices=["ClassPartitioner", "Dirichlet"], default="ClassPartitioner")
-    parser.add_argument("--strategy", type=str, choices=["fedavg", "fedprox"], default="fedavg")
+    parser.add_argument("--strategy", type=str, choices=["fedavg", "fedprox", "scaffold"], default="fedavg")
     parser.add_argument("--mu", type=float, default=0.5, help="fedprox parameter")
 
     parser.add_argument("--checkpoint_epoch", type=int, default=None)
@@ -185,6 +205,20 @@ def main():
 
     client_test_loaders = [DataLoader(dataset=ds["test"], batch_size=64, shuffle=True) for ds in client_datasets]
 
+    # --- SCAFFOLD state initialization ---
+    # server control variate c (list of tensors matching global_net.state_dict())
+    c = None
+    client_cs = None
+    if strategy == "scaffold":
+        # initialize c and ci to zeros (same shapes as model parameters)
+        global_sd = global_net.state_dict()
+        keys = list(global_sd.keys())
+        zero_vec = [torch.zeros_like(v).to(device) for v in global_sd.values()]
+        c = [v.clone().detach() for v in zero_vec]  # list of tensors
+        # one ci per client
+        client_cs = [[v.clone().detach() for v in zero_vec] for _ in range(num_partitions)]
+        # Note: warm-start (computing gi(x0)) can be added if desired (paper suggests it for theory).
+
     # Training loop
     metrics_dict = {
                 "net_loss_chunk": [],
@@ -215,6 +249,8 @@ def main():
 
             params = []
             results = []
+
+            sum_delta_ci = None  # will be accumulated as list of tensors
 
             client_bar = tqdm(enumerate(zip(nets, client_chunks)), desc="Clients", leave=True, position=2)
 
@@ -313,15 +349,24 @@ def main():
                 net.train()
                 optim = optims[cliente]
 
+                # --- SCAFFOLD: get local control variate ci (if strategy==scaffold) ---
+                if strategy == "scaffold":
+                    ci = client_cs[cliente]  # list of tensors on device
+
                 # Train classifier on dataset
                 batch_bar_net = tqdm(chunk_loader, desc="Batches", leave=True, position=3)
                 start_net_time = time.time()
+
+                # Count of local update steps K_local for Option II formula (K)
+                K_local = 0
+
                 for batch in batch_bar_net:
                     images, labels = batch[image].to(device), batch["label"].to(device)
                     real_batch_size = images.size(0)
                     if real_batch_size == 1:
                         print("Batch size is 1, skipping batch")
                         continue
+
                     optim.zero_grad()
                     outputs = net(images)
                     if strategy == "fedprox":
@@ -331,18 +376,115 @@ def main():
                         loss = criterion(net(images), labels) + (mu / 2) * proximal_term
                     else:
                         loss = criterion(outputs, labels)
+
                     loss.backward()
+
+                    # If scaffold: modify gradients by adding (c - ci) to each param grad
+                    if strategy == "scaffold":
+                        # c and ci are lists of tensors in same order as state_dict().items()
+                        # map model.parameters() with the state_dict ordering
+                        # We'll add the respective correction term to each param.grad in-place.
+                        # Build an iterator over state_dict keys to match shapes
+                        sd = net.state_dict()
+                        sd_keys = list(sd.keys())
+                        # create mapping: parameter tensor names -> param objects (by traversal)
+                        # We will iterate param tensors in the same order as state_dict
+                        # Danger: param ordering between state_dict and net.parameters() may differ;
+                        # safest is to iterate over state_dict keys and find corresponding param in net by name.
+                        # We'll use named_parameters() for reliable name mapping.
+                        name_to_param = dict(net.named_parameters())
+                        for idx, key in enumerate(sd_keys):
+                            # state_dict key may be like 'layer.weight' or 'layer.bias' and maps to parameter name
+                            # only apply to keys that correspond to parameters (i.e., in name_to_param)
+                            # in many models state_dict keys equal named_parameters keys; if not, skip gracefully
+                            if key in name_to_param:
+                                param = name_to_param[key]
+                                if param.grad is None:
+                                    # if no grad (e.g., buffer or something) skip
+                                    continue
+                                # add correction (c - ci) for this param
+                                corr = (c[idx] - ci[idx])
+                                # ensure shapes match; if not, try to reshape
+                                if corr.shape != param.grad.shape:
+                                    # try broadcasting safely
+                                    try:
+                                        corr = corr.view(param.grad.shape)
+                                    except Exception:
+                                        # shapes mismatch, skip this key
+                                        continue
+                                param.grad.data.add_(corr)
+                            else:
+                                # not a parameter (maybe a buffer) -> skip
+                                continue
+
                     optim.step()
+                    K_local += 1
+
                 net_time = time.time() - start_net_time
 
-                params.append(ndarrays_to_parameters([val.cpu().numpy() for _, val in net.state_dict().items()]))
-                results.append((cliente, FitRes(status=Status(code=Code.OK, message="Success"), parameters=params[cliente], num_examples=len(chunk_loader.dataset), metrics={})))
+                # After local updates, prepare outputs for aggregation
+                # collect local model parameters (as list of tensors)
+                local_vec = state_dict_to_vector(net.state_dict())
+                global_vec = state_dict_to_vector(global_net.state_dict())
 
-            # Aggregate updated classifier weights
-            aggregated_ndarrays = aggregate_inplace(results)
+                # Append updated parameters (for aggregate_inplace) - same behavior as before:
+                params.append(ndarrays_to_parameters(vec_to_numpy_list(local_vec)))
+                # num_examples:
+                if strategy == "scaffold":
+                    num_examples = 1
+                else:
+                    num_examples = len(chunk_loader.dataset)
+
+                results.append((cliente, FitRes(status=Status(code=Code.OK, message="Success"), parameters=params[cliente], num_examples=num_examples, metrics={})))
+
+                # --- SCAFFOLD: compute updated client control variate ci^+ (Option II) ---
+                if strategy == "scaffold":
+                    # If no local steps happened (K_local==0) we skip update
+                    if K_local == 0:
+                        ci_plus = ci
+                        delta_ci = [torch.zeros_like(t).to(device) for t in ci]
+                    else:
+                        # local learning rate (eta_l) — assume from optimizer
+                        try:
+                            eta_l = optim.param_groups[0]['lr']
+                        except Exception:
+                            eta_l = 0.01  # fallback
+
+                        # ci_plus = ci - c + (1/(K * eta_l)) * (x - y_i)
+                        # note (x - y_i) = - delta_y
+                        factor = 1.0 / (max(K_local, 1) * eta_l)
+                        # compute (x - y_i)
+                        x_minus_y = vector_subtract(global_vec, local_vec)
+                        scaled = vector_scale(x_minus_y, factor)
+                        # ci_plus = ci - c + scaled
+                        ci_plus = [ci_j - c_j + s_j for (ci_j, c_j, s_j) in zip(ci, c, scaled)]
+                        delta_ci = [ci_p - ci_j for (ci_p, ci_j) in zip(ci_plus, ci)]
+
+                    # Update local storage of client control variate
+                    client_cs[cliente] = [t.clone().detach() for t in ci_plus]
+
+                    # accumulate sum_delta_ci for server update
+                    if sum_delta_ci is None:
+                        sum_delta_ci = [d.clone().detach() for d in delta_ci]
+                    else:
+                        sum_delta_ci = [s + d for s, d in zip(sum_delta_ci, delta_ci)]
+
+            if strategy == "scaffold":    
+                aggregated_ndarrays = aggregate_scaffold(results, [p.cpu().numpy() for p in global_net.state_dict().values()], eta_g=1.0)
+            else:
+                aggregated_ndarrays = aggregate_inplace(results)
+
             params_dict = zip(global_net.state_dict().keys(), aggregated_ndarrays)
             state_dict = OrderedDict({k: torch.tensor(v).to(device) for k, v in params_dict})
             global_net.load_state_dict(state_dict, strict=True)
+
+            # --- SCAFFOLD: update server control variate c using sum_delta_ci ---
+            if strategy == "scaffold" and sum_delta_ci is not None:
+                # c <- c + (1/N) * sum_{i in S} (c_i^+ - c_i)
+                # paper uses division by N (total clients), not |S|, see Eq (5).
+                add_term = vector_scale(sum_delta_ci, 1.0 / float(num_partitions))
+                c= [c_j + a_j for c_j, a_j in zip(c, add_term)]
+                # Note: client_cs were already updated per-client above (ci <- ci^+)
 
             # Evaluation globally each 10 chunks
             if chunk_idx % 10 == 0:
@@ -369,6 +511,10 @@ def main():
                     'alvo_state_dict': global_net.state_dict(),
                     'optimizer_alvo_state_dict': [optim.state_dict() for optim in optims]
                 }
+            # Also save scaffold state if used
+            if strategy == "scaffold":
+                checkpoint['c'] = c
+                checkpoint['client_cs'] = client_cs
             checkpoint_file = f"{folder}/checkpoint_epoch{epoch+1}.pth"
             torch.save(checkpoint, checkpoint_file)
             print(f"Global net saved to {checkpoint_file}")
