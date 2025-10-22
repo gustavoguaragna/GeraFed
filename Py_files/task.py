@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Optional, List, Tuple, Union
+from typing import Optional, List, Tuple
 from collections import defaultdict
 from flwr_datasets.partitioner.partitioner import Partitioner
 import matplotlib.pyplot as plt
