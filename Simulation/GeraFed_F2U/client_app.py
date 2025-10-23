@@ -24,8 +24,8 @@ from flwr.common.typing import UserConfigValue
 from typing import Union, List
 import pickle
 import copy
+import time
 
-# import time
 # import random
 # import numpy as np
 
@@ -121,7 +121,7 @@ class FlowerClient(NumPyClient):
     
 
         if num_syn > 0:
-            trainloader_syn = syn_input(
+            trainloader_aug = syn_input(
                                     num_samples=num_syn,
                                     gan=self.net_gen,
                                     round=config["round"],
@@ -134,16 +134,16 @@ class FlowerClient(NumPyClient):
                                     )
 
         # Treina o modelo classificador
-        ##train_alvo_start_time = time.time()
+        train_alvo_start_time = time.time()
         train_loss = train_alvo(
             net=self.net_alvo,
-            trainloader=trainloader_syn,
+            trainloader=trainloader_aug,
             epochs=self.local_epochs_alvo,
             lr=self.lr_alvo,
             device=self.device,
             dataset=self.dataset
         )
-        ##train_classifier_time  = time.time() - train_alvo_start_time
+        train_classifier_time  = time.time() - train_alvo_start_time
 
         # Cria state_dict para a disc
         state_dict = {}
@@ -170,7 +170,7 @@ class FlowerClient(NumPyClient):
                    self.optim_D.state_dict()['state'][p] = torch.from_numpy(v.numpy())
 
 
-        ##train_gen_start_time = time.time()
+        train_disc_start_time = time.time()
         # Treina o modelo generativo
         avg_d_loss = train_disc(
         disc=self.net_disc,
@@ -182,7 +182,7 @@ class FlowerClient(NumPyClient):
         latent_dim=self.latent_dim,
         optim=self.optim_D
         )
-        ##train_gen_time = time.time() - train_gen_start_time
+        train_disc_time = time.time() - train_disc_start_time
 
         # Save all elements of the state_dict into a single RecordSet
         p_record = ParametersRecord()
@@ -206,31 +206,31 @@ class FlowerClient(NumPyClient):
         disc_params = get_weights(self.net_disc)
         
         return (
-        get_weights(self.net_alvo),
-        len(trainloader_syn.dataset),
-        {"train_loss": train_loss,
-         "disc": pickle.dumps(disc_params),
-         "avg_d_loss": avg_d_loss,
-         "optimDs_state_dict": pickle.dumps(self.optim_D.state_dict()),
-         "cid": self.cid
-         ##"tempo_treino_alvo": train_classifier_time,
-         ##"tempo_treino_gen": train_gen_time
-        },
+            get_weights(self.net_alvo),
+            len(trainloader_aug.dataset),
+            {"train_loss": train_loss,
+            "disc": pickle.dumps(disc_params),
+            "avg_d_loss": avg_d_loss,
+            "optimDs_state_dict": pickle.dumps(self.optim_D.state_dict()),
+            "cid": self.cid,
+            "tempo_treino_alvo": train_classifier_time,
+            "tempo_treino_disc": train_disc_time
+            },
         )
 
     def evaluate(self, parameters, config):
 
 
         set_weights(self.net_alvo, parameters)
-        ##test_time_start = time.time()
+        test_time_start = time.time()
         # Avalia o modelo classificador
         loss, accuracy = test(self.net_alvo, self.testloader, self.device, model=self.model, dataset=self.dataset)
-        ##test_time = time.time() - test_time_start
+        test_time = time.time() - test_time_start
 
 
         test_local = config["round"] % self.num_chunks == 0
         if test_local:
-            ##local_test_start_time = time.time()
+            local_test_start_time = time.time()
             # Avalia o modelo classificador localmente
             local_test(net=self.net_alvo,
                     testloader=self.testloader_local,
@@ -240,13 +240,13 @@ class FlowerClient(NumPyClient):
                     cliente=self.cid,
                     continue_epoch=self.continue_epoch,
                     dataset=self.dataset)
-            ##local_test_time = time.time() - local_test_start_time
+            local_test_time = time.time() - local_test_start_time
 
         return (loss,
                 len(self.testloader.dataset),
                 {"accuracy": accuracy,
-                 ##"test_time": test_time,
-                 ##"local_test_time": local_test_time if test_local else None
+                 "test_time": test_time,
+                 "local_test_time": local_test_time if test_local else 0
                  }
             )
 

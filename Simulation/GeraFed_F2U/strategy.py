@@ -208,7 +208,12 @@ class GeraFed(Strategy):
                         "d_loss_chunk": [],
                         "net_loss_chunk": [],
                         "net_acc_chunk": [],
-                        "time_chunk": []
+                        "time_chunk": [],
+                        "net_time_chunk" :[],
+                        "disc_time_chunk": [],
+                        "gen_time_chunk": [],
+                        "test_time_chunk": [],
+                        "local_test_time_chunk": []
                         }
         if self.on_fit_config_fn is not None:
             # Custom fit config function provided
@@ -241,6 +246,9 @@ class GeraFed(Strategy):
         # Do not configure federated evaluation if fraction eval is 0.
         if self.fraction_evaluate_alvo == 0.0:
             return []
+    
+        if server_round % self.num_chunks != 0:
+            return None
 
         # Parameters and config
         config = {"round": server_round}
@@ -299,6 +307,11 @@ class GeraFed(Strategy):
             metrics_aggregated = self.fit_metrics_aggregation_fn(fit_metrics)
             self.metrics_dict["d_loss_chunk"].append(metrics_aggregated["d_loss_chunk"])
             self.metrics_dict["net_loss_chunk"].append(metrics_aggregated["net_loss_chunk"])
+            # Simple mean of times
+            net_times = [m["tempo_treino_alvo"]/len(fit_metrics) for _, m in fit_metrics]
+            disc_times = [m["tempo_treino_disc"]/len(fit_metrics) for _, m in fit_metrics]
+            self.metrics_dict["net_time_chunk"].append(sum(net_times))
+            self.metrics_dict["disc_time_chunk"].append(sum(disc_times))
         elif server_round == 1:  # Only log this warning once
             log(WARNING, "No fit_metrics_aggregation_fn provided")
 
@@ -327,6 +340,7 @@ class GeraFed(Strategy):
             for i, disc in enumerate(self.discs):
                 set_weights(disc, disc_ndarrays[i])
 
+            gen_time_start = time.time()
             g_loss, self.optimG_state_dict = train_G(
             net=self.gen,
             discs=self.discs,
@@ -337,8 +351,10 @@ class GeraFed(Strategy):
             batch_size=1,
             optim_state_dict=self.optimG_state_dict
             )
+            gen_time = time.time() - gen_time_start
 
             self.metrics_dict["g_loss_chunk"].append(g_loss)
+            self.metrics_dict["gen_time_chunk"].append(gen_time)
 
             discs_state_dict = {
                 cid: disc.state_dict() for cid, disc in enumerate(self.discs)
@@ -407,6 +423,11 @@ class GeraFed(Strategy):
         if server_round % self.num_chunks == 0:
             figura = generate_plot(net=self.gen, device=self.device, round_number=int(server_round/self.num_chunks), server=True, latent_dim=self.latent_dim)
             figura.savefig(f"{self.folder}/mnistF2U_r{int(server_round/self.num_chunks)+self.continue_epoch}.png")
+
+        test_times = [evaluate_res.metrics["test_time"]/len(results) for _, evaluate_res in results]
+        local_test_times = [evaluate_res.metrics["local_test_time"]/len(results) for _, evaluate_res in results]
+        self.metrics_dict["test_time_chunk"].append(sum(test_times))
+        self.metrics_dict["local_test_time_chunk"].append(sum(local_test_times))
 
         round_time = time.time() - self.init_round_time
         self.metrics_dict["time_chunk"].append(round_time)
