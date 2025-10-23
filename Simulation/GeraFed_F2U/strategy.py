@@ -330,7 +330,7 @@ class GeraFed(Strategy):
             g_loss, self.optimG_state_dict = train_G(
             net=self.gen,
             discs=self.discs,
-            epochs=20,
+            epochs=2,
             lr=self.lr_gen,
             device=self.device,
             latent_dim=self.latent_dim,

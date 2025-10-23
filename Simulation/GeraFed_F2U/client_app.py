@@ -19,14 +19,15 @@ from Simulation.GeraFed_F2U.task import (
     train_disc,
     local_test
 )
-# import random
-# import numpy as np
 import math
 from flwr.common.typing import UserConfigValue
 from typing import Union, List
-##import time
 import pickle
 import copy
+
+# import time
+# import random
+# import numpy as np
 
 # SEED = 42
 # random.seed(SEED)
@@ -105,10 +106,8 @@ class FlowerClient(NumPyClient):
         # Atualiza pesos do modelo generativo
         set_weights(net=self.net_gen, parameters=pickle.loads(config["gan"]))
 
-
         # Atualiza pesos do modelo classificador
         set_weights(self.net_alvo, parameters)
-
 
         # Define o dataloader
         if isinstance(self.trainloader, list):
@@ -118,7 +117,7 @@ class FlowerClient(NumPyClient):
             trainloader_chunk = self.trainloader
 
         # Calcula numero de amostras sinteticas
-        num_syn = int(math.ceil(len(trainloader_chunk.dataset)) * (math.exp(0.01*config["round"]) - 1) / (math.exp(0.01*self.num_epochs/2) - 1))
+        num_syn = int(math.ceil(len(trainloader_chunk.dataset)) * (math.exp(0.01*config["round"]) - 1) / (math.exp(0.01*self.num_epochs/2) - 1)) * 10
     
 
         if num_syn > 0:
