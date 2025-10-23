@@ -44,6 +44,7 @@ model                = "both"       # 'alvo', 'gen', 'both'
 num_chunks           = 2
 num_rodadas          = 4
 partitioner          = "Class"        # 'Class', 'Dir', 'IID' (IID no else)
+strategy             = "fedavg"
 tam_batch            = 32
 tam_img              = 28
 tam_ruido            = 128

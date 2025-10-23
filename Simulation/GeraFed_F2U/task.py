@@ -897,6 +897,14 @@ def local_test(net: nn.Module,
 def get_weights(net):
     return [val.cpu().numpy() for _, val in net.state_dict().items()]
 
+def vector_subtract(vecA, vecB):
+    return [a - b for a, b in zip(vecA, vecB)]
+
+def vector_scale(vec, scalar):
+    return [v * scalar for v in vec]
+
+
+
 def get_weights_gen(net):
     return [val.cpu().numpy() for key, val in net.state_dict().items() if 'discriminator' in key or 'label' in key]
 
