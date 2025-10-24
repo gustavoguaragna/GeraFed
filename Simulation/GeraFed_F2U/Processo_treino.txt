@@ -2,9 +2,9 @@
 2. Servidor compartilha parametros iniciais do modelo classificador e da geradora.
 3. Clientes em paralelo carregam os dados e dividem em treino e teste, alem de receberem um teste global. Ao carregar os dados, são adicionados dados sinteticos gerados pela geradora, formando um dataset de treino misto e mais homogeneo para treino somente do modelo classificador, enquanto outro dataset de treino contendo somente dados reais é mantido para treino da discriminadora. A quantidade de dados sinteticos adicionados aumenta a cada rodada e os dados sao renovados.
 4. Clientes treinam o modelo classificador com o dataset misto e a discriminadora com o dataset real. Durante os treinamentos sao coletadas as losses de treino.
-5. Clientes enviam os parametros do modelo classificador e a loss da discriminadora para o servidor. Os parametros do modelo classificador são usados para atualizar o modelo global, enquanto a loss da discriminadora é usada para avaliar o desempenho do modelo gerador.
+5. Clientes enviam os parametros do modelo classificador e da discriminadora, além da loss da discriminadora para o servidor. Os parametros do modelo classificador são usados para atualizar o modelo global, enquanto a discriminadora é usada para o treino do modelo gerador.
 6. Servidor agrega os parametros dos modelos classificadores recebidos dos clientes, atualizando o modelo global.
-7. Servidor agrega as losses das discriminadoras e salva. 
+7. Servidor agrega as losses das discriminadoras e salva.
 8. Servidor treina a geradora e salva a loss.
 9. Servidor envia modelo global atualizado para os clientes.
 10. Clientes testam a acuracia e f1-score do modelo classificador no conjunto de teste local e salvam resultados.
@@ -17,4 +17,4 @@ COISAS QUE ESTOU DEIXANDO PARA DEPOIS:
  separar classe de gerador e discriminador ja que estao sempre desconectadas, assim reduz parametros enviados na rede
  Corrigir erros Pylance
  Docstrings para funcoes
- padronizar lingua
+ padronizar lingua e comentarios

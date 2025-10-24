@@ -257,13 +257,19 @@ def client_fn(context: Context):
     partition_id       = context.node_config["partition-id"]
     num_partitions     = context.node_config["num-partitions"]
     partitioner        = context.run_config["partitioner"]
-    alpha_dir          = context.run_config["alpha_dir"]
+    if partitioner == "Dir01":
+        alpha_dir       = 0.1
+    elif partitioner == "Dir05":
+        alpha_dir       = 0.5
+    else:
+        alpha_dir       = None
     batch_size         = context.run_config["tam_batch"]
     teste              = context.run_config["teste"]
     num_chunks         = context.run_config["num_chunks"]
     continue_epoch     = context.run_config["continue_epoch"]
     dataset            = context.run_config["dataset"]
     gan_arq            = context.run_config["gan_arq"]
+    strategy           = context.run_config["strategy"]
 
     local_epochs_alvo  = context.run_config["epocas_alvo"]
     local_epochs_gen   = context.run_config["epocas_gen"]
@@ -271,11 +277,13 @@ def client_fn(context: Context):
     lr_disc            = context.run_config["learn_rate_disc"]
     lr_alvo            = context.run_config["learn_rate_alvo"]
     latent_dim         = context.run_config["tam_ruido"]
+    seed               = context.run_config["seed"]
     agg                = context.run_config["agg"]
     model              = context.run_config["model"]
     niid               = False if partitioner == "IID" else True 
-    folder             = f"{context.run_config['Exp_name_folder']}FedGenIA_F2U_{num_partitions}clients/{dataset}/{partitioner}"
+    folder             = f"{context.run_config['Exp_name_folder']}FedGenIA_F2U/{dataset}/{partitioner}/{strategy}/{num_partitions}_clients"
     num_epochs         = int(context.run_config["num_rodadas"]/num_chunks)
+    patience           = context.run_config["patience"]
     
     if dataset == "mnist":
         net_alvo = Net()
@@ -295,7 +303,6 @@ def client_fn(context: Context):
         raise ValueError(f"{dataset} nao identificado")
 
     optim_D = torch.optim.Adam(gan.discriminator.parameters(), lr=lr_disc, betas=(0.5, 0.999))
-
 
 
     if continue_epoch != 0:

@@ -50,10 +50,11 @@ def server_fn(context: Context):
     teste = context.run_config["teste"]
     num_partitions = context.run_config["num_clients"]
     partitioner = context.run_config["partitioner"]
-    folder = f"{context.run_config['Exp_name_folder']}FedGenIA_F2U_{num_partitions}clients/{dataset}/{partitioner}"
+    strategy = context.run_config["strategy"]
     num_chunks = context.run_config["num_chunks"]
-    os.makedirs(folder, exist_ok=True)
     continue_epoch = context.run_config["continue_epoch"]
+    folder = f"{context.run_config['Exp_name_folder']}FedGenIA_F2U/{dataset}/{partitioner}/{strategy}/{num_partitions}_clients"
+    os.makedirs(folder, exist_ok=True)
     
     # Initialize model parameters
     if dataset == "mnist":
