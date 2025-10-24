@@ -46,6 +46,7 @@ def server_fn(context: Context):
     img_size = context.run_config["tam_img"]
     latent_dim = context.run_config["tam_ruido"]
     gan_arq = context.run_config["gan_arq"]
+    gen_epochs = context.run_config["epocas_gen"]
     teste = context.run_config["teste"]
     num_partitions = context.run_config["num_clients"]
     partitioner = context.run_config["partitioner"]
@@ -102,6 +103,7 @@ def server_fn(context: Context):
         img_size=img_size,
         latent_dim=latent_dim,
         gan_arq=gan_arq,
+        gen_epochs=gen_epochs,
         teste=teste,
         folder=folder,
         num_chunks=num_chunks,

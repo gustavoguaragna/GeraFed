@@ -109,6 +109,7 @@ class GeraFed(Strategy):
         img_size: int = 28,
         latent_dim: int = 100,
         gan_arq: str = "simple_cnn",
+        gen_epochs: int = 2,
         teste: bool = False,
         lr_gen: float = 0.0002,
         folder: str = ".",
@@ -145,6 +146,7 @@ class GeraFed(Strategy):
         self.img_size = img_size
         self.latent_dim = latent_dim
         self.gan_arq = gan_arq
+        self.gen_epochs = gen_epochs
         self.teste = teste
         self.lr_gen = lr_gen
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -344,7 +346,7 @@ class GeraFed(Strategy):
             g_loss, self.optimG_state_dict = train_G(
             net=self.gen,
             discs=self.discs,
-            epochs=2,
+            epochs=self.gen_epochs,
             lr=self.lr_gen,
             device=self.device,
             latent_dim=self.latent_dim,
