@@ -903,6 +903,10 @@ def vector_subtract(vecA, vecB):
 def vector_scale(vec, scalar):
     return [v * scalar for v in vec]
 
+def state_dict_to_vector(sd):
+    """Flatten state_dict tensors (torch) to a single vector list (list of tensors)."""
+    # Keep as list of tensors in same order as state_dict().items()
+    return [v.clone().detach() for _, v in sd.items()]
 
 
 def get_weights_gen(net):
