@@ -670,11 +670,14 @@ def train_disc(gen, disc, trainloader, epochs, device, optim, dataset="mnist", l
 
     d_losses = []
 
-
     for epoch in range(epochs):
         for batch_idx, batch in enumerate(trainloader):
             images, labels = batch[image].to(device), batch["label"].to(device)
             batch_size = images.size(0)
+            if batch_size == 1:
+                print("Batch size is 1, skipping batch")
+                continue
+            
             real_ident = torch.full((batch_size, 1), 1., device=device)
             fake_ident = torch.full((batch_size, 1), 0., device=device)
 
@@ -698,21 +701,22 @@ def train_disc(gen, disc, trainloader, epochs, device, optim, dataset="mnist", l
 
             d_losses.append(d_loss.item())
 
-            if batch_idx % 10 == 0 and batch_idx > 0:
+            if batch_idx % 50 == 0 and batch_idx > 0:
                 print('Epoch {} [{}/{}] loss_D_treino: {:.4f}'.format(
                         epoch, batch_idx, len(trainloader),
                         d_loss.mean().item())) 
+                
     avg_d_loss = np.mean(d_losses)
     return avg_d_loss            
         
                 
 def train_G(net: nn.Module, discs: list, device: str, lr: float, epochs: int, batch_size: int, latent_dim: int, optim_state_dict = None):
     net.to(device)  # move model to GPU if available
+
     optim_G = torch.optim.Adam(net.generator.parameters(), lr=lr, betas=(0.5, 0.999))
     if optim_state_dict:
         optim_G.load_state_dict(optim_state_dict)
 
-    
     g_losses = []
 
     for _ in range(epochs):

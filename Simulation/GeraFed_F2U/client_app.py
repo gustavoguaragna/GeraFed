@@ -47,10 +47,9 @@ class FlowerClient(NumPyClient):
                 net_gan,
                 optim_D,
                 local_epochs_alvo: UserConfigValue, 
-                local_epochs_gen: UserConfigValue, 
+                local_epochs_disc: UserConfigValue, 
                 dataset: UserConfigValue, 
                 lr_alvo: UserConfigValue, 
-                lr_gen: UserConfigValue, 
                 latent_dim: UserConfigValue, 
                 context: Context,
                 agg: UserConfigValue,
@@ -74,12 +73,11 @@ class FlowerClient(NumPyClient):
         self.net_disc = copy.deepcopy(net_gan)
         self.optim_D = optim_D
         self.local_epochs_alvo = local_epochs_alvo
-        self.local_epochs_gen = local_epochs_gen
+        self.local_epochs_disc = local_epochs_disc
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.net_alvo.to(self.device)
         self.lr_alvo = lr_alvo
         self.net_gen.to(self.device)
-        self.lr_gen = lr_gen
         self.dataset = dataset
         self.latent_dim = latent_dim
         self.client_state = (
@@ -121,6 +119,8 @@ class FlowerClient(NumPyClient):
     
 
         if num_syn > 0:
+            img_syn_start_time = time.time()
+            # Gera dados sinteticos
             trainloader_aug = syn_input(
                                     num_samples=num_syn,
                                     gan=self.net_gen,
@@ -132,6 +132,7 @@ class FlowerClient(NumPyClient):
                                     dataset=self.dataset,
                                     continue_epoch=self.continue_epoch
                                     )
+            img_syn_time = time.time() - img_syn_start_time
 
         # Treina o modelo classificador
         train_alvo_start_time = time.time()
@@ -176,7 +177,7 @@ class FlowerClient(NumPyClient):
         disc=self.net_disc,
         gen=self.net_gen,
         trainloader=trainloader_chunk,
-        epochs=self.local_epochs_gen,
+        epochs=self.local_epochs_disc,
         device=self.device,
         dataset=self.dataset,
         latent_dim=self.latent_dim,
@@ -214,7 +215,8 @@ class FlowerClient(NumPyClient):
             "optimDs_state_dict": pickle.dumps(self.optim_D.state_dict()),
             "cid": self.cid,
             "tempo_treino_alvo": train_classifier_time,
-            "tempo_treino_disc": train_disc_time
+            "tempo_treino_disc": train_disc_time,
+            "img_syn_time": img_syn_time
             },
         )
 
@@ -272,8 +274,7 @@ def client_fn(context: Context):
     strategy           = context.run_config["strategy"]
 
     local_epochs_alvo  = context.run_config["epocas_alvo"]
-    local_epochs_gen   = context.run_config["epocas_gen"]
-    lr_gen             = context.run_config["learn_rate_gen"]
+    local_epochs_disc   = context.run_config["epocas_disc"]
     lr_disc            = context.run_config["learn_rate_disc"]
     lr_alvo            = context.run_config["learn_rate_alvo"]
     latent_dim         = context.run_config["tam_ruido"]
@@ -329,10 +330,9 @@ def client_fn(context: Context):
                         net_gan=gan,  
                         optim_D=optim_D,
                         local_epochs_alvo=local_epochs_alvo, 
-                        local_epochs_gen=local_epochs_gen,
+                        local_epochs_disc=local_epochs_disc,
                         dataset=dataset,
                         lr_alvo=lr_alvo,
-                        lr_gen=lr_gen,
                         latent_dim=latent_dim,
                         context=context,
                         agg=agg,

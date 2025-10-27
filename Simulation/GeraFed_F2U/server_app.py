@@ -46,6 +46,7 @@ def server_fn(context: Context):
     img_size = context.run_config["tam_img"]
     latent_dim = context.run_config["tam_ruido"]
     gan_arq = context.run_config["gan_arq"]
+    lr_gen = context.run_config["learn_rate_gen"]
     gen_epochs = context.run_config["epocas_gen"]
     teste = context.run_config["teste"]
     num_partitions = context.run_config["num_clients"]
@@ -99,6 +100,7 @@ def server_fn(context: Context):
         fraction_evaluate_alvo=1.0,
         initial_parameters_alvo=parameters_alvo,
         gen=gen,
+        lr_gen=lr_gen,
         optimG_state_dict=optimGstate_dict,
         dataset=dataset,
         img_size=img_size,

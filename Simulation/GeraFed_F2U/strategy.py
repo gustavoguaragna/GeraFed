@@ -214,6 +214,7 @@ class GeraFed(Strategy):
                         "net_time_chunk" :[],
                         "disc_time_chunk": [],
                         "gen_time_chunk": [],
+                        "img_syn_time_chunk": [],
                         "test_time_chunk": [],
                         "local_test_time_chunk": []
                         }
@@ -312,8 +313,10 @@ class GeraFed(Strategy):
             # Simple mean of times
             net_times = [m["tempo_treino_alvo"]/len(fit_metrics) for _, m in fit_metrics]
             disc_times = [m["tempo_treino_disc"]/len(fit_metrics) for _, m in fit_metrics]
+            img_syn_times = [m["img_syn_time"]/len(fit_metrics) for _, m in fit_metrics]
             self.metrics_dict["net_time_chunk"].append(sum(net_times))
             self.metrics_dict["disc_time_chunk"].append(sum(disc_times))
+            self.metrics_dict["img_syn_time_chunk"].append(sum(img_syn_times))
         elif server_round == 1:  # Only log this warning once
             log(WARNING, "No fit_metrics_aggregation_fn provided")
 

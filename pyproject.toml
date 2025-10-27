@@ -33,6 +33,7 @@ continue_epoch       = 0
 dataset              = "mnist"       # 'mnist', 'cifar10'
 epocas_alvo          = 1
 epocas_gen           = 2
+epocas_disc          = 1
 Exp_name_folder      = "Experimentos/Flwr_run/"
 fid                  = false
 fraction_fit_alvo    = 1.0
