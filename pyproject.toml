@@ -8,12 +8,22 @@ version = "1.0.0"
 description = "Data Augmentation para Dados Heterogêneos em Aprendizado Federado"
 license = "Apache-2.0"
 dependencies = [
-    "flwr[simulation]",
-    "flwr-datasets",
-    "torchvision",
-    "numpy<2.0",
-    "xgboost",
-    "ctgan"
+    # Federated learning
+    "flwr[simulation]==1.15.2",
+    "flwr-datasets==0.5.0",
+
+    # Deep learning
+    "torch==2.2.2",
+    "torchvision==0.17.2",
+
+    # Core scientific stack
+    "numpy==1.26.4",
+    "matplotlib==3.10.1",
+    "scipy==1.15.2",
+
+    # Utility & support
+    "tqdm==4.67.1",
+    "click==8.1.8"
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -23,12 +33,11 @@ packages = ["."]
 publisher = "gustavoguaragna"
 
 [tool.flwr.app.components]
-serverapp = "Simulation.GeraFed_F2U.server_app:app"
-clientapp = "Simulation.GeraFed_F2U.client_app:app"
+serverapp = "Simulation.CNN.server_app:app"
+clientapp = "Simulation.CNN.client_app:app"
 
 [tool.flwr.app.config]
 agg                  = "full"        # 'disc', 'full', 'f2a', 'none'
-alpha_dir            = 0.1
 continue_epoch       = 0
 dataset              = "mnist"       # 'mnist', 'cifar10'
 epocas_alvo          = 1

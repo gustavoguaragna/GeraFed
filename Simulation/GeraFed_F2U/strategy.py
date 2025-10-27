@@ -209,14 +209,14 @@ class GeraFed(Strategy):
                         "g_loss_chunk": [],
                         "d_loss_chunk": [],
                         "net_loss_chunk": [],
-                        "net_acc_chunk": [],
+                        "net_acc_epoch": [],
                         "time_chunk": [],
                         "net_time_chunk" :[],
                         "disc_time_chunk": [],
                         "gen_time_chunk": [],
                         "img_syn_time_chunk": [],
-                        "test_time_chunk": [],
-                        "local_test_time_chunk": []
+                        "test_time": [],
+                        "local_test_time": []
                         }
         if self.on_fit_config_fn is not None:
             # Custom fit config function provided
@@ -329,7 +329,7 @@ class GeraFed(Strategy):
             elif self.dataset == "cifar10":
                 self.classifier = Net_CIFAR()
             else:
-                raise ValueError(f"{self.dataset} nao identificado")
+                raise ValueError(f"Dataset {self.dataset} nao identificado. Deveria ser 'mnist' ou 'cifar10'")
             # Define os pesos do modelo
             set_weights(self.classifier, aggregated_ndarrays)
 
@@ -368,7 +368,6 @@ class GeraFed(Strategy):
                 fit_res.metrics["cid"]: pickle.loads(fit_res.metrics["optimDs_state_dict"])
                 for _, fit_res in results
             }
-
 
             if server_round % self.num_chunks == 0:
                 checkpoint = {
@@ -419,7 +418,7 @@ class GeraFed(Strategy):
             ]
         )
 
-        self.metrics_dict["net_acc_chunk"].append(accuracy_aggregated)
+        self.metrics_dict["net_acc_epoch"].append(accuracy_aggregated)
 
 
         # Aggregate custom metrics if aggregation fn was provided
@@ -431,8 +430,8 @@ class GeraFed(Strategy):
 
         test_times = [evaluate_res.metrics["test_time"]/len(results) for _, evaluate_res in results]
         local_test_times = [evaluate_res.metrics["local_test_time"]/len(results) for _, evaluate_res in results]
-        self.metrics_dict["test_time_chunk"].append(sum(test_times))
-        self.metrics_dict["local_test_time_chunk"].append(sum(local_test_times))
+        self.metrics_dict["test_time"].append(sum(test_times))
+        self.metrics_dict["local_test_time"].append(sum(local_test_times))
 
         round_time = time.time() - self.init_round_time
         self.metrics_dict["time_chunk"].append(round_time)

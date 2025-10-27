@@ -222,7 +222,6 @@ class FlowerClient(NumPyClient):
 
     def evaluate(self, parameters, config):
 
-
         set_weights(self.net_alvo, parameters)
         test_time_start = time.time()
         # Avalia o modelo classificador
@@ -287,21 +286,21 @@ def client_fn(context: Context):
     patience           = context.run_config["patience"]
     
     if dataset == "mnist":
-        net_alvo = Net()
+        net_alvo = Net(seed=seed)
         if gan_arq == "simple_cnn":
             # Use a simple CNN architecture for the generator
             gan = CGAN()
         elif gan_arq == "f2u_gan":
-            gan = F2U_GAN()
+            gan = F2U_GAN(seed=seed)
     elif dataset == "cifar10":
-        net_alvo = Net_CIFAR()
+        net_alvo = Net_CIFAR(seed=seed)
         if gan_arq == "simple_cnn":
             # Use a simple CNN architecture for the generator
             raise ValueError(f"cGAN nao implementada para CIFAR10")
         elif gan_arq == "f2u_gan":
-            gan = F2U_GAN_CIFAR()
+            gan = F2U_GAN_CIFAR(seed=seed)
     else:
-        raise ValueError(f"{dataset} nao identificado")
+        raise ValueError(f"Dataset {dataset} nao identificado. Deveria ser 'mnist' ou 'cifar10'")
 
     optim_D = torch.optim.Adam(gan.discriminator.parameters(), lr=lr_disc, betas=(0.5, 0.999))
 

@@ -39,27 +39,28 @@ def weighted_average(metrics: List[Tuple[int, Metrics]]) -> Metrics:
 
 def server_fn(context: Context):
     # Read from config
-    num_rounds = context.run_config["num_rodadas"]
+    num_rounds        = context.run_config["num_rodadas"]
     fraction_fit_alvo = context.run_config["fraction_fit_alvo"]
-    fraction_fit_gen = context.run_config["fraction_fit_gen"]
-    dataset = context.run_config["dataset"]
-    img_size = context.run_config["tam_img"]
-    latent_dim = context.run_config["tam_ruido"]
-    gan_arq = context.run_config["gan_arq"]
-    lr_gen = context.run_config["learn_rate_gen"]
-    gen_epochs = context.run_config["epocas_gen"]
-    teste = context.run_config["teste"]
-    num_partitions = context.run_config["num_clients"]
-    partitioner = context.run_config["partitioner"]
-    strategy = context.run_config["strategy"]
-    num_chunks = context.run_config["num_chunks"]
-    continue_epoch = context.run_config["continue_epoch"]
-    folder = f"{context.run_config['Exp_name_folder']}FedGenIA_F2U/{dataset}/{partitioner}/{strategy}/{num_partitions}_clients"
+    fraction_fit_gen  = context.run_config["fraction_fit_gen"]
+    dataset           = context.run_config["dataset"]
+    img_size          = context.run_config["tam_img"]
+    latent_dim        = context.run_config["tam_ruido"]
+    gan_arq           = context.run_config["gan_arq"]
+    lr_gen            = context.run_config["learn_rate_gen"]
+    gen_epochs        = context.run_config["epocas_gen"]
+    teste             = context.run_config["teste"]
+    num_partitions    = context.run_config["num_clients"]
+    partitioner       = context.run_config["partitioner"]
+    strategy          = context.run_config["strategy"]
+    num_chunks        = context.run_config["num_chunks"]
+    continue_epoch    = context.run_config["continue_epoch"]
+    seed              = context.run_config["seed"]
+    folder            = f"{context.run_config['Exp_name_folder']}FedGenIA_F2U/{dataset}/{partitioner}/{strategy}/{num_partitions}_clients"
     os.makedirs(folder, exist_ok=True)
     
     # Initialize model parameters
     if dataset == "mnist":
-        classifier = Net()
+        classifier = Net(seed=seed)
         if gan_arq == "simple_cnn":
             gen = CGAN(
                     dataset=dataset,
@@ -69,13 +70,15 @@ def server_fn(context: Context):
         elif gan_arq == "f2u_gan":
             gen = F2U_GAN(
                     img_size=img_size,
-                    latent_dim=latent_dim
+                    latent_dim=latent_dim,
+                    seed=seed
                     )
     elif dataset == "cifar10":
-        classifier = Net_CIFAR()
+        classifier = Net_CIFAR(seed=seed)
         gen = F2U_GAN_CIFAR(
             img_size=img_size,
-            latent_dim=latent_dim
+            latent_dim=latent_dim,
+            seed=seed
         )
 
     optimGstate_dict = None
@@ -87,7 +90,6 @@ def server_fn(context: Context):
         optimGstate_dict = checkpoint['optim_G_state_dict']
 
     
-
     ndarrays_alvo = get_weights(classifier)
     # ndarrays_gen  = get_weights(gen)
     parameters_alvo = ndarrays_to_parameters(ndarrays_alvo)

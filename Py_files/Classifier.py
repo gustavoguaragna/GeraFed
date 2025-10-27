@@ -23,17 +23,8 @@ def state_dict_to_vector(sd):
 def vector_subtract(vecA, vecB):
     return [a - b for a, b in zip(vecA, vecB)]
 
-def vector_add(vecA, vecB):
-    return [a + b for a, b in zip(vecA, vecB)]
-
 def vector_scale(vec, scalar):
     return [v * scalar for v in vec]
-
-def vector_to_state_dict(keys, vec, device):
-    return OrderedDict({k: v.to(device) for k, v in zip(keys, vec)})
-
-def vec_to_numpy_list(vec):
-    return [v.cpu().numpy() for v in vec]
 
 def main():
 
@@ -212,7 +203,6 @@ def main():
     if strategy == "scaffold":
         # initialize c and ci to zeros (same shapes as model parameters)
         global_sd = global_net.state_dict()
-        keys = list(global_sd.keys())
         zero_vec = [torch.zeros_like(v).to(device) for v in global_sd.values()]
         c = [v.clone().detach() for v in zero_vec]  # list of tensors
         # one ci per client
@@ -422,13 +412,8 @@ def main():
 
                 net_time = time.time() - start_net_time
 
-                # After local updates, prepare outputs for aggregation
-                # collect local model parameters (as list of tensors)
-                local_vec = state_dict_to_vector(net.state_dict())
-                global_vec = state_dict_to_vector(global_net.state_dict())
-
                 # Append updated parameters (for aggregate_inplace) - same behavior as before:
-                params.append(ndarrays_to_parameters(vec_to_numpy_list(local_vec)))
+                params.append(ndarrays_to_parameters([val.cpu().numpy() for _, val in net.state_dict().items()]))
                 # num_examples:
                 if strategy == "scaffold":
                     num_examples = 1
@@ -454,6 +439,8 @@ def main():
                         # note (x - y_i) = - delta_y
                         factor = 1.0 / (max(K_local, 1) * eta_l)
                         # compute (x - y_i)
+                        local_vec = state_dict_to_vector(net.state_dict())
+                        global_vec = state_dict_to_vector(global_net.state_dict())
                         x_minus_y = vector_subtract(global_vec, local_vec)
                         scaled = vector_scale(x_minus_y, factor)
                         # ci_plus = ci - c + scaled

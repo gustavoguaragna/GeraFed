@@ -1,7 +1,6 @@
 """GeraFed: um framework para balancear dados heterogêneos em aprendizado federado."""
 
 from collections import OrderedDict
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -11,19 +10,19 @@ from torch.utils.data import DataLoader, Subset, Dataset, ConcatDataset, random_
 from torchvision.transforms import Compose, Normalize, ToTensor
 import numpy as np
 import random
-import torchvision
-from torch.utils.model_zoo import load_url as load_state_dict_from_url
-from PIL import Image as IMG
 import os
-from scipy import linalg
-from tqdm import tqdm
-from flwr.common import parameters_to_ndarrays
 from collections import defaultdict, OrderedDict
 from typing import Optional, List, Union
 import math
 from torchvision.utils import save_image
 import datasets
 import time
+# from scipy import linalg
+# from tqdm import tqdm
+# from flwr.common import parameters_to_ndarrays
+# import torchvision
+# from torch.utils.model_zoo import load_url as load_state_dict_from_url
+# from PIL import Image as IMG
 
 os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
@@ -344,7 +343,6 @@ class F2U_GAN_CIFAR(nn.Module):
         return self.adv_loss(logits.view(-1), targets.float().view(-1))
 
 
-
 #######################################################################################
 
 # Copyright 2023 Flower Labs GmbH. All Rights Reserved.
@@ -364,7 +362,6 @@ class F2U_GAN_CIFAR(nn.Module):
 """Class-based partitioner for Hugging Face Datasets."""
 
  # Assuming this is in the package structure
-
 
 class ClassPartitioner(Partitioner):
     """Partitions a dataset by class, ensuring each class appears in exactly one partition.
@@ -635,7 +632,7 @@ def train_alvo(net, trainloader, epochs, lr, device, dataset):
     elif dataset == "cifar10":
         image = "img"
     else:
-        raise ValueError(f"{dataset} nao identificado")
+        raise ValueError(f"Dataset {dataset} nao identificado. Deveria ser 'mnist' ou 'cifar10'")
     
     #treinou = False
     running_loss = 0.0
@@ -754,7 +751,7 @@ def test(net, testloader, device, model, dataset):
     elif dataset == "cifar10":
         image = "img"
     else:
-        raise ValueError(f"dataset nao identificado")
+        raise ValueError(f"Dataset {dataset} nao identificado. Deveria ser 'mnist' ou 'cifar10'")
     if model == "gen":
         g_losses = []
         d_losses = []

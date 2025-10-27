@@ -1,3 +1,5 @@
+import json
+import time
 from flwr.server.strategy import Strategy
 from logging import WARNING
 from typing import Callable, Optional, Union
@@ -16,13 +18,14 @@ from flwr.common import (
 from flwr.common.logger import log
 from flwr.server.client_manager import ClientManager
 from flwr.server.client_proxy import ClientProxy
+import torch
 
 # from collections import Counter
 
 from flwr.server.strategy.aggregate import aggregate, aggregate_inplace, weighted_loss_avg
 # import random
 
-#from Simulation.task import Net, set_weights
+from Simulation.CNN.task import Net, Net_CIFAR, set_weights
 # import torch
 
 
@@ -63,13 +66,13 @@ class GeraFed(Strategy):
     accept_failures : bool, optional
         Whether or not accept rounds containing failures. Defaults to True.
     initial_parameters : Parameters, optional
-        Initial global model parameters.
+        Initial global net parameters.
     fit_metrics_aggregation_fn : Optional[MetricsAggregationFn]
         Metrics aggregation function, optional.
     evaluate_metrics_aggregation_fn : Optional[MetricsAggregationFn]
         Metrics aggregation function, optional.
     inplace : bool (default: True)
-        Enable (True) or disable (False) in-place aggregation of model updates.
+        Enable (True) or disable (False) in-place aggregation of net updates.
     """
 
     # pylint: disable=too-many-arguments,too-many-instance-attributes, line-too-long
@@ -97,7 +100,9 @@ class GeraFed(Strategy):
         dataset: str = "mnist",
         img_size: int = 28,
         latent_dim: int = 100,
-        agg: str = "full"
+        agg: str = "full",
+        num_chunks: int = 1,
+        folder: str = ".",
     ) -> None:
         super().__init__()
 
@@ -125,6 +130,8 @@ class GeraFed(Strategy):
         self.img_size = img_size
         self.latent_dim = latent_dim
         self.agg = agg
+        self.num_chunks = num_chunks
+        self.folder = folder
 
     def __repr__(self) -> str:
         """Compute a string representation of the strategy."""
@@ -139,31 +146,25 @@ class GeraFed(Strategy):
         return max(num_clients, self.min_fit_clients), self.min_available_clients
 
 
-
-
     def num_evaluation_clients(self, num_available_clients: int) -> tuple[int, int]:
         """Use a fraction of available clients for evaluation."""
         num_clients = int(num_available_clients * self.fraction_evaluate)
         return max(num_clients, self.min_evaluate_clients), self.min_available_clients
 
 
-
-
     def initialize_parameters(
         self, client_manager: ClientManager
     ) -> Optional[Parameters]:
-        """Initialize global model parameters."""
+        """Initialize global net parameters."""
         initial_parameters = self.initial_parameters
         self.initial_parameters = None  # Don't keep initial parameters in memory
         return initial_parameters
 
 
-
-
     def evaluate(
         self, server_round: int, parameters: Parameters
     ) -> Optional[tuple[float, dict[str, Scalar]]]:
-        """Evaluate model parameters using an evaluation function."""
+        """Evaluate net parameters using an evaluation function."""
         if self.evaluate_fn is None:
             # No evaluation function provided
             return None
@@ -175,12 +176,16 @@ class GeraFed(Strategy):
         return loss, metrics
 
 
-
-
     def configure_fit(
         self, server_round: int, parameters: Parameters, client_manager: ClientManager
     ) -> list[tuple[ClientProxy, FitIns]]:
         """Configure the next round of training."""
+        self.init_round_time = time.time()
+        self.metrics_dict = {
+            "time_round": [],
+            "net_loss_chunk": [],
+            "net_acc_epoch": [],
+            }
         config = {}
         if self.on_fit_config_fn is not None:
             # Custom fit config function provided
@@ -203,7 +208,7 @@ class GeraFed(Strategy):
         # self.client_counter.update(conjunto_gen)
 
         fit_instructions = []
-        config = {}
+        config = {"round": server_round}
         # config_alvo = {"modelo": "alvo"}
         # config_gen = {"modelo": "gen", "round": server_round}
 
@@ -223,8 +228,6 @@ class GeraFed(Strategy):
         return fit_instructions
 
 
-
-
     def configure_evaluate(
         self, server_round: int, parameters: Parameters, client_manager: ClientManager
     ) -> list[tuple[ClientProxy, EvaluateIns]]:
@@ -233,6 +236,9 @@ class GeraFed(Strategy):
         if self.fraction_evaluate == 0.0:
             return []
 
+        if server_round % self.num_chunks != 0:
+            return None
+        
         # Parameters and config
         config = {}
         if self.on_evaluate_config_fn is not None:
@@ -252,8 +258,6 @@ class GeraFed(Strategy):
         return [(client, evaluate_ins) for client in clients]
 
 
-
-
     def aggregate_fit(
         self,
         server_round: int,
@@ -267,7 +271,6 @@ class GeraFed(Strategy):
         if not self.accept_failures and failures:
             return None, {}
         
-        results = [res for res in results]
         # results_alvo = [res for res in results if res[1].metrics["modelo"] == "alvo"]
         # results_gen = [res for res in results if res[1].metrics["modelo"] == "gen"]
 
@@ -297,38 +300,41 @@ class GeraFed(Strategy):
         if self.fit_metrics_aggregation_fn:
             fit_metrics = [(res.num_examples, res.metrics) for _, res in results]
             metrics_aggregated = self.fit_metrics_aggregation_fn(fit_metrics)
+            self.metrics_dict["net_loss_chunk"].append(metrics_aggregated["net_loss_chunk"])
         elif server_round == 1:  # Only log this warning once
             log(WARNING, "No fit_metrics_aggregation_fn provided")
 
-        # if parameters_aggregated is not None:
-        #     # Salva o modelo após a agregação
-        #     ndarrays = parameters_to_ndarrays(parameters_aggregated)
-        #     # Cria uma instância do modelo
-        #     model = Net()
-        #     # Define os pesos do modelo
-        #     set_weights(model, ndarrays)
-        #     # Salva o modelo no disco com o nome específico do dataset
-        #     model_path = f"modelo_alvo_round_{server_round}_mnist.pt"
-        #     torch.save(model.state_dict(), model_path)
-        #     print(f"Modelo salvo em {model_path}")
+        if parameters_aggregated is not None:
+            # Salva o modelo após a agregação
+            # Cria uma instância do modelo
+            if self.dataset == "mnist":
+                net = Net()
+            elif self.dataset == "cifar10":
+                net = Net_CIFAR()
+            else:
+                raise ValueError(f"Dataset {self.dataset} nao identificado. Deveria ser 'mnist' ou 'cifar10'")
+            # Define os pesos do modelo
+            set_weights(net, aggregated_ndarrays)
+            # Salva o modelo no disco com o nome específico do dataset
+            if server_round % self.num_chunks == 0:
+                net_path = f"{self.folder}/modelo_epoch_{int(server_round/self.num_chunks)}.pth"
+                torch.save(net.state_dict(), net_path)
+                print(f"Modelo salvo em {net_path}")
 
         # if parameters_aggregated_gen is not None and self.agg == "full":
         #     ndarrays = parameters_to_ndarrays(parameters_aggregated_gen)
         #     # Cria uma instância do modelo
-        #     model = CGAN(dataset=self.dataset,
+        #     net = CGAN(dataset=self.dataset,
         #                  img_size=self.img_size,
         #                  latent_dim=self.latent_dim)
         #     # Define os pesos do modelo
-        #     set_weights(model, ndarrays)
+        #     set_weights(net, ndarrays)
         #     # Salva o modelo no disco com o nome específico do dataset
         #     model_path = f"modelo_gen_round_{server_round}_mnist.pt"
-        #     torch.save(model.state_dict(), model_path)
+        #     torch.save(net.state_dict(), model_path)
         #     print(f"Modelo salvo em {model_path}")
 
         return parameters_aggregated, metrics_aggregated
-
-
-
 
     def aggregate_evaluate(
         self,
@@ -360,11 +366,12 @@ class GeraFed(Strategy):
             sum(accuracies) / sum(examples) if sum(examples) != 0 else 0
         )
 
+        self.metrics_dict["net_acc_epoch"].append(accuracy_aggregated)
+
         loss_file = f"losses.txt"
         with open(loss_file, "a") as f:
             f.write(f"Rodada {server_round}, Perda: {loss_aggregated}, Acuracia: {accuracy_aggregated}\n")
         print(f"Perda da rodada {server_round} salva em {loss_file}")
-
 
         # Aggregate custom metrics if aggregation fn was provided
         metrics_aggregated = {"loss": loss_aggregated, "accuracy": accuracy_aggregated}
@@ -373,6 +380,38 @@ class GeraFed(Strategy):
             metrics_aggregated = self.evaluate_metrics_aggregation_fn(eval_metrics)
         elif server_round == 1:  # Only log this warning once
             log(WARNING, "No evaluate_metrics_aggregation_fn provided")
+
+        round_time = time.time() - self.init_round_time
+        self.metrics_dict["time_round"].append(round_time)
+
+        metrics_filename = f"{self.folder}/metrics.json"
+
+        try:
+            with open(metrics_filename, 'r', encoding='utf-8') as f:
+                # Load the dictionary from the JSON file
+                existing_metrics = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            # If the file is not found or is not valid JSON, we start fresh
+            existing_metrics = {}
+            print("Metrics file not found or invalid. A new one will be created.")
+            print(metrics_filename)
+
+        for key, new_values in self.metrics_dict.items():
+            # Get the list that already exists for this key, or an empty list if the key is new
+            existing_list = existing_metrics.get(key, [])
+            
+            # Use .extend() to add the new items to the existing list
+            existing_list.extend(new_values)
+            
+            # Update the dictionary with the newly extended list
+            existing_metrics[key] = existing_list
+
+        try:
+            with open(metrics_filename, 'w', encoding='utf-8') as f:
+                json.dump(existing_metrics, f, ensure_ascii=False, indent=4) # indent makes it readable
+            print(f"Losses dict successfully saved to {metrics_filename}")
+        except Exception as e:
+            print(f"Error saving losses dict to JSON: {e}")
 
         return loss_aggregated, metrics_aggregated
 
