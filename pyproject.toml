@@ -33,8 +33,8 @@ packages = ["."]
 publisher = "gustavoguaragna"
 
 [tool.flwr.app.components]
-serverapp = "Simulation.CNN.server_app:app"
-clientapp = "Simulation.CNN.client_app:app"
+serverapp = "Simulation.GeraFed_F2U.server_app:app"
+clientapp = "Simulation.GeraFed_F2U.client_app:app"
 
 [tool.flwr.app.config]
 agg                  = "full"        # 'disc', 'full', 'f2a', 'none'

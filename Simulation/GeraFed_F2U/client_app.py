@@ -98,6 +98,7 @@ class FlowerClient(NumPyClient):
         self.trainloader = trainloader
         self.testloader = testloader
         self.testloader_local = testloader_local
+        self.num_classes = 10 if dataset in ["mnist", "cifar10"] else None  # Ajuste conforme necessário
 
     def fit(self, parameters, config):
         
@@ -115,8 +116,10 @@ class FlowerClient(NumPyClient):
             trainloader_chunk = self.trainloader
 
         # Calcula numero de amostras sinteticas
-        num_syn = int(math.ceil(len(trainloader_chunk.dataset)) * (math.exp(0.01*config["round"]) - 1) / (math.exp(0.01*self.num_epochs/2) - 1)) * 10
-    
+        num_syn = int(math.ceil(len(trainloader_chunk.dataset)/self.num_chunks/self.num_classes) * (math.exp(0.01*config["round"]/self.num_chunks) - 1) / (math.exp(0.01*self.num_epochs/2) - 1))
+
+        img_syn_time = 0
+        trainloader_aug = trainloader_chunk
 
         if num_syn > 0:
             img_syn_start_time = time.time()
