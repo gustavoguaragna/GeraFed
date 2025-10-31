@@ -688,7 +688,7 @@ class GeneratedDataset(torch.utils.data.Dataset):
     def __init__(self,
                  generator,
                  num_samples,
-                 latent_dim=100,
+                 latent_dim=128,
                  num_classes=10, # Total classes the generator model knows
                  desired_classes=None, # Optional: List of specific class indices to generate
                  device="cpu",
