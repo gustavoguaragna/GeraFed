@@ -1082,7 +1082,15 @@ class GeneratedDataset(Dataset):
             self.label_col_name: int(self.labels[idx]) # Return label as standard Python int
         }
 
-def generate_plot(net, device, round_number, client_id = None, examples_per_class: int=5, classes: int=10, latent_dim: int=100, server: bool=False):
+def generate_plot(net, 
+                  round_number, 
+                  device: str="cpu",
+                  client_id = None, 
+                  examples_per_class: int=5, 
+                  classes: int=10, 
+                  latent_dim: int=128, 
+                  folder: str=".",
+                  server: bool=True):
     """Gera plot de imagens de cada classe"""
     if server:
         import matplotlib
@@ -1091,9 +1099,11 @@ def generate_plot(net, device, round_number, client_id = None, examples_per_clas
     else:
         import matplotlib.pyplot as plt
 
+    net_type = type(net).__name__
     net.to(device) 
     net.eval()
     batch_size = examples_per_class * classes
+    dataset = "cifar10" if "CIFAR" in net_type else "mnist"
 
     latent_vectors = torch.randn(batch_size, latent_dim, device=device)
     labels = torch.tensor([i for i in range(classes) for _ in range(examples_per_class)], device=device)
@@ -1108,11 +1118,15 @@ def generate_plot(net, device, round_number, client_id = None, examples_per_clas
     if isinstance(client_id, int):
         fig.text(0.5, 0.98, f"Round: {round_number} | Client: {client_id}", ha="center", fontsize=12)
     else:
-        fig.text(0.5, 0.98, f"Round: {round_number-1}", ha="center", fontsize=12)
+        fig.text(0.5, 0.98, f"Round: {round_number}", ha="center", fontsize=12)
 
     # Exibir as imagens nos subplots
     for i, ax in enumerate(axes.flat):
-        ax.imshow(generated_images[i, 0, :, :], cmap='gray')
+        if dataset == "mnist":
+            ax.imshow(generated_images[i, 0, :, :], cmap='gray')
+        else:
+            images = (generated_images[i] + 1)/2
+            ax.imshow(images.permute(1, 2, 0).clamp(0,1))
         ax.set_xticks([])
         ax.set_yticks([])
 
@@ -1133,7 +1147,14 @@ def generate_plot(net, device, round_number, client_id = None, examples_per_clas
         # Adicionar o rótulo
         fig.text(0.04, center_y, str(row), va='center', fontsize=12, color='black')
     
-    return fig
+    if isinstance(client_id, int):
+        fig.savefig(f"{folder}/{dataset}{net_type}_r{round_number}_c{client_id}.png")
+        print("Imagem do cliente salva")
+    else:
+        fig.savefig(f"{folder}/{dataset}{net_type}_r{round_number}.png")
+        print("Imagem do servidor salva")
+    plt.close(fig)
+    return
 
 #     # FID
 

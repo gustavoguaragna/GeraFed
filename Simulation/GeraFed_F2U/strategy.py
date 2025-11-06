@@ -439,9 +439,8 @@ class GeraFed(Strategy):
         metrics_aggregated = {"loss": loss_aggregated, "accuracy": accuracy_aggregated}
 
         if server_round % self.num_chunks == 0:
-            figura = generate_plot(net=self.gen, device=self.device, round_number=int(server_round/self.num_chunks), server=True, latent_dim=self.latent_dim)
-            figura.savefig(f"{self.folder}/mnistF2U_r{int(server_round/self.num_chunks)+self.continue_epoch}.png")
-
+            generate_plot(net=self.gen, device=self.device, round_number=int(server_round/self.num_chunks+self.continue_epoch), folder=self.folder, latent_dim=self.latent_dim)
+        
         test_times = [evaluate_res.metrics["test_time"]/len(results) for _, evaluate_res in results]
         local_test_times = [evaluate_res.metrics["local_test_time"]/len(results) for _, evaluate_res in results]
         self.metrics_dict["test_time"].append(sum(test_times))
