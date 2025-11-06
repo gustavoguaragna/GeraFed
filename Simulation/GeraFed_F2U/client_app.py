@@ -285,7 +285,7 @@ def client_fn(context: Context):
     model              = context.run_config["model"]
     niid               = False if partitioner == "IID" else True 
     folder             = f"{context.run_config['Exp_name_folder']}FedGenIA_F2U/{dataset}/{partitioner}/{strategy}/{num_partitions}_clients"
-    num_epochs         = int(context.run_config["num_rodadas"]/num_chunks)
+    num_epochs         = context.run_config["num_epocas"]
     patience           = context.run_config["patience"]
     
     if dataset == "mnist":
