@@ -205,22 +205,34 @@ class GeraFed(Strategy):
     ) -> list[tuple[ClientProxy, FitIns]]:
         """Configure the next round of training."""
         self.init_round_time = time.time()
-        self.metrics_dict = {
+        if (server_round - 1) % self.num_chunks == 0 or server_round == 1:
+            self.init_epoch_time = time.time()
+            self.metrics_dict = {
                         "g_loss_chunk": [],
+                        "g_loss_epoch": [],
                         "d_loss_chunk": [],
+                        "d_loss_epoch": [],
                         "net_loss_chunk": [],
+                        "net_loss_epoch": [],
                         "net_acc_epoch": [],
                         "time_chunk": [],
-                        "net_time_chunk" :[],
+                        "time_epoch": [],
+                        "net_time_chunk": [],
+                        "net_time_epoch": [],
                         "disc_time_chunk": [],
+                        "disc_time_epoch": [],
                         "gen_time_chunk": [],
+                        "gen_time_epoch": [],
                         "img_syn_time_chunk": [],
+                        "img_syn_time_epoch": [],
                         "test_time": [],
                         "local_test_time": []
                         }
+
         if self.on_fit_config_fn is not None:
             # Custom fit config function provided
             config = self.on_fit_config_fn(server_round)
+
         #fit_ins = FitIns(parameters, config)
 
         # Sample clients
@@ -251,6 +263,8 @@ class GeraFed(Strategy):
             return []
     
         if server_round % self.num_chunks != 0:
+            round_time = time.time() - self.init_round_time
+            self.metrics_dict["time_chunk"].append(round_time)
             return None
 
         # Parameters and config
@@ -433,9 +447,28 @@ class GeraFed(Strategy):
         self.metrics_dict["test_time"].append(sum(test_times))
         self.metrics_dict["local_test_time"].append(sum(local_test_times))
 
+        epoch_time = time.time() - self.init_epoch_time
+        self.metrics_dict["time_epoch"].append(epoch_time)
         round_time = time.time() - self.init_round_time
         self.metrics_dict["time_chunk"].append(round_time)
+
         metrics_filename = f"{self.folder}/metrics.json"
+
+        for key, val in list(self.metrics_dict.items()):
+            if key.endswith("time_chunk") and key != "time_chunk":
+                epoch_key = key.replace("chunk", "epoch")
+                sum_value = sum(val)
+                self.metrics_dict[epoch_key].append(sum_value)
+
+            if key.endswith("epoch") or "time" in key:
+                continue
+
+            epoch_key = key.replace('_chunk', '_epoch')
+
+            mean_value = sum(val) / len(val)
+
+            self.metrics_dict[epoch_key].append(mean_value)
+            
 
         try:
             with open(metrics_filename, 'r', encoding='utf-8') as f:
