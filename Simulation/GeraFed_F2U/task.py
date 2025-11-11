@@ -155,7 +155,7 @@ class CGAN(nn.Module):
         return self.adv_loss(output, label)
     
 class F2U_GAN(nn.Module):
-    def __init__(self, img_size=28, latent_dim=128, condition=True, seed=42):
+    def __init__(self, img_size=28, latent_dim=128, condition=True, seed=None):
         if seed is not None:
           torch.manual_seed(seed)
         super(F2U_GAN, self).__init__()
