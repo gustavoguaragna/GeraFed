@@ -39,7 +39,8 @@ def weighted_average(metrics: List[Tuple[int, Metrics]]) -> Metrics:
 
 def server_fn(context: Context):
     # Read from config
-    num_rounds        = context.run_config["num_rodadas"]
+    num_chunks        = context.run_config["num_chunks"]
+    num_rounds        = context.run_config["num_epocas"] * num_chunks
     fraction_fit_alvo = context.run_config["fraction_fit_alvo"]
     fraction_fit_gen  = context.run_config["fraction_fit_gen"]
     dataset           = context.run_config["dataset"]
@@ -52,7 +53,6 @@ def server_fn(context: Context):
     num_partitions    = context.run_config["num_clients"]
     partitioner       = context.run_config["partitioner"]
     strategy          = context.run_config["strategy"]
-    num_chunks        = context.run_config["num_chunks"]
     continue_epoch    = context.run_config["continue_epoch"]
     seed              = context.run_config["seed"]
     folder            = f"{context.run_config['Exp_name_folder']}FedGenIA_F2U/{dataset}/{partitioner}/{strategy}/{num_partitions}_clients"

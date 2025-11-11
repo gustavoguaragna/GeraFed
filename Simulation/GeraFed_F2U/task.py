@@ -155,7 +155,7 @@ class CGAN(nn.Module):
         return self.adv_loss(output, label)
     
 class F2U_GAN(nn.Module):
-    def __init__(self, img_size=28, latent_dim=128, condition=True, seed=42):
+    def __init__(self, img_size=28, latent_dim=128, condition=True, seed=None):
         if seed is not None:
           torch.manual_seed(seed)
         super(F2U_GAN, self).__init__()
@@ -743,7 +743,7 @@ def train_G(net: nn.Module, discs: list, device: str, lr: float, epochs: int, ba
 
     return np.mean(g_losses), optim_G.state_dict()
 
-def test(net, testloader, device, model, dataset):
+def test(net, testloader, device, dataset):
     """Validate the model on the test set."""
     net.to(device)
     if dataset == "mnist":
@@ -752,52 +752,52 @@ def test(net, testloader, device, model, dataset):
         image = "img"
     else:
         raise ValueError(f"Dataset {dataset} nao identificado. Deveria ser 'mnist' ou 'cifar10'")
-    if model == "gen":
-        g_losses = []
-        d_losses = []
-        with torch.no_grad():
-            for batch_idx, batch in enumerate(testloader):
-                images, labels = batch[image].to(device), batch["label"].to(device)
-                batch_size = images.size(0)
-                real_ident = torch.full((batch_size, 1), 1., device=device)
-                fake_ident = torch.full((batch_size, 1), 0., device=device)
+    # if model == "gen":
+    #     g_losses = []
+    #     d_losses = []
+    #     with torch.no_grad():
+    #         for batch_idx, batch in enumerate(testloader):
+    #             images, labels = batch[image].to(device), batch["label"].to(device)
+    #             batch_size = images.size(0)
+    #             real_ident = torch.full((batch_size, 1), 1., device=device)
+    #             fake_ident = torch.full((batch_size, 1), 0., device=device)
                 
-                #Gen loss
-                z_noise = torch.randn(batch_size, 100, device=device)
-                x_fake_labels = torch.randint(0, 10, (batch_size,), device=device)
-                x_fake = net(z_noise, x_fake_labels)
-                y_fake_g = net(x_fake, x_fake_labels)
-                g_loss = net.loss(y_fake_g, real_ident)
+    #             #Gen loss
+    #             z_noise = torch.randn(batch_size, 100, device=device)
+    #             x_fake_labels = torch.randint(0, 10, (batch_size,), device=device)
+    #             x_fake = net(z_noise, x_fake_labels)
+    #             y_fake_g = net(x_fake, x_fake_labels)
+    #             g_loss = net.loss(y_fake_g, real_ident)
 
-                #Disc loss
-                y_real = net(images, labels)
-                d_real_loss = net.loss(y_real, real_ident)
-                y_fake_d = net(x_fake.detach(), x_fake_labels)
-                d_fake_loss = net.loss(y_fake_d, fake_ident)
-                d_loss = (d_real_loss + d_fake_loss) / 2
+    #             #Disc loss
+    #             y_real = net(images, labels)
+    #             d_real_loss = net.loss(y_real, real_ident)
+    #             y_fake_d = net(x_fake.detach(), x_fake_labels)
+    #             d_fake_loss = net.loss(y_fake_d, fake_ident)
+    #             d_loss = (d_real_loss + d_fake_loss) / 2
 
-                g_losses.append(g_loss.item())
-                d_losses.append(d_loss.item())
+    #             g_losses.append(g_loss.item())
+    #             d_losses.append(d_loss.item())
 
-                if batch_idx % 100 == 0 and batch_idx > 0:
-                    print('[{}/{}] loss_D_teste: {:.4f} loss_G_teste: {:.4f}'.format(
-                                batch_idx, len(testloader),
-                                d_loss.mean().item(),
-                                g_loss.mean().item()))
-        return np.mean(g_losses), np.mean(d_losses)
-    else:
-        criterion = torch.nn.CrossEntropyLoss()
-        correct, loss = 0, 0.0
-        with torch.no_grad():
-            for batch in testloader:
-                images = batch[image].to(device)
-                labels = batch["label"].to(device)
-                outputs = net(images)
-                loss += criterion(outputs, labels).item()
-                correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
-        accuracy = correct / len(testloader.dataset)
-        loss = loss / len(testloader)
-        return loss, accuracy
+    #             if batch_idx % 100 == 0 and batch_idx > 0:
+    #                 print('[{}/{}] loss_D_teste: {:.4f} loss_G_teste: {:.4f}'.format(
+    #                             batch_idx, len(testloader),
+    #                             d_loss.mean().item(),
+    #                             g_loss.mean().item()))
+    #     return np.mean(g_losses), np.mean(d_losses)
+    # else:
+    criterion = torch.nn.CrossEntropyLoss()
+    correct, loss = 0, 0.0
+    with torch.no_grad():
+        for batch in testloader:
+            images = batch[image].to(device)
+            labels = batch["label"].to(device)
+            outputs = net(images)
+            loss += criterion(outputs, labels).item()
+            correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
+    accuracy = correct / len(testloader.dataset)
+    loss = loss / len(testloader)
+    return loss, accuracy
     
 def local_test(net: nn.Module,
                testloader: DataLoader,
@@ -1082,7 +1082,15 @@ class GeneratedDataset(Dataset):
             self.label_col_name: int(self.labels[idx]) # Return label as standard Python int
         }
 
-def generate_plot(net, device, round_number, client_id = None, examples_per_class: int=5, classes: int=10, latent_dim: int=100, server: bool=False):
+def generate_plot(net, 
+                  round_number, 
+                  device: str="cpu",
+                  client_id = None, 
+                  examples_per_class: int=5, 
+                  classes: int=10, 
+                  latent_dim: int=128, 
+                  folder: str=".",
+                  server: bool=True):
     """Gera plot de imagens de cada classe"""
     if server:
         import matplotlib
@@ -1091,9 +1099,11 @@ def generate_plot(net, device, round_number, client_id = None, examples_per_clas
     else:
         import matplotlib.pyplot as plt
 
+    net_type = type(net).__name__
     net.to(device) 
     net.eval()
     batch_size = examples_per_class * classes
+    dataset = "cifar10" if "CIFAR" in net_type else "mnist"
 
     latent_vectors = torch.randn(batch_size, latent_dim, device=device)
     labels = torch.tensor([i for i in range(classes) for _ in range(examples_per_class)], device=device)
@@ -1108,11 +1118,15 @@ def generate_plot(net, device, round_number, client_id = None, examples_per_clas
     if isinstance(client_id, int):
         fig.text(0.5, 0.98, f"Round: {round_number} | Client: {client_id}", ha="center", fontsize=12)
     else:
-        fig.text(0.5, 0.98, f"Round: {round_number-1}", ha="center", fontsize=12)
+        fig.text(0.5, 0.98, f"Round: {round_number}", ha="center", fontsize=12)
 
     # Exibir as imagens nos subplots
     for i, ax in enumerate(axes.flat):
-        ax.imshow(generated_images[i, 0, :, :], cmap='gray')
+        if dataset == "mnist":
+            ax.imshow(generated_images[i, 0, :, :], cmap='gray')
+        else:
+            images = (generated_images[i] + 1)/2
+            ax.imshow(images.permute(1, 2, 0).clamp(0,1))
         ax.set_xticks([])
         ax.set_yticks([])
 
@@ -1133,7 +1147,14 @@ def generate_plot(net, device, round_number, client_id = None, examples_per_clas
         # Adicionar o rótulo
         fig.text(0.04, center_y, str(row), va='center', fontsize=12, color='black')
     
-    return fig
+    if isinstance(client_id, int):
+        fig.savefig(f"{folder}/{dataset}{net_type}_r{round_number}_c{client_id}.png")
+        print("Imagem do cliente salva")
+    else:
+        fig.savefig(f"{folder}/{dataset}{net_type}_r{round_number}.png")
+        print("Imagem do servidor salva")
+    plt.close(fig)
+    return
 
 #     # FID
 

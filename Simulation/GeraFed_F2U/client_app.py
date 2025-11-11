@@ -52,11 +52,7 @@ class FlowerClient(NumPyClient):
                 lr_alvo: UserConfigValue, 
                 latent_dim: UserConfigValue, 
                 context: Context,
-                agg: UserConfigValue,
-                model: UserConfigValue,
                 num_partitions: UserConfigValue,
-                niid: bool,
-                alpha_dir: UserConfigValue,
                 batch_size: UserConfigValue,
                 teste: UserConfigValue,
                 trainloader: Union[DataLoader, List],
@@ -64,7 +60,6 @@ class FlowerClient(NumPyClient):
                 testloader_local: DataLoader,
                 folder: UserConfigValue = ".",
                 num_chunks: UserConfigValue = 1,
-                partitioner: UserConfigValue = "Class",
                 continue_epoch: UserConfigValue = 0,
                 num_epochs: UserConfigValue = 100):
         self.cid=cid
@@ -76,23 +71,18 @@ class FlowerClient(NumPyClient):
         self.local_epochs_disc = local_epochs_disc
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.net_alvo.to(self.device)
-        self.lr_alvo = lr_alvo
         self.net_gen.to(self.device)
+        self.lr_alvo = lr_alvo
         self.dataset = dataset
         self.latent_dim = latent_dim
         self.client_state = (
             context.state
         ) 
-        self.agg = agg
-        self.model = model
         self.num_partitions = num_partitions
-        self.niid = niid
-        self.alpha_dir = alpha_dir
         self.batch_size = batch_size
         self.teste = teste
         self.folder = folder
         self.num_chunks = num_chunks
-        self.partitioner = partitioner
         self.continue_epoch = continue_epoch
         self.num_epochs = num_epochs
         self.trainloader = trainloader
@@ -116,7 +106,7 @@ class FlowerClient(NumPyClient):
             trainloader_chunk = self.trainloader
 
         # Calcula numero de amostras sinteticas
-        num_syn = int(math.ceil(len(trainloader_chunk.dataset)/self.num_chunks/self.num_classes) * (math.exp(0.01*config["round"]/self.num_chunks) - 1) / (math.exp(0.01*self.num_epochs/2) - 1))
+        num_syn = int(math.ceil(len(trainloader_chunk.dataset)/self.num_chunks) * (math.exp(0.01*int(config["round"]/self.num_chunks)) - 1) / (math.exp(0.01*self.num_epochs/2) - 1))
 
         img_syn_time = 0
         trainloader_aug = trainloader_chunk
@@ -228,7 +218,7 @@ class FlowerClient(NumPyClient):
         set_weights(self.net_alvo, parameters)
         test_time_start = time.time()
         # Avalia o modelo classificador
-        loss, accuracy = test(self.net_alvo, self.testloader, self.device, model=self.model, dataset=self.dataset)
+        loss, accuracy = test(self.net_alvo, self.testloader, self.device, dataset=self.dataset)
         test_time = time.time() - test_time_start
 
 
@@ -281,11 +271,8 @@ def client_fn(context: Context):
     lr_alvo            = context.run_config["learn_rate_alvo"]
     latent_dim         = context.run_config["tam_ruido"]
     seed               = context.run_config["seed"]
-    agg                = context.run_config["agg"]
-    model              = context.run_config["model"]
-    niid               = False if partitioner == "IID" else True 
     folder             = f"{context.run_config['Exp_name_folder']}FedGenIA_F2U/{dataset}/{partitioner}/{strategy}/{num_partitions}_clients"
-    num_epochs         = int(context.run_config["num_rodadas"]/num_chunks)
+    num_epochs         = context.run_config["num_epocas"]
     patience           = context.run_config["patience"]
     
     if dataset == "mnist":
@@ -322,6 +309,7 @@ def client_fn(context: Context):
                                 teste=teste,
                                 partitioner_type=partitioner,
                                 num_chunks=num_chunks,
+                                alpha_dir=alpha_dir
 
     )
 
@@ -337,16 +325,11 @@ def client_fn(context: Context):
                         lr_alvo=lr_alvo,
                         latent_dim=latent_dim,
                         context=context,
-                        agg=agg,
-                        model=model,
                         num_partitions=num_partitions,
-                        niid=niid,
-                        alpha_dir=alpha_dir,
                         batch_size=batch_size,
                         teste=teste,
                         folder=folder,
                         num_chunks=num_chunks,
-                        partitioner=partitioner,
                         continue_epoch=continue_epoch,
                         num_epochs=num_epochs,
                         trainloader=trainloader,
