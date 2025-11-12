@@ -120,7 +120,12 @@ def run_trial_training(trial, dataset="mnist", epochs=20, device="cuda"):
         torch.optim.Adam(model.discriminator.parameters(), lr=d_lr, betas=(beta1_d, beta2_d), weight_decay=wd_d)
         for model in models
     ]
-    
+    # optim_G = torch.optim.Adam(list(gen.generator.parameters())+list(gen.label_embedding.parameters()), lr=g_lr, betas=(beta1_g, beta2_g))
+    # optim_Ds = [
+    #     torch.optim.Adam(list(model.discriminator.parameters())+list(model.label_embedding.parameters()), lr=d_lr, betas=(beta1_d, beta2_d), weight_decay=wd_d)
+    #     for model in models
+    # ]
+
     fds = FederatedDataset(dataset=dataset, partitioners={"train": partitioner})
     train_partitions = [fds.load_partition(i, split="train") for i in range(num_partitions)]
     

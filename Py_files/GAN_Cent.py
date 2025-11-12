@@ -27,6 +27,9 @@ def main(test_mode: bool, gan_arq: str, freq_save: int):
 
     optim_G = torch.optim.Adam(gen.parameters(), lr=0.0002, betas=(0.5, 0.999))
     optim_D = torch.optim.Adam(disc.parameters(), lr=0.0002, betas=(0.5, 0.999))
+    # Nao fiz testes nesse arquivo, mas para treinar tambem os embeddings:
+    # optim_G = torch.optim.Adam(list(gen.generator.parameters())+list(gen.label_embedding.parameters()), lr=0.0002, betas=(0.5, 0.999))
+    # optim_D = torch.optim.Adam(list(model.discriminator.parameters())+list(gen.label_embedding.parameters()), lr=0.0002, betas=(0.5, 0.999))
 
     criterion = torch.nn.BCEWithLogitsLoss()
 

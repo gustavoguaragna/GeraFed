@@ -710,7 +710,7 @@ def train_disc(gen, disc, trainloader, epochs, device, optim, dataset="mnist", l
 def train_G(net: nn.Module, discs: list, device: str, lr: float, epochs: int, batch_size: int, latent_dim: int, optim_state_dict = None):
     net.to(device)  # move model to GPU if available
 
-    optim_G = torch.optim.Adam(net.generator.parameters(), lr=lr, betas=(0.5, 0.999))
+    optim_G = torch.optim.Adam(list(net.generator.parameters())+list(net.label_embedding.parameters()), lr=lr, betas=(0.5, 0.999))
     if optim_state_dict:
         optim_G.load_state_dict(optim_state_dict)
 

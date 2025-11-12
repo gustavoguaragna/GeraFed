@@ -610,8 +610,8 @@ def train_gen(net, trainloader, epochs, lr, device, dataset="mnist", latent_dim=
       imagem = "img"
     
     net.to(device)  # move model to GPU if available
-    optim_G = torch.optim.Adam(net.generator.parameters(), lr=lr, betas=(0.5, 0.999))
-    optim_D = torch.optim.Adam(net.discriminator.parameters(), lr=lr, betas=(0.5, 0.999))
+    optim_G = torch.optim.Adam(list(net.generator.parameters())+list(net.label_embedding.parameters()), lr=lr, betas=(0.5, 0.999))
+    optim_D = torch.optim.Adam(list(net.discriminator.parameters())+list(net.label_embedding.parameters()), lr=lr, betas=(0.5, 0.999))
 
     g_losses = []
     d_losses = []
@@ -677,7 +677,7 @@ def train_gen(net, trainloader, epochs, lr, device, dataset="mnist", latent_dim=
                 
 def train_G(net: CGAN, discs: list, device: str, lr: float, epochs: int, batch_size: int, latent_dim: int):
     net.to(device)  # move model to GPU if available
-    optim_G = torch.optim.Adam(net.generator.parameters(), lr=lr, betas=(0.5, 0.999))
+    optim_G = torch.optim.Adam(list(net.generator.parameters())+list(net.label_embedding.parameters()), lr=lr, betas=(0.5, 0.999))
     
     for epoch in range(epochs):
         # Train G

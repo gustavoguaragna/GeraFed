@@ -331,7 +331,7 @@ def client_fn(context: Context):
     else:
         raise ValueError(f"Dataset {dataset} nao identificado. Deveria ser 'mnist' ou 'cifar10'")
 
-    optim_D = torch.optim.Adam(gan.discriminator.parameters(), lr=lr_disc, betas=(0.5, 0.999))
+    optim_D = torch.optim.Adam(list(gan.discriminator.parameters())+list(gan.label_embedding.parameters()), lr=lr_disc, betas=(0.5, 0.999))
 
 
     if continue_epoch != 0:
