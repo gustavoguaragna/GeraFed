@@ -112,7 +112,7 @@ class FlowerClient(NumPyClient):
             trainloader_chunk = self.trainloader
 
         # Calcula numero de amostras sinteticas
-        num_syn = int(math.ceil(len(trainloader_chunk.dataset)/self.num_chunks) * (math.exp(0.01*int(config["round"]/self.num_chunks)) - 1) / (math.exp(0.01*self.num_epochs/2) - 1))
+        num_syn = int(math.ceil(len(trainloader_chunk.dataset)) * (math.exp(0.01*int(config["round"]/self.num_chunks)) - 1) / (math.exp(0.01*self.num_epochs/2) - 1))
 
         img_syn_time = 0
         trainloader_aug = trainloader_chunk
