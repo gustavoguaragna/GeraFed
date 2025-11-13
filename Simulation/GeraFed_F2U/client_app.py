@@ -27,6 +27,7 @@ import copy
 import time
 import io
 import numpy as np
+from itertools import islice
 
 # import random
 # import numpy as np
@@ -47,11 +48,11 @@ class FlowerClient(NumPyClient):
                 cid: UserConfigValue, 
                 net_alvo,
                 net_gan,
-                optim_D,
                 local_epochs_alvo: UserConfigValue, 
                 local_epochs_disc: UserConfigValue, 
                 dataset: UserConfigValue, 
-                lr_alvo: UserConfigValue, 
+                lr_alvo: UserConfigValue,
+                lr_disc: UserConfigValue,
                 latent_dim: UserConfigValue, 
                 context: Context,
                 num_partitions: UserConfigValue,
@@ -68,13 +69,14 @@ class FlowerClient(NumPyClient):
         self.net_alvo = net_alvo
         self.net_gen = copy.deepcopy(net_gan)
         self.net_disc = copy.deepcopy(net_gan)
-        self.optim_D = optim_D
         self.local_epochs_alvo = local_epochs_alvo
         self.local_epochs_disc = local_epochs_disc
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.net_alvo.to(self.device)
         self.net_gen.to(self.device)
+        self.net_disc.to(self.device)
         self.lr_alvo = lr_alvo
+        self.lr_disc = lr_disc
         self.dataset = dataset
         self.latent_dim = latent_dim
         self.client_state = (
@@ -91,6 +93,8 @@ class FlowerClient(NumPyClient):
         self.testloader = testloader
         self.testloader_local = testloader_local
         self.num_classes = 10 if dataset in ["mnist", "cifar10"] else None  # Ajuste conforme necessário
+
+        self.optim_D = torch.optim.Adam(list(self.net_disc.discriminator.parameters())+list(self.net_disc.label_embedding.parameters()), lr=self.lr_disc, betas=(0.5, 0.999))
 
     def fit(self, parameters, config):
         
@@ -181,7 +185,6 @@ class FlowerClient(NumPyClient):
         #         for _, v in optim_record.items():
         #            self.optim_D.state_dict()['state'][p] = torch.from_numpy(v.numpy())
 
-
         train_disc_start_time = time.time()
         # Treina o modelo generativo
         avg_d_loss = train_disc(
@@ -192,8 +195,10 @@ class FlowerClient(NumPyClient):
         device=self.device,
         dataset=self.dataset,
         latent_dim=self.latent_dim,
-        optim=self.optim_D
+        optim=self.optim_D,
+        cid=self.cid, round=config["round"]
         )
+
         train_disc_time = time.time() - train_disc_start_time
 
         # Save all elements of the state_dict into a single RecordSet
@@ -331,8 +336,6 @@ def client_fn(context: Context):
     else:
         raise ValueError(f"Dataset {dataset} nao identificado. Deveria ser 'mnist' ou 'cifar10'")
 
-    optim_D = torch.optim.Adam(list(gan.discriminator.parameters())+list(gan.label_embedding.parameters()), lr=lr_disc, betas=(0.5, 0.999))
-
 
     if continue_epoch != 0:
         checkpoint = torch.load(f"{folder}/checkpoint_epoch{continue_epoch}.pth", map_location=torch.device("cuda:0" if torch.cuda.is_available() else "cpu"))
@@ -356,12 +359,12 @@ def client_fn(context: Context):
     # Return Client instance
     return FlowerClient(cid=partition_id,
                         net_alvo=net_alvo, 
-                        net_gan=gan,  
-                        optim_D=optim_D,
+                        net_gan=gan,
                         local_epochs_alvo=local_epochs_alvo, 
                         local_epochs_disc=local_epochs_disc,
                         dataset=dataset,
                         lr_alvo=lr_alvo,
+                        lr_disc=lr_disc,
                         latent_dim=latent_dim,
                         context=context,
                         num_partitions=num_partitions,
