@@ -25,6 +25,9 @@ from typing import Union, List
 import pickle
 import copy
 import time
+import io
+import numpy as np
+from itertools import islice
 
 # import random
 # import numpy as np
@@ -45,11 +48,11 @@ class FlowerClient(NumPyClient):
                 cid: UserConfigValue, 
                 net_alvo,
                 net_gan,
-                optim_D,
                 local_epochs_alvo: UserConfigValue, 
                 local_epochs_disc: UserConfigValue, 
                 dataset: UserConfigValue, 
-                lr_alvo: UserConfigValue, 
+                lr_alvo: UserConfigValue,
+                lr_disc: UserConfigValue,
                 latent_dim: UserConfigValue, 
                 context: Context,
                 num_partitions: UserConfigValue,
@@ -66,13 +69,14 @@ class FlowerClient(NumPyClient):
         self.net_alvo = net_alvo
         self.net_gen = copy.deepcopy(net_gan)
         self.net_disc = copy.deepcopy(net_gan)
-        self.optim_D = optim_D
         self.local_epochs_alvo = local_epochs_alvo
         self.local_epochs_disc = local_epochs_disc
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.net_alvo.to(self.device)
         self.net_gen.to(self.device)
+        self.net_disc.to(self.device)
         self.lr_alvo = lr_alvo
+        self.lr_disc = lr_disc
         self.dataset = dataset
         self.latent_dim = latent_dim
         self.client_state = (
@@ -90,6 +94,8 @@ class FlowerClient(NumPyClient):
         self.testloader_local = testloader_local
         self.num_classes = 10 if dataset in ["mnist", "cifar10"] else None  # Ajuste conforme necessário
 
+        self.optim_D = torch.optim.Adam(list(self.net_disc.discriminator.parameters())+list(self.net_disc.label_embedding.parameters()), lr=self.lr_disc, betas=(0.5, 0.999))
+
     def fit(self, parameters, config):
         
         # Atualiza pesos do modelo generativo
@@ -106,7 +112,7 @@ class FlowerClient(NumPyClient):
             trainloader_chunk = self.trainloader
 
         # Calcula numero de amostras sinteticas
-        num_syn = int(math.ceil(len(trainloader_chunk.dataset)/self.num_chunks) * (math.exp(0.01*int(config["round"]/self.num_chunks)) - 1) / (math.exp(0.01*self.num_epochs/2) - 1))
+        num_syn = int(math.ceil(len(trainloader_chunk.dataset)) * (math.exp(0.01*int(config["round"]/self.num_chunks)) - 1) / (math.exp(0.01*self.num_epochs/2) - 1))
 
         img_syn_time = 0
         trainloader_aug = trainloader_chunk
@@ -139,30 +145,45 @@ class FlowerClient(NumPyClient):
         )
         train_classifier_time  = time.time() - train_alvo_start_time
 
-        # Cria state_dict para a disc
-        state_dict = {}
-        # Carrega parametros da disc do estado do cliente
-        if "net_parameters" in self.client_state.parameters_records:
-            p_record = self.client_state.parameters_records["net_parameters"]
-
-            # Deserialize arrays
-            for k, v in p_record.items():
-                state_dict[k] = torch.from_numpy(v.numpy())
-
-            # Apply state dict to disc
+        # --- Restore discriminator model parameters ---
+        if "disc_state_dict" in self.client_state.parameters_records:
+            rec_model = self.client_state.parameters_records["disc_state_dict"]
+            arr_model = rec_model["state_bytes"].numpy()
+            buf_model = io.BytesIO(arr_model.tobytes())
+            state_dict = torch.load(buf_model, map_location=self.device)
             self.net_disc.load_state_dict(state_dict)
 
-        # Load optimizer state for the discriminator
-        if "optim_parameter0" in self.client_state.parameters_records:
+        # --- Restore optimizer state ---
+        if "disc_optim_state_dict" in self.client_state.parameters_records:
+            rec_optim = self.client_state.parameters_records["disc_optim_state_dict"]
+            arr_optim = rec_optim["state_bytes"].numpy()
+            buf_optim = io.BytesIO(arr_optim.tobytes())
+            optim_state_dict = torch.load(buf_optim, map_location=self.device)
+            self.optim_D.load_state_dict(optim_state_dict)
 
-            for p in self.optim_D.state_dict()['state'].keys():
-                # Carrega parametros do estado do parametro p do optim da disc
-                optim_record = self.client_state.parameters_records[f"optim_parameter{p}"]
+        # # Cria state_dict para a disc
+        # state_dict = {}
+        # # Carrega parametros da disc do estado do cliente
+        # if "net_parameters" in self.client_state.parameters_records:
+        #     p_record = self.client_state.parameters_records["net_parameters"]
 
-                # Deserialize arrays and substitute for current value
-                for _, v in optim_record.items():
-                   self.optim_D.state_dict()['state'][p] = torch.from_numpy(v.numpy())
+        #     # Deserialize arrays
+        #     for k, v in p_record.items():
+        #         state_dict[k] = torch.from_numpy(v.numpy())
 
+        #     # Apply state dict to disc
+        #     self.net_disc.load_state_dict(state_dict)
+
+        # # Load optimizer state for the discriminator
+        # if "optim_parameter0" in self.client_state.parameters_records:
+
+        #     for p in self.optim_D.state_dict()['state'].keys():
+        #         # Carrega parametros do estado do parametro p do optim da disc
+        #         optim_record = self.client_state.parameters_records[f"optim_parameter{p}"]
+
+        #         # Deserialize arrays and substitute for current value
+        #         for _, v in optim_record.items():
+        #            self.optim_D.state_dict()['state'][p] = torch.from_numpy(v.numpy())
 
         train_disc_start_time = time.time()
         # Treina o modelo generativo
@@ -174,27 +195,50 @@ class FlowerClient(NumPyClient):
         device=self.device,
         dataset=self.dataset,
         latent_dim=self.latent_dim,
-        optim=self.optim_D
+        optim=self.optim_D,
+        cid=self.cid, round=config["round"]
         )
+
         train_disc_time = time.time() - train_disc_start_time
 
         # Save all elements of the state_dict into a single RecordSet
         p_record = ParametersRecord()
         for k, v in self.net_disc.state_dict().items():
-            # Convert to NumPy, then to Array. Add to record
+            # Convert to NumPy, then to Array. Add to self.client_state
             p_record[k] = array_from_numpy(v.detach().cpu().numpy())
         # Add to a context
         self.client_state.parameters_records["net_parameters"] = p_record
 
-        # Save all elements of the optim.state_dict into a single RecordSet
+        # # Save all elements of the optim.state_dict into a single RecordSet    
+        # optim_records = [ParametersRecord() for _ in self.optim_D.state_dict()['state'].keys()]
+        # for p in self.optim_D.state_dict()['state'].keys():
+        #     for k, v in self.optim_D.state_dict()['state'][p].items():
+        #         # Convert to NumPy, then to Array. Add to self.client_state
+        #         optim_records[p][k] = array_from_numpy(v.detach().cpu().numpy())
+        #     # Add to a context
+        #     self.client_state.parameters_records[f"optim_parameter{p}"] = optim_records[p]
         
-        optim_records = [ParametersRecord() for _ in self.optim_D.state_dict()['state'].keys()]
-        for p in self.optim_D.state_dict()['state'].keys():
-            for k, v in self.optim_D.state_dict()['state'][p].items():
-                # Convert to NumPy, then to Array. Add to record
-                optim_records[p][k] = array_from_numpy(v.detach().cpu().numpy())
-            # Add to a context
-            self.client_state.parameters_records[f"optim_parameter{p}"] = optim_records[p]
+        # Save optimizer state_dict fully (state + param_groups)
+        # --- Save discriminator model parameters ---
+        buf_model = io.BytesIO()
+        torch.save(self.net_disc.state_dict(), buf_model)
+
+        # Convert bytes → numpy array (uint8)
+        arr_model = np.frombuffer(buf_model.getvalue(), dtype=np.uint8)
+
+        # Store in ParametersRecord
+        rec_model = ParametersRecord()
+        rec_model["state_bytes"] = array_from_numpy(arr_model)
+        self.client_state.parameters_records["disc_state_dict"] = rec_model
+
+        # --- Save optimizer state (Adam, etc.) ---
+        buf_optim = io.BytesIO()
+        torch.save(self.optim_D.state_dict(), buf_optim)
+
+        arr_optim = np.frombuffer(buf_optim.getvalue(), dtype=np.uint8)
+        rec_optim = ParametersRecord()
+        rec_optim["state_bytes"] = array_from_numpy(arr_optim)
+        self.client_state.parameters_records["disc_optim_state_dict"] = rec_optim
 
 
         disc_params = get_weights(self.net_disc)
@@ -292,8 +336,6 @@ def client_fn(context: Context):
     else:
         raise ValueError(f"Dataset {dataset} nao identificado. Deveria ser 'mnist' ou 'cifar10'")
 
-    optim_D = torch.optim.Adam(gan.discriminator.parameters(), lr=lr_disc, betas=(0.5, 0.999))
-
 
     if continue_epoch != 0:
         checkpoint = torch.load(f"{folder}/checkpoint_epoch{continue_epoch}.pth", map_location=torch.device("cuda:0" if torch.cuda.is_available() else "cpu"))
@@ -317,12 +359,12 @@ def client_fn(context: Context):
     # Return Client instance
     return FlowerClient(cid=partition_id,
                         net_alvo=net_alvo, 
-                        net_gan=gan,  
-                        optim_D=optim_D,
+                        net_gan=gan,
                         local_epochs_alvo=local_epochs_alvo, 
                         local_epochs_disc=local_epochs_disc,
                         dataset=dataset,
                         lr_alvo=lr_alvo,
+                        lr_disc=lr_disc,
                         latent_dim=latent_dim,
                         context=context,
                         num_partitions=num_partitions,

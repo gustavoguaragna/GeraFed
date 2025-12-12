@@ -17,6 +17,7 @@ import math
 from torchvision.utils import save_image
 import datasets
 import time
+import json
 # from scipy import linalg
 # from tqdm import tqdm
 # from flwr.common import parameters_to_ndarrays
@@ -653,7 +654,7 @@ def train_alvo(net, trainloader, epochs, lr, device, dataset):
     avg_trainloss = running_loss / (len(trainloader) * epochs)
     return avg_trainloss
 
-def train_disc(gen, disc, trainloader, epochs, device, optim, dataset="mnist", latent_dim=128):
+def train_disc(gen, disc, trainloader, epochs, device, optim, cid, round, dataset="mnist", latent_dim=128):
     """Train the network on the training set."""
     if dataset == "mnist":
       image = "image"
@@ -665,8 +666,8 @@ def train_disc(gen, disc, trainloader, epochs, device, optim, dataset="mnist", l
     gen.to(device)  # move model to GPU if available
     disc.to(device)  # move model to GPU if available
 
-    d_losses = []
-
+    d_loss_b = 0
+    total_samples = 0
     for epoch in range(epochs):
         for batch_idx, batch in enumerate(trainloader):
             images, labels = batch[image].to(device), batch["label"].to(device)
@@ -696,21 +697,23 @@ def train_disc(gen, disc, trainloader, epochs, device, optim, dataset="mnist", l
             d_loss.backward()
             optim.step()
 
-            d_losses.append(d_loss.item())
+            d_loss_b += d_loss.item() * batch_size
+            total_samples += batch_size
 
             if batch_idx % 50 == 0 and batch_idx > 0:
                 print('Epoch {} [{}/{}] loss_D_treino: {:.4f}'.format(
                         epoch, batch_idx, len(trainloader),
                         d_loss.mean().item())) 
+            
                 
-    avg_d_loss = np.mean(d_losses)
+    avg_d_loss = d_loss_b / total_samples if total_samples != 0 else 0.0
     return avg_d_loss            
         
                 
 def train_G(net: nn.Module, discs: list, device: str, lr: float, epochs: int, batch_size: int, latent_dim: int, optim_state_dict = None):
     net.to(device)  # move model to GPU if available
 
-    optim_G = torch.optim.Adam(net.generator.parameters(), lr=lr, betas=(0.5, 0.999))
+    optim_G = torch.optim.Adam(list(net.generator.parameters())+list(net.label_embedding.parameters()), lr=lr, betas=(0.5, 0.999))
     if optim_state_dict:
         optim_G.load_state_dict(optim_state_dict)
 

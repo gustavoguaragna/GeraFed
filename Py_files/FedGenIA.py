@@ -153,9 +153,9 @@ def main():
             nets = [Net_Cifar(seed).to(device) for _ in range(num_partitions)]
             global_net = Net_Cifar(seed).to(device)
 
-        optim_G = torch.optim.Adam(gen.generator.parameters(), lr=lr_gen, betas=(beta1_gen, beta2_gen))
+        optim_G = torch.optim.Adam(list(gen.generator.parameters())+list(gen.label_embedding.parameters()), lr=lr_gen, betas=(beta1_gen, beta2_gen))
         optim_Ds = [
-            torch.optim.Adam(model.discriminator.parameters(), lr=lr_disc, betas=(beta1_disc, beta2_disc))
+            torch.optim.Adam(list(model.discriminator.parameters())+list(model.label_embedding.parameters()), lr=lr_disc, betas=(beta1_disc, beta2_disc))
             for model in models
         ]
 

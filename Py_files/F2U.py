@@ -89,9 +89,9 @@ elif dataset == "cifar10":
     models = [F2U_GAN_CIFAR(condition=True, seed=42) for _ in range(num_partitions)]
     gen = F2U_GAN_CIFAR(condition=True, seed=42).to(device)
 
-optim_G = torch.optim.Adam(gen.generator.parameters(), lr=g_lr, betas=(beta1_g, beta2_g))
+optim_G = torch.optim.Adam(list(gen.generator.parameters())+list(gen.label_embedding.parameters()), lr=g_lr, betas=(beta1_g, beta2_g))
 optim_Ds = [
-    torch.optim.Adam(model.discriminator.parameters(), lr=d_lr, betas=(beta1_d, beta2_d ), weight_decay=wd_d)
+    torch.optim.Adam(list(model.discriminator.parameters())+list(model.label_embedding.parameters()), lr=d_lr, betas=(beta1_d, beta2_d ), weight_decay=wd_d)
     for model in models
 ]
 
