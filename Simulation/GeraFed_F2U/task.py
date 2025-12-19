@@ -567,15 +567,18 @@ def load_data(partition_id: int,
             start = i * chunk_size_real
             end = min((i + 1) * chunk_size_real, n_real)
             chunk_indices = indices_real[start:end]
-            chunks_real.append(Subset(client_dataset["train"], chunk_indices))
+            chunk_subset = Subset(client_dataset["train"], chunk_indices)
+            chunks_real.append(chunk_subset)
 
         trainloader_real = [DataLoader(chunk, batch_size=batch_size, shuffle=True) for chunk in chunks_real if len(chunk) > 0]
 
     else:
         trainloader_real = DataLoader(client_dataset["train"], batch_size=batch_size, shuffle=True)
 
-    testloader = DataLoader(test_partition, batch_size=batch_size, shuffle=True)
-    testloader_local = DataLoader(client_dataset["test"], batch_size=batch_size, shuffle=True)
+
+
+    testloader = DataLoader(test_partition, batch_size=64, shuffle=True)
+    testloader_local = DataLoader(client_dataset["test"], batch_size=64, shuffle=True)
 
     return trainloader_real, testloader, testloader_local
 
@@ -721,7 +724,7 @@ def train_G(net: nn.Module, discs: list, device: str, lr: float, epochs: int, ba
 
     for _ in range(epochs):
         # Train G
-        net.zero_grad()
+        optim_G.zero_grad()
 
         z_noise = torch.randn(batch_size, latent_dim, device=device)
         x_fake_labels = torch.randint(0, 10, (batch_size,), device=device)
@@ -925,7 +928,7 @@ class GeneratedDataset(Dataset):
     def __init__(self,
                  generator,
                  num_samples,
-                 latent_dim=100,
+                 latent_dim=128,
                  num_classes=10, # Total classes the generator model knows
                  desired_classes=None, # Optional: List of specific class indices to generate
                  device="cpu",
@@ -1015,7 +1018,6 @@ class GeneratedDataset(Dataset):
         # Double check label count (should match num_samples due to logic above)
         if len(labels) != self.num_samples:
              # This indicates an unexpected issue, potentially if num_generated_classes was 0 initially
-             # but num_samples > 0. Raise error or adjust. Let's adjust defensively.
              print(f"Warning: Label count mismatch. Expected {self.num_samples}, got {len(labels)}. Adjusting size.")
              if len(labels) > self.num_samples:
                  labels = labels[:self.num_samples]
@@ -1044,17 +1046,8 @@ class GeneratedDataset(Dataset):
                 if z_batch.shape[0] == 0:
                     continue
 
-                # --- Condition the generator based on its type ---
-                if self.model_type == 'Generator': # Assumes input: concat(z, one_hot_label)
-                    # One-hot encode labels using the TOTAL number of classes the generator knows
-                    labels_one_hot_batch = F.one_hot(labels_batch, num_classes=self.total_num_classes).float()
-                    generator_input = torch.cat([z_batch, labels_one_hot_batch], dim=1)
-                    gen_imgs = self.generator(generator_input)
-                elif self.model_type in ('CGAN', 'F2U_GAN', 'F2U_GAN_CIFAR'): # Assumes input: z, label_index
-                    gen_imgs = self.generator(z_batch, labels_batch)
-                else:
-                    # Handle other potential generator architectures or raise an error
-                    raise NotImplementedError(f"Generation logic not defined for model type: {self.model_type}")
+                # Generate images for the batch
+                gen_imgs = self.generator(z_batch, labels_batch)
 
                 generated_images_list.append(gen_imgs.cpu()) # Move generated images to CPU
 

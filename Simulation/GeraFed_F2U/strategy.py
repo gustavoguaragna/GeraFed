@@ -34,6 +34,7 @@ import torch
 import pickle
 import time
 import json
+import numpy as np
 
 WARNING_MIN_AVAILABLE_CLIENTS_TOO_LOW = """
     Setting `min_available_clients` lower than `min_fit_clients` or
@@ -107,8 +108,8 @@ class GeraFed(Strategy):
         inplace: bool = True,
         dataset: str = "mnist",
         img_size: int = 28,
-        latent_dim: int = 100,
-        gan_arq: str = "simple_cnn",
+        latent_dim: int = 128,
+        gan_arq: str = "f2u_gan",
         gen_epochs: int = 2,
         teste: bool = False,
         lr_gen: float = 0.0002,
@@ -205,7 +206,8 @@ class GeraFed(Strategy):
     ) -> list[tuple[ClientProxy, FitIns]]:
         """Configure the next round of training."""
         self.init_round_time = time.time()
-        if (server_round - 1) % self.num_chunks == 0 or server_round == 1:
+        #np.save(f"{self.folder}/models/gen__e{int(server_round%self.num_chunks)}_r{server_round}.npy", self.gen.generator[9].weight.detach().cpu().numpy())
+        if (server_round - 1) % self.num_chunks == 0:
             self.init_epoch_time = time.time()
             self.metrics_dict = {
                         "g_loss_chunk": [],

@@ -27,7 +27,6 @@ import copy
 import time
 import io
 import numpy as np
-from itertools import islice
 
 # import random
 # import numpy as np
@@ -55,9 +54,6 @@ class FlowerClient(NumPyClient):
                 lr_disc: UserConfigValue,
                 latent_dim: UserConfigValue, 
                 context: Context,
-                num_partitions: UserConfigValue,
-                batch_size: UserConfigValue,
-                teste: UserConfigValue,
                 trainloader: Union[DataLoader, List],
                 testloader: DataLoader,
                 testloader_local: DataLoader,
@@ -82,9 +78,6 @@ class FlowerClient(NumPyClient):
         self.client_state = (
             context.state
         ) 
-        self.num_partitions = num_partitions
-        self.batch_size = batch_size
-        self.teste = teste
         self.folder = folder
         self.num_chunks = num_chunks
         self.continue_epoch = continue_epoch
@@ -92,7 +85,7 @@ class FlowerClient(NumPyClient):
         self.trainloader = trainloader
         self.testloader = testloader
         self.testloader_local = testloader_local
-        self.num_classes = 10 if dataset in ["mnist", "cifar10"] else None  # Ajuste conforme necessário
+        self.num_classes = 10 if dataset in ["mnist", "cifar10"] else None
 
         self.optim_D = torch.optim.Adam(list(self.net_disc.discriminator.parameters())+list(self.net_disc.label_embedding.parameters()), lr=self.lr_disc, betas=(0.5, 0.999))
 
@@ -196,7 +189,8 @@ class FlowerClient(NumPyClient):
         dataset=self.dataset,
         latent_dim=self.latent_dim,
         optim=self.optim_D,
-        cid=self.cid, round=config["round"]
+        cid=self.cid, 
+        round=config["round"]
         )
 
         train_disc_time = time.time() - train_disc_start_time
@@ -310,7 +304,7 @@ def client_fn(context: Context):
     strategy           = context.run_config["strategy"]
 
     local_epochs_alvo  = context.run_config["epocas_alvo"]
-    local_epochs_disc   = context.run_config["epocas_disc"]
+    local_epochs_disc  = context.run_config["epocas_disc"]
     lr_disc            = context.run_config["learn_rate_disc"]
     lr_alvo            = context.run_config["learn_rate_alvo"]
     latent_dim         = context.run_config["tam_ruido"]
@@ -367,9 +361,6 @@ def client_fn(context: Context):
                         lr_disc=lr_disc,
                         latent_dim=latent_dim,
                         context=context,
-                        num_partitions=num_partitions,
-                        batch_size=batch_size,
-                        teste=teste,
                         folder=folder,
                         num_chunks=num_chunks,
                         continue_epoch=continue_epoch,
