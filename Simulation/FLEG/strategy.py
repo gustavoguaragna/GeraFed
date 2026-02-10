@@ -1,0 +1,522 @@
+"""FLEG: um framework para balancear dados heterogêneos em aprendizado federado, com precupações com a privacidade."""
+
+from flwr.server.strategy import Strategy
+from logging import WARNING
+from typing import Callable, Optional, Union
+from flwr.common import (
+    EvaluateIns,
+    EvaluateRes,
+    FitIns,
+    FitRes,
+    MetricsAggregationFn,
+    NDArrays,
+    Parameters,
+    Scalar,
+    ndarrays_to_parameters,
+    parameters_to_ndarrays,
+)
+from flwr.common.logger import log
+from flwr.server.client_manager import ClientManager
+from flwr.server.client_proxy import ClientProxy
+
+from flwr.server.strategy.aggregate import aggregate, aggregate_inplace, weighted_loss_avg
+
+from Simulation.GeraFed_F2U.task import (
+    Net,
+    Net_CIFAR,
+    CGAN,
+    F2U_GAN,
+    F2U_GAN_CIFAR,
+    set_weights,
+    train_G,
+    get_weights,
+    generate_plot
+)
+import torch
+import pickle
+import time
+import json
+import numpy as np
+
+WARNING_MIN_AVAILABLE_CLIENTS_TOO_LOW = """
+    Setting `min_available_clients` lower than `min_fit_clients` or
+    `min_evaluate_clients` can cause the server to fail when there are too few clients
+    connected to the server. `min_available_clients` must be set to a value larger
+    than or equal to the values of `min_fit_clients` and `min_evaluate_clients`.
+    """
+class FLEG(Strategy):
+
+    """FLEG Strategy.
+
+    Implementation based on Aprendizado Federado com Geração de Embeddings para Controle da Heterogeneidade Estatística
+
+    Parameters
+    ----------
+    fraction_fit : float, optional
+        Fraction of clients used during training. In case `min_fit_clients`
+        is larger than `fraction_fit * available_clients`, `min_fit_clients`
+        will still be sampled. Defaults to 1.0.
+    fraction_evaluate : float, optional
+        Fraction of clients used during validation. In case `min_evaluate_clients`
+        is larger than `fraction_evaluate * available_clients`,
+        `min_evaluate_clients` will still be sampled. Defaults to 1.0.
+    min_fit_clients : int, optional
+        Minimum number of clients used during training. Defaults to 2.
+    min_evaluate_clients : int, optional
+        Minimum number of clients used during validation. Defaults to 2.
+    min_available_clients : int, optional
+        Minimum number of total clients in the system. Defaults to 2.
+    evaluate_fn : Optional[Callable[[int, NDArrays, Dict[str, Scalar]],Optional[Tuple[float, Dict[str, Scalar]]]]]
+        Optional function used for validation. Defaults to None.
+    on_fit_config_fn : Callable[[int], Dict[str, Scalar]], optional
+        Function used to configure training. Defaults to None.
+    on_evaluate_config_fn : Callable[[int], Dict[str, Scalar]], optional
+        Function used to configure validation. Defaults to None.
+    accept_failures : bool, optional
+        Whether or not accept rounds containing failures. Defaults to True.
+    initial_parameters : Parameters, optional
+        Initial global model parameters.
+    fit_metrics_aggregation_fn : Optional[MetricsAggregationFn]
+        Metrics aggregation function, optional.
+    evaluate_metrics_aggregation_fn : Optional[MetricsAggregationFn]
+        Metrics aggregation function, optional.
+    inplace : bool (default: True)
+        Enable (True) or disable (False) in-place aggregation of model updates.
+    """
+
+    # pylint: disable=too-many-arguments,too-many-instance-attributes, line-too-long
+    def __init__(
+        self,
+        *,
+        fraction_fit_alvo: float = 1.0,
+        fraction_fit_gen: float = 1.0,
+        fraction_evaluate_alvo: float = 1.0,
+        fraction_evaluate_gen: float = 1.0,
+        min_fit_clients: int = 2,
+        min_evaluate_clients: int = 2,
+        min_available_clients: int = 2,
+        evaluate_fn: Optional[
+            Callable[
+                [int, NDArrays, dict[str, Scalar]],
+                Optional[tuple[float, dict[str, Scalar]]],
+            ]
+        ] = None,
+        on_fit_config_fn: Optional[Callable[[int], dict[str, Scalar]]] = None,
+        on_evaluate_config_fn: Optional[Callable[[int], dict[str, Scalar]]] = None,
+        accept_failures: bool = True,
+        initial_parameters_alvo: Optional[Parameters] = None,
+        fit_metrics_aggregation_fn: Optional[MetricsAggregationFn] = None,
+        evaluate_metrics_aggregation_fn: Optional[MetricsAggregationFn] = None,
+        inplace: bool = True,
+        dataset: str = "mnist",
+        img_size: int = 28,
+        latent_dim: int = 128,
+        gan_arq: str = "f2u_gan",
+        gen_epochs: int = 2,
+        teste: bool = False,
+        lr_gen: float = 0.0002,
+        folder: str = ".",
+        num_chunks: int = 1,
+        gen,
+        optimG_state_dict = None,
+        continue_epoch:int = 0
+    ) -> None:
+        super().__init__()
+
+        if (
+            min_fit_clients > min_available_clients
+            or min_evaluate_clients > min_available_clients
+        ):
+            log(WARNING, WARNING_MIN_AVAILABLE_CLIENTS_TOO_LOW)
+
+        self.fraction_fit_alvo = fraction_fit_alvo
+        self.fraction_fit_gen = fraction_fit_gen
+        self.fraction_evaluate_alvo = fraction_evaluate_alvo
+        self.fraction_evaluate_gen = fraction_evaluate_gen
+        self.min_fit_clients = min_fit_clients
+        self.min_evaluate_clients = min_evaluate_clients
+        self.min_available_clients = min_available_clients
+        self.evaluate_fn = evaluate_fn
+        self.on_fit_config_fn = on_fit_config_fn
+        self.on_evaluate_config_fn = on_evaluate_config_fn
+        self.accept_failures = accept_failures
+        self.initial_parameters_alvo = initial_parameters_alvo
+        self.parameters_alvo = initial_parameters_alvo
+        self.fit_metrics_aggregation_fn = fit_metrics_aggregation_fn
+        self.evaluate_metrics_aggregation_fn = evaluate_metrics_aggregation_fn
+        self.inplace = inplace
+        self.dataset = dataset
+        self.img_size = img_size
+        self.latent_dim = latent_dim
+        self.gan_arq = gan_arq
+        self.gen_epochs = gen_epochs
+        self.teste = teste
+        self.lr_gen = lr_gen
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.folder = folder
+        self.gen = gen.to(self.device)
+        self.optimG_state_dict = optimG_state_dict if optimG_state_dict else None
+        self.num_chunks = num_chunks
+        self.freq_save = self.num_chunks // 10 if self.num_chunks >= 10 else 1
+        self.continue_epoch = continue_epoch
+
+            
+    def __repr__(self) -> str:
+        """Compute a string representation of the strategy."""
+        rep = f"GeraFed(accept_failures={self.accept_failures})"
+        return rep
+
+
+    def num_fit_clients(self, num_available_clients: int) -> tuple[int, int]:
+        """Return the sample size and the required number of available clients."""
+        num_clients = int(num_available_clients * self.fraction_fit_alvo)
+        return max(num_clients, self.min_fit_clients), self.min_available_clients
+
+
+    def num_evaluation_clients(self, num_available_clients: int) -> tuple[int, int]:
+        """Use a fraction of available clients for evaluation."""
+        num_clients = int(num_available_clients * self.fraction_evaluate_alvo)
+        return max(num_clients, self.min_evaluate_clients), self.min_available_clients
+
+
+    def initialize_parameters(
+        self, client_manager: ClientManager
+    ) -> Optional[Parameters]:
+        """Initialize global model parameters."""
+        initial_parameters = self.initial_parameters_alvo
+        self.initial_parameters_alvo = None  # Don't keep initial parameters in memory
+        return initial_parameters
+
+
+    def evaluate(
+        self, server_round: int, parameters: Parameters
+    ) -> Optional[tuple[float, dict[str, Scalar]]]:
+        """Evaluate model parameters using an evaluation function."""
+        if self.evaluate_fn is None:
+            # No evaluation function provided
+            return None
+        parameters_ndarrays = parameters_to_ndarrays(parameters)
+        eval_res = self.evaluate_fn(server_round, parameters_ndarrays, {})
+        if eval_res is None:
+            return None
+        loss, metrics = eval_res
+        return loss, metrics
+
+
+    def configure_fit(
+        self, server_round: int, parameters: Parameters, client_manager: ClientManager
+    ) -> list[tuple[ClientProxy, FitIns]]:
+        """Configure the next round of training."""
+        self.init_round_time = time.time()
+        #np.save(f"{self.folder}/models/gen__e{int(server_round%self.num_chunks)}_r{server_round}.npy", self.gen.generator[9].weight.detach().cpu().numpy())
+        if (server_round - 1) % self.num_chunks == 0:
+            self.init_epoch_time = time.time()
+            self.metrics_dict = {
+                        "g_loss_chunk": [],
+                        "g_loss_epoch": [],
+                        "d_loss_chunk": [],
+                        "d_loss_epoch": [],
+                        "net_loss_chunk": [],
+                        "net_loss_epoch": [],
+                        "local_acc_epoch": [],
+                        "test_acc_epoch": [],
+                        "time_chunk": [],
+                        "time_epoch": [],
+                        "net_time_chunk": [],
+                        "net_time_epoch": [],
+                        "disc_time_chunk": [],
+                        "disc_time_epoch": [],
+                        "gen_time_chunk": [],
+                        "gen_time_epoch": [],
+                        "img_syn_time_chunk": [],
+                        "img_syn_time_epoch": [],
+                        "test_time": [],
+                        "local_test_time": []
+                        }
+
+        if self.on_fit_config_fn is not None:
+            # Custom fit config function provided
+            config = self.on_fit_config_fn(server_round)
+
+        #fit_ins = FitIns(parameters, config)
+
+        # Sample clients
+        sample_size, min_num_clients = self.num_fit_clients(
+            client_manager.num_available()
+        )
+        clients = client_manager.sample(
+            num_clients=sample_size, min_num_clients=min_num_clients
+        )
+
+        fit_instructions = []
+        gen_params = get_weights(self.gen)
+        config = {"round": server_round, "gan": pickle.dumps(gen_params)}
+        fit_ins = FitIns(parameters=self.parameters_alvo, config=config)
+        for c in clients:
+            fit_instructions.append((c, fit_ins))
+
+        # Return client/config pairs
+        return fit_instructions
+
+
+    def configure_evaluate(
+        self, server_round: int, parameters: Parameters, client_manager: ClientManager
+    ) -> list[tuple[ClientProxy, EvaluateIns]]:
+        """Configure the next round of evaluation."""
+        # Do not configure federated evaluation if fraction eval is 0.
+        if self.fraction_evaluate_alvo == 0.0:
+            return []
+    
+        if server_round % self.num_chunks != 0:
+            round_time = time.time() - self.init_round_time
+            self.metrics_dict["time_chunk"].append(round_time)
+            return None
+
+        # Parameters and config
+        config = {"round": server_round}
+        if self.on_evaluate_config_fn is not None:
+            # Custom evaluation config function provided
+            config = self.on_evaluate_config_fn(server_round)
+        evaluate_ins = EvaluateIns(parameters, config)
+
+        # Sample clients
+        sample_size, min_num_clients = self.num_evaluation_clients(
+            client_manager.num_available()
+        )
+        clients = client_manager.sample(
+            num_clients=sample_size, min_num_clients=min_num_clients
+        )
+
+        # Return client/config pairs
+        return [(client, evaluate_ins) for client in clients]
+
+
+    def aggregate_fit(
+        self,
+        server_round: int,
+        results: list[tuple[ClientProxy, FitRes]],
+        failures: list[Union[tuple[ClientProxy, FitRes], BaseException]],
+    ) -> tuple[Optional[Parameters], dict[str, Scalar]]:
+        """Aggregate fit results using weighted average."""
+        if not results:
+            return None, {}
+        # Do not aggregate if there are failures and failures are not accepted
+        if not self.accept_failures and failures:
+            return None, {}
+
+        if self.inplace:
+            # Does in-place weighted average of results
+            aggregated_ndarrays= aggregate_inplace(results)
+            parameters_aggregated = ndarrays_to_parameters(aggregated_ndarrays)
+            self.parameters_alvo = parameters_aggregated
+
+        else:
+            # Convert results
+            weights_results = [
+                (parameters_to_ndarrays(fit_res.parameters), fit_res.num_examples)
+                for _, fit_res in results
+            ]
+            aggregated_ndarrays = aggregate(weights_results)
+
+            parameters_aggregated = ndarrays_to_parameters(aggregated_ndarrays)
+
+            self.parameters_alvo = parameters_aggregated
+
+        # Aggregate custom metrics if aggregation fn was provided
+        metrics_aggregated = {}
+        if self.fit_metrics_aggregation_fn:
+            fit_metrics = [(res.num_examples, res.metrics) for _, res in results]
+            metrics_aggregated = self.fit_metrics_aggregation_fn(fit_metrics)
+            self.metrics_dict["d_loss_chunk"].append(metrics_aggregated["d_loss_chunk"])
+            self.metrics_dict["net_loss_chunk"].append(metrics_aggregated["net_loss_chunk"])
+            # Simple mean of times
+            net_times = [m["tempo_treino_alvo"]/len(fit_metrics) for _, m in fit_metrics]
+            disc_times = [m["tempo_treino_disc"]/len(fit_metrics) for _, m in fit_metrics]
+            img_syn_times = [m["img_syn_time"]/len(fit_metrics) for _, m in fit_metrics]
+            self.metrics_dict["net_time_chunk"].append(sum(net_times))
+            self.metrics_dict["disc_time_chunk"].append(sum(disc_times))
+            self.metrics_dict["img_syn_time_chunk"].append(sum(img_syn_times))
+        elif server_round == 1:  # Only log this warning once
+            log(WARNING, "No fit_metrics_aggregation_fn provided")
+
+
+        if parameters_aggregated is not None:
+            # Salva o modelo após a agregação
+            # Cria uma instância do modelo
+            if self.dataset == "mnist":
+                self.classifier = Net()
+            elif self.dataset == "cifar10":
+                self.classifier = Net_CIFAR()
+            else:
+                raise ValueError(f"Dataset {self.dataset} nao identificado. Deveria ser 'mnist' ou 'cifar10'")
+            # Define os pesos do modelo
+            set_weights(self.classifier, aggregated_ndarrays)
+
+            # Define os pesos do modelo
+            disc_ndarrays = {fit_res.metrics["cid"]: pickle.loads(fit_res.metrics["disc"]) for _, fit_res in results}
+            if self.gan_arq == "simple_cnn":
+                self.discs = [CGAN().to(self.device) for _ in range(len(disc_ndarrays))]
+            elif self.gan_arq == "f2u_gan":
+                if self.dataset == "mnist":
+                    self.discs = [F2U_GAN().to(self.device) for _ in range(len(disc_ndarrays))]
+                elif self.dataset == "cifar10":
+                    self.discs = [F2U_GAN_CIFAR().to(self.device) for _ in range(len(disc_ndarrays))] 
+            for i, disc in enumerate(self.discs):
+                set_weights(disc, disc_ndarrays[i])
+
+            gen_time_start = time.time()
+            g_loss, self.optimG_state_dict = train_G(
+            net=self.gen,
+            discs=self.discs,
+            epochs=self.gen_epochs,
+            lr=self.lr_gen,
+            device=self.device,
+            latent_dim=self.latent_dim,
+            batch_size=1,
+            optim_state_dict=self.optimG_state_dict
+            )
+            gen_time = time.time() - gen_time_start
+
+            self.metrics_dict["g_loss_chunk"].append(g_loss)
+            self.metrics_dict["gen_time_chunk"].append(gen_time)
+
+            discs_state_dict = {
+                cid: disc.state_dict() for cid, disc in enumerate(self.discs)
+            }
+            optimDs_state_dict = {
+                fit_res.metrics["cid"]: pickle.loads(fit_res.metrics["optimDs_state_dict"])
+                for _, fit_res in results
+            }
+
+            if server_round % self.num_chunks == 0:
+                net_global_eval_start_time = time.time()
+                test(net=self.classifier, testloader=self.testloader, device=self.device, dataset=self.dataset, level=self.level)
+                with torch.no_grad():
+                    for batch in testloader:
+                        images = batch[image].to(device)
+                        labels = batch["label"].to(device)
+                        if level == 0:
+                            outputs = global_net(images)
+                        else:
+                            outputs = class_head(feature_extractor(images))
+                        loss += criterion(outputs, labels).item()
+                        correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
+                accuracy = correct / len(testloader.dataset)
+                metrics_dict["net_global_eval_time"].append(time.time() - net_global_eval_start_time)
+                metrics_dict["net_acc"].append(accuracy)
+
+                metrics_dict["time_epoch_classifier"].append(time.time() - epoch_start_time)
+
+                checkpoint = {
+                        'classifier_state_dict': self.classifier.state_dict(),
+                        'gen_state_dict': self.gen.state_dict(),
+                        'optim_G_state_dict': self.optimG_state_dict,
+                        'discs_state_dict': discs_state_dict,
+                        'optimDs_state_dict': optimDs_state_dict
+                    }
+                checkpoint_file = f"{self.folder}/checkpoint_epoch{int(server_round/self.num_chunks)+self.continue_epoch}.pth"
+                torch.save(checkpoint, checkpoint_file)
+                print(f"Global net saved to {checkpoint_file}")
+
+            return parameters_aggregated, metrics_aggregated
+
+    def aggregate_evaluate(
+        self,
+        server_round: int,
+        results: list[tuple[ClientProxy, EvaluateRes]],
+        failures: list[Union[tuple[ClientProxy, EvaluateRes], BaseException]],
+    ) -> tuple[Optional[float], dict[str, Scalar]]:
+        """Aggregate evaluation losses using weighted average."""
+        if not results:
+            return None, {}
+        # Do not aggregate if there are failures and failures are not accepted
+        if not self.accept_failures and failures:
+            return None, {}
+
+        # Aggregate loss
+        loss_aggregated = weighted_loss_avg(
+            [
+                (evaluate_res.num_examples, evaluate_res.loss)
+                for _, evaluate_res in results
+            ]
+        )
+        # accuracies = [
+        #     evaluate_res.metrics["accuracy"] * evaluate_res.num_examples
+        #     for _, evaluate_res in results
+        # ]
+        # examples = [evaluate_res.num_examples for _, evaluate_res in results]
+        # accuracy_aggregated = (
+        #     sum(accuracies) / sum(examples) if sum(examples) != 0 else 0
+        # )
+        accuracy_aggregated = weighted_loss_avg(
+            [
+                (evaluate_res.num_examples, evaluate_res.metrics["local accuracy"])
+                for _, evaluate_res in results
+            ]
+        )
+
+        self.metrics_dict["local_acc_epoch"].append(accuracy_aggregated)
+
+
+        # Aggregate custom metrics if aggregation fn was provided
+        metrics_aggregated = {"loss": loss_aggregated, "local_accuracy": accuracy_aggregated}
+        if server_round % self.num_chunks == 0:
+            generate_plot(net=self.gen, device=self.device, round_number=int(server_round/self.num_chunks+self.continue_epoch), folder=self.folder, latent_dim=self.latent_dim)
+        
+        test_times = [evaluate_res.metrics["test_time"]/len(results) for _, evaluate_res in results]
+        local_test_times = [evaluate_res.metrics["local_test_time"]/len(results) for _, evaluate_res in results]
+        self.metrics_dict["test_time"].append(sum(test_times))
+        self.metrics_dict["local_test_time"].append(sum(local_test_times))
+
+        epoch_time = time.time() - self.init_epoch_time
+        self.metrics_dict["time_epoch"].append(epoch_time)
+        round_time = time.time() - self.init_round_time
+        self.metrics_dict["time_chunk"].append(round_time)
+
+        metrics_filename = f"{self.folder}/metrics.json"
+
+        for key, val in list(self.metrics_dict.items()):
+            if key.endswith("time_chunk") and key != "time_chunk":
+                epoch_key = key.replace("chunk", "epoch")
+                sum_value = sum(val)
+                self.metrics_dict[epoch_key].append(sum_value)
+
+            if key.endswith("epoch") or "time" in key:
+                continue
+
+            epoch_key = key.replace('_chunk', '_epoch')
+
+            mean_value = sum(val) / len(val)
+
+            self.metrics_dict[epoch_key].append(mean_value)
+            
+
+        try:
+            with open(metrics_filename, 'r', encoding='utf-8') as f:
+                # Load the dictionary from the JSON file
+                existing_metrics = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            # If the file is not found or is not valid JSON, we start fresh
+            existing_metrics = {}
+            print("Metrics file not found or invalid. A new one will be created.")
+            print(metrics_filename)
+
+        for key, new_values in self.metrics_dict.items():
+            # Get the list that already exists for this key, or an empty list if the key is new
+            existing_list = existing_metrics.get(key, [])
+            
+            # Use .extend() to add the new items to the existing list
+            existing_list.extend(new_values)
+            
+            # Update the dictionary with the newly extended list
+            existing_metrics[key] = existing_list
+
+        try:
+            with open(metrics_filename, 'w', encoding='utf-8') as f:
+                json.dump(existing_metrics, f, ensure_ascii=False, indent=4) # indent makes it readable
+            print(f"Losses dict successfully saved to {metrics_filename}")
+        except Exception as e:
+            print(f"Error saving losses dict to JSON: {e}")
+
+        return loss_aggregated, metrics_aggregated
+
