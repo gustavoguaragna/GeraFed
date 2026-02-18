@@ -21,16 +21,15 @@ from flwr.server.client_proxy import ClientProxy
 
 from flwr.server.strategy.aggregate import aggregate, aggregate_inplace, weighted_loss_avg
 
-from Simulation.GeraFed_F2U.task import (
+from Simulation.FLEG.task import (
     Net,
-    Net_CIFAR,
-    CGAN,
-    F2U_GAN,
-    F2U_GAN_CIFAR,
+    Net_Cifar,
+    EmbeddingGAN1, EmbeddingGAN2, EmbeddingGAN3, EmbeddingGAN4,
+    EmbeddingGAN1_Cifar, EmbeddingGAN2_Cifar, EmbeddingGAN3_Cifar, EmbeddingGAN4_Cifar,
+    GeneratedAssetDataset,
     set_weights,
     train_G,
     get_weights,
-    generate_plot
 )
 import torch
 import pickle
@@ -105,6 +104,7 @@ class FLEG(Strategy):
         on_evaluate_config_fn: Optional[Callable[[int], dict[str, Scalar]]] = None,
         accept_failures: bool = True,
         initial_parameters_alvo: Optional[Parameters] = None,
+        initial_parameters_gen: Optional[Parameters] = None,
         fit_metrics_aggregation_fn: Optional[MetricsAggregationFn] = None,
         evaluate_metrics_aggregation_fn: Optional[MetricsAggregationFn] = None,
         inplace: bool = True,
@@ -142,6 +142,7 @@ class FLEG(Strategy):
         self.accept_failures = accept_failures
         self.initial_parameters_alvo = initial_parameters_alvo
         self.parameters_alvo = initial_parameters_alvo
+        self.parameters_gen = initial_parameters_gen
         self.fit_metrics_aggregation_fn = fit_metrics_aggregation_fn
         self.evaluate_metrics_aggregation_fn = evaluate_metrics_aggregation_fn
         self.inplace = inplace
@@ -159,6 +160,70 @@ class FLEG(Strategy):
         self.num_chunks = num_chunks
         self.freq_save = self.num_chunks // 10 if self.num_chunks >= 10 else 1
         self.continue_epoch = continue_epoch
+        self.size_classifier = {
+            'cifar10': {1: 0.25, 2: 0.248, 3: 0.238, 4: 0.045, 5: 0.004},
+            'mnist': {1: 0.18, 2: 0.179, 3: 0.169, 4: 0.045, 5: 0.004}
+        }
+        self.size_disc = {
+            'cifar10': {1: 18.12, 2: 3.79, 3: 0.79, 4: 0.23},
+            'mnist': {1: 5.69, 2: 1.08, 3: 0.8, 4: 0.23}
+        }
+        self.embds = GeneratedAssetDataset(generator=gen, num_samples=0)
+        self.newlvl= True
+        self.training_gan = False
+        self.metrics_dict = {
+                        "g_loss_chunk": [],
+                        "g_loss_epoch": [],
+                        "d_loss_chunk": [],
+                        "d_loss_epoch": [],
+                        "net_loss_epoch": [],
+                        "local_acc_epoch": [],
+                        "test_acc_epoch": [],
+                        "time_chunk_gan": [],
+                        "time_epoch": [],
+                        "time_epoch_gan": [],
+                        "disc_time": [],
+                        "gen_time": [],
+                        "img_syn_time": [],
+                        "test_time": [],
+                        "local_test_time": [],
+                        "level_time": [],
+                        "MB_transmission": [],
+                        "traffic_cost_classifier": [],
+                        "traffic_cost_embeddings": [],
+                        "traffic_cost_discriminator": [],
+                        "accuracy_transition": [],
+                    },
+        self.fe= {
+            "mnist": {
+                1: FeatureExtractor1, 2: FeatureExtractor2,
+                3: FeatureExtractor3, 4: FeatureExtractor4,
+            },
+            "cifar10": {
+                1: FeatureExtractor1_Cifar, 2: FeatureExtractor2_Cifar,
+                3: FeatureExtractor3_Cifar, 4: FeatureExtractor4_Cifar,
+            },
+        },
+        self.ch = {
+            "mnist": {
+                1: ClassifierHead1, 2: ClassifierHead2,
+                3: ClassifierHead3, 4: ClassifierHead4,
+            },
+            "cifar10": {
+                1: ClassifierHead1_Cifar, 2: ClassifierHead2_Cifar,
+                3: ClassifierHead3_Cifar, 4: ClassifierHead4_Cifar,
+            },
+        }
+        self.gan = {
+            "mnist": {
+                1: EmbeddingGAN1, 2: EmbeddingGAN2, 3: EmbeddingGAN3, 4: EmbeddingGAN4,
+            },
+            "cifar10": {
+                1: EmbeddingGAN1_Cifar, 2: EmbeddingGAN2_Cifar,
+                3: EmbeddingGAN3_Cifar, 4: EmbeddingGAN4_Cifar,
+            },
+        }
+
 
             
     def __repr__(self) -> str:
@@ -207,38 +272,14 @@ class FLEG(Strategy):
         self, server_round: int, parameters: Parameters, client_manager: ClientManager
     ) -> list[tuple[ClientProxy, FitIns]]:
         """Configure the next round of training."""
+        if self.newlvl:
+            self.init_lvl_time = time.time()
+        
         self.init_round_time = time.time()
-        #np.save(f"{self.folder}/models/gen__e{int(server_round%self.num_chunks)}_r{server_round}.npy", self.gen.generator[9].weight.detach().cpu().numpy())
-        if (server_round - 1) % self.num_chunks == 0:
-            self.init_epoch_time = time.time()
-            self.metrics_dict = {
-                        "g_loss_chunk": [],
-                        "g_loss_epoch": [],
-                        "d_loss_chunk": [],
-                        "d_loss_epoch": [],
-                        "net_loss_chunk": [],
-                        "net_loss_epoch": [],
-                        "local_acc_epoch": [],
-                        "test_acc_epoch": [],
-                        "time_chunk": [],
-                        "time_epoch": [],
-                        "net_time_chunk": [],
-                        "net_time_epoch": [],
-                        "disc_time_chunk": [],
-                        "disc_time_epoch": [],
-                        "gen_time_chunk": [],
-                        "gen_time_epoch": [],
-                        "img_syn_time_chunk": [],
-                        "img_syn_time_epoch": [],
-                        "test_time": [],
-                        "local_test_time": []
-                        }
 
         if self.on_fit_config_fn is not None:
             # Custom fit config function provided
             config = self.on_fit_config_fn(server_round)
-
-        #fit_ins = FitIns(parameters, config)
 
         # Sample clients
         sample_size, min_num_clients = self.num_fit_clients(
@@ -249,9 +290,16 @@ class FLEG(Strategy):
         )
 
         fit_instructions = []
-        gen_params = get_weights(self.gen)
-        config = {"round": server_round, "gan": pickle.dumps(gen_params)}
-        fit_ins = FitIns(parameters=self.parameters_alvo, config=config)
+        config = {}
+        if self.newlvl:
+            config["embds"] = pickle.dumps(self.embds)
+            self.newlvl = False
+        
+        if self.training_gan:
+            fit_ins = FitIns(parameters=self.parameters_gen, config=config)
+        else:
+            fit_ins = FitIns(parameters=self.parameters_alvo, config=config)
+
         for c in clients:
             fit_instructions.append((c, fit_ins))
 
@@ -304,63 +352,13 @@ class FLEG(Strategy):
         if not self.accept_failures and failures:
             return None, {}
 
-        if self.inplace:
-            # Does in-place weighted average of results
-            aggregated_ndarrays= aggregate_inplace(results)
-            parameters_aggregated = ndarrays_to_parameters(aggregated_ndarrays)
-            self.parameters_alvo = parameters_aggregated
-
-        else:
-            # Convert results
-            weights_results = [
-                (parameters_to_ndarrays(fit_res.parameters), fit_res.num_examples)
-                for _, fit_res in results
-            ]
-            aggregated_ndarrays = aggregate(weights_results)
-
-            parameters_aggregated = ndarrays_to_parameters(aggregated_ndarrays)
-
-            self.parameters_alvo = parameters_aggregated
-
-        # Aggregate custom metrics if aggregation fn was provided
-        metrics_aggregated = {}
-        if self.fit_metrics_aggregation_fn:
-            fit_metrics = [(res.num_examples, res.metrics) for _, res in results]
-            metrics_aggregated = self.fit_metrics_aggregation_fn(fit_metrics)
-            self.metrics_dict["d_loss_chunk"].append(metrics_aggregated["d_loss_chunk"])
-            self.metrics_dict["net_loss_chunk"].append(metrics_aggregated["net_loss_chunk"])
-            # Simple mean of times
-            net_times = [m["tempo_treino_alvo"]/len(fit_metrics) for _, m in fit_metrics]
-            disc_times = [m["tempo_treino_disc"]/len(fit_metrics) for _, m in fit_metrics]
-            img_syn_times = [m["img_syn_time"]/len(fit_metrics) for _, m in fit_metrics]
-            self.metrics_dict["net_time_chunk"].append(sum(net_times))
-            self.metrics_dict["disc_time_chunk"].append(sum(disc_times))
-            self.metrics_dict["img_syn_time_chunk"].append(sum(img_syn_times))
-        elif server_round == 1:  # Only log this warning once
-            log(WARNING, "No fit_metrics_aggregation_fn provided")
-
-
-        if parameters_aggregated is not None:
-            # Salva o modelo após a agregação
-            # Cria uma instância do modelo
+        if self.training_gan:
+             # Define os pesos do modelo
+            disc_ndarrays = {fit_res.metrics["cid"]: parameters_to_ndarrays(fit_res.parameters) for _, fit_res in results}
             if self.dataset == "mnist":
-                self.classifier = Net()
+                self.discs = [F2U_GAN().to(self.device) for _ in range(len(disc_ndarrays))]
             elif self.dataset == "cifar10":
-                self.classifier = Net_CIFAR()
-            else:
-                raise ValueError(f"Dataset {self.dataset} nao identificado. Deveria ser 'mnist' ou 'cifar10'")
-            # Define os pesos do modelo
-            set_weights(self.classifier, aggregated_ndarrays)
-
-            # Define os pesos do modelo
-            disc_ndarrays = {fit_res.metrics["cid"]: pickle.loads(fit_res.metrics["disc"]) for _, fit_res in results}
-            if self.gan_arq == "simple_cnn":
-                self.discs = [CGAN().to(self.device) for _ in range(len(disc_ndarrays))]
-            elif self.gan_arq == "f2u_gan":
-                if self.dataset == "mnist":
-                    self.discs = [F2U_GAN().to(self.device) for _ in range(len(disc_ndarrays))]
-                elif self.dataset == "cifar10":
-                    self.discs = [F2U_GAN_CIFAR().to(self.device) for _ in range(len(disc_ndarrays))] 
+                self.discs = [F2U_GAN_CIFAR().to(self.device) for _ in range(len(disc_ndarrays))] 
             for i, disc in enumerate(self.discs):
                 set_weights(disc, disc_ndarrays[i])
 
@@ -387,36 +385,55 @@ class FLEG(Strategy):
                 fit_res.metrics["cid"]: pickle.loads(fit_res.metrics["optimDs_state_dict"])
                 for _, fit_res in results
             }
+        
+        else:
+            if self.inplace:
+                # Does in-place weighted average of results
+                aggregated_ndarrays= aggregate_inplace(results)
+                parameters_aggregated = ndarrays_to_parameters(aggregated_ndarrays)
+                self.parameters_alvo = parameters_aggregated
 
-            if server_round % self.num_chunks == 0:
-                net_global_eval_start_time = time.time()
-                test(net=self.classifier, testloader=self.testloader, device=self.device, dataset=self.dataset, level=self.level)
-                with torch.no_grad():
-                    for batch in testloader:
-                        images = batch[image].to(device)
-                        labels = batch["label"].to(device)
-                        if level == 0:
-                            outputs = global_net(images)
-                        else:
-                            outputs = class_head(feature_extractor(images))
-                        loss += criterion(outputs, labels).item()
-                        correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
-                accuracy = correct / len(testloader.dataset)
-                metrics_dict["net_global_eval_time"].append(time.time() - net_global_eval_start_time)
-                metrics_dict["net_acc"].append(accuracy)
+            else:
+                # Convert results
+                weights_results = [
+                    (parameters_to_ndarrays(fit_res.parameters), fit_res.num_examples)
+                    for _, fit_res in results
+                ]
+                aggregated_ndarrays = aggregate(weights_results)
 
-                metrics_dict["time_epoch_classifier"].append(time.time() - epoch_start_time)
+                parameters_aggregated = ndarrays_to_parameters(aggregated_ndarrays)
 
-                checkpoint = {
-                        'classifier_state_dict': self.classifier.state_dict(),
-                        'gen_state_dict': self.gen.state_dict(),
-                        'optim_G_state_dict': self.optimG_state_dict,
-                        'discs_state_dict': discs_state_dict,
-                        'optimDs_state_dict': optimDs_state_dict
-                    }
-                checkpoint_file = f"{self.folder}/checkpoint_epoch{int(server_round/self.num_chunks)+self.continue_epoch}.pth"
-                torch.save(checkpoint, checkpoint_file)
-                print(f"Global net saved to {checkpoint_file}")
+                self.parameters_alvo = parameters_aggregated
+
+            # Aggregate custom metrics if aggregation fn was provided
+            metrics_aggregated = {}
+            if self.fit_metrics_aggregation_fn:
+                fit_metrics = [(res.num_examples, res.metrics) for _, res in results]
+                metrics_aggregated = self.fit_metrics_aggregation_fn(fit_metrics)
+                self.metrics_dict["d_loss_chunk"].append(metrics_aggregated["d_loss_chunk"])
+                self.metrics_dict["net_loss_chunk"].append(metrics_aggregated["net_loss_chunk"])
+                # Simple mean of times
+                net_times = [m["tempo_treino_alvo"]/len(fit_metrics) for _, m in fit_metrics]
+                disc_times = [m["tempo_treino_disc"]/len(fit_metrics) for _, m in fit_metrics]
+                img_syn_times = [m["img_syn_time"]/len(fit_metrics) for _, m in fit_metrics]
+                self.metrics_dict["net_time_chunk"].append(sum(net_times))
+                self.metrics_dict["disc_time_chunk"].append(sum(disc_times))
+                self.metrics_dict["img_syn_time_chunk"].append(sum(img_syn_times))
+            elif server_round == 1:  # Only log this warning once
+                log(WARNING, "No fit_metrics_aggregation_fn provided")
+
+
+            if parameters_aggregated is not None:
+                # Salva o modelo após a agregação
+                # Cria uma instância do modelo
+                if self.dataset == "mnist":
+                    self.classifier = Net()
+                elif self.dataset == "cifar10":
+                    self.classifier = Net_CIFAR()
+                else:
+                    raise ValueError(f"Dataset {self.dataset} nao identificado. Deveria ser 'mnist' ou 'cifar10'")
+                # Define os pesos do modelo
+                set_weights(self.classifier, aggregated_ndarrays)
 
             return parameters_aggregated, metrics_aggregated
 
@@ -454,6 +471,53 @@ class FLEG(Strategy):
                 for _, evaluate_res in results
             ]
         )
+
+        net_global_eval_start_time = time.time()
+        test(net=self.classifier, testloader=self.testloader, device=self.device, dataset=self.dataset, level=self.level)
+        with torch.no_grad():
+            for batch in testloader:
+                images = batch[image].to(device)
+                labels = batch["label"].to(device)
+                if level == 0:
+                    outputs = global_net(images)
+                else:
+                    outputs = class_head(feature_extractor(images))
+                loss += criterion(outputs, labels).item()
+                correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
+        accuracy = correct / len(testloader.dataset)
+        metrics_dict["net_global_eval_time"].append(time.time() - net_global_eval_start_time)
+        metrics_dict["net_acc"].append(accuracy)
+
+        metrics_dict["time_epoch_classifier"].append(time.time() - epoch_start_time)
+
+        checkpoint = {
+                'classifier_state_dict': self.classifier.state_dict(),
+                'gen_state_dict': self.gen.state_dict(),
+                'optim_G_state_dict': self.optimG_state_dict,
+                'discs_state_dict': discs_state_dict,
+                'optimDs_state_dict': optimDs_state_dict
+            }
+        checkpoint_file = f"{self.folder}/checkpoint_epoch{int(server_round/self.num_chunks)+self.continue_epoch}.pth"
+        torch.save(checkpoint, checkpoint_file)
+        print(f"Global net saved to {checkpoint_file}")
+
+        if accuracy > self.best_accuracy:
+            self.best_accuracy = accuracy
+            self.epochs_no_improve = 0
+            if self.level == 0:
+                self.best_model.load_state_dict(self.classifier.state_dict())
+            else:
+                self.best_model.load_state_dict(self.class_head.state_dict(), strict=False)
+        else:
+            self.epochs_no_improve += 1
+            print(f"No improvement for {self.epochs_no_improve} epoch(s). Best accuracy: {self.best_accuracy:.4f}")
+        
+        if self.epochs_no_improve > self.patience:
+            self.epochs_no_improve = 0
+            self.training_gan = True
+
+        self.global_net.load_state_dict(self.best_model.state_dict())
+
 
         self.metrics_dict["local_acc_epoch"].append(accuracy_aggregated)
 
