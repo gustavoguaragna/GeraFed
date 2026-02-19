@@ -1,0 +1,6 @@
+- Alterar valor self.newlvl ao finalizar level da GAN (antes ou depois da geracao dos embeddings para os clientes por exemplo)
+- adicionar lgica de class_head e fe no cnfigure_fit
+- diferenciar parametros da gen e disc a enviar para clientes no configure fit
+- diferenciar parametros da gan ao enviar dos clientes ao servidor
+
+PAREI NO AGGREGATEFIT (NO COMECO)

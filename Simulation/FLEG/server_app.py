@@ -3,7 +3,13 @@
 import os
 from flwr.common import Context, ndarrays_to_parameters
 from flwr.server import ServerApp, ServerAppComponents, ServerConfig
-from Simulation.FLEG.task import Net, Net_CIFAR, CGAN, F2U_GAN, F2U_GAN_CIFAR, get_weights
+from Simulation.FLEG.task import(
+    Net, 
+    Net_Cifar, 
+    EmbeddingGAN1,
+    EmbeddingGAN1_Cifar,
+    get_weights
+)
 from Simulation.FLEG.strategy import FLEG
 from typing import List, Tuple
 from flwr.common.typing import Metrics
@@ -61,23 +67,12 @@ def server_fn(context: Context):
     # Initialize model parameters
     if dataset == "mnist":
         classifier = Net(seed=seed)
-        if gan_arq == "simple_cnn":
-            gen = CGAN(
-                    dataset=dataset,
-                    img_size=img_size,
-                    latent_dim=latent_dim
-                    )
-        elif gan_arq == "f2u_gan":
-            gen = F2U_GAN(
-                    img_size=img_size,
-                    latent_dim=latent_dim,
-                    seed=seed
-                    )
+        gen = EmbeddingGAN1(
+                seed=seed
+                )
     elif dataset == "cifar10":
-        classifier = Net_CIFAR(seed=seed)
-        gen = F2U_GAN_CIFAR(
-            img_size=img_size,
-            latent_dim=latent_dim,
+        classifier = Net_Cifar(seed=seed)
+        gen = EmbeddingGAN1_Cifar(
             seed=seed
         )
 
@@ -91,9 +86,9 @@ def server_fn(context: Context):
 
     
     ndarrays_alvo = get_weights(classifier)
-    # ndarrays_gen  = get_weights(gen)
+    ndarrays_gen  = get_weights(gen)
     parameters_alvo = ndarrays_to_parameters(ndarrays_alvo)
-    # parameters_gen = ndarrays_to_parameters(ndarrays_gen)
+    parameters_gen = ndarrays_to_parameters(ndarrays_gen)
 
     # Define strategy
     strategy = FLEG(
@@ -101,6 +96,7 @@ def server_fn(context: Context):
         fraction_fit_gen=fraction_fit_gen,
         fraction_evaluate_alvo=1.0,
         initial_parameters_alvo=parameters_alvo,
+        initial_parameters_gen=parameters_gen,
         gen=gen,
         lr_gen=lr_gen,
         optimG_state_dict=optimGstate_dict,
