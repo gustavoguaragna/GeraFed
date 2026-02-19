@@ -8,7 +8,8 @@ from Simulation.FLEG.task import(
     Net_Cifar, 
     EmbeddingGAN1,
     EmbeddingGAN1_Cifar,
-    get_weights
+    get_weights,
+    load_data
 )
 from Simulation.FLEG.strategy import FLEG
 from typing import List, Tuple
@@ -30,17 +31,17 @@ import torch
 #     torch.backends.cudnn.deterministic = True
 #     torch.backends.cudnn.benchmark = False
 
-def weighted_average(metrics: List[Tuple[int, Metrics]]) -> Metrics:
-    # Multiply accuracy of each client by number of examples used
-    d_losses = [num_examples * m["avg_d_loss"] for num_examples, m in metrics]
-    net_losses = [num_examples * m["train_loss"] for num_examples, m in metrics]
-    examples = [num_examples for num_examples, _ in metrics]
+# def weighted_average(metrics: List[Tuple[int, Metrics]]) -> Metrics:
+#     # Multiply accuracy of each client by number of examples used
+#     d_losses = [num_examples * m["avg_d_loss"] for num_examples, m in metrics]
+#     net_losses = [num_examples * m["train_loss"] for num_examples, m in metrics]
+#     examples = [num_examples for num_examples, _ in metrics]
 
-    # Aggregate and return custom metric (weighted average)
-    return {
-        "d_loss_chunk": sum(d_losses) / sum(examples),
-        "net_loss": sum(net_losses) / sum(examples)
-            }
+#     # Aggregate and return custom metric (weighted average)
+#     return {
+#         "d_loss_chunk": sum(d_losses) / sum(examples),
+#         "net_loss": sum(net_losses) / sum(examples)
+            # }
 
 
 def server_fn(context: Context):
@@ -58,9 +59,16 @@ def server_fn(context: Context):
     teste             = context.run_config["teste"]
     num_partitions    = context.run_config["num_clients"]
     partitioner       = context.run_config["partitioner"]
+    if partitioner == "Dir01":
+        alpha_dir       = 0.1
+    elif partitioner == "Dir05":
+        alpha_dir       = 0.5
+    else:
+        alpha_dir       = None
     strategy          = context.run_config["strategy"]
     continue_epoch    = context.run_config["continue_epoch"]
     seed              = context.run_config["seed"]
+    patience          = context.run_config["patience"]
     folder            = f"{context.run_config['Exp_name_folder']}FedGenIA_F2U/{dataset}/{partitioner}/{strategy}/{num_partitions}_clients"
     os.makedirs(folder, exist_ok=True)
     
@@ -77,6 +85,16 @@ def server_fn(context: Context):
         )
 
     optimGstate_dict = None
+
+    _, valloader, _ = load_data(
+            partition_id=0,
+            num_partitions=num_partitions,
+            dataset=dataset,
+            teste=teste,
+            partitioner_type=partitioner,
+            num_chunks=1,
+            alpha_dir=alpha_dir
+        )
 
     if continue_epoch != 0:
         checkpoint = torch.load(f"{folder}/checkpoint_epoch{continue_epoch}.pth", map_location=torch.device("cuda:0" if torch.cuda.is_available() else "cpu"))
@@ -108,8 +126,9 @@ def server_fn(context: Context):
         teste=teste,
         folder=folder,
         num_chunks=num_chunks,
-        fit_metrics_aggregation_fn=weighted_average,
-        continue_epoch=continue_epoch
+        continue_epoch=continue_epoch,
+        patience=patience,
+        valloader=valloader
     )
     config = ServerConfig(num_rounds=num_rounds)
 

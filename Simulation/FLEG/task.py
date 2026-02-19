@@ -933,7 +933,7 @@ class _IndexWrappingDataset(torch.utils.data.Dataset):
         return self.base[self.indices[idx]]
     
 
-def unpack_batch(batch, image_key='image', label_key='label'):
+def unpack_batch(batch, dataset):
     """
     Accepts either:
      - a dict batch -> {'image': tensor, 'label': tensor}
@@ -941,6 +941,15 @@ def unpack_batch(batch, image_key='image', label_key='label'):
      - a pair (images, labels)
     Returns (images_tensor, labels_tensor)
     """
+    if dataset == "mnist":
+        image_key = "image"
+    elif dataset == "cifar10":
+        image_key = "img"
+    else:
+        raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {dataset} não reconhecido")
+            
+    label_key = "label"
+
     if isinstance(batch, dict):
         images = batch[image_key]
         labels = batch[label_key]
@@ -1061,7 +1070,7 @@ gen_img_part = None # Cache GeneratedDataset
 
 def load_data(partition_id: int, 
               num_partitions: int,
-              batch_size: int,
+              batch_size: int = 32,
               dataset: str = "mnist",
               teste: bool = False,
               partitioner_type: str = "IID",
@@ -1174,8 +1183,6 @@ def load_data(partition_id: int,
     else:
         trainloader_real = DataLoader(client_dataset["train"], batch_size=batch_size, shuffle=True)
 
-
-
     testloader = DataLoader(test_partition, batch_size=64, shuffle=True)
     testloader_local = DataLoader(client_dataset["test"], batch_size=64, shuffle=True)
 
@@ -1208,19 +1215,18 @@ def train_alvo(net, trainloader, epochs, lr, device, dataset):
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
-            #treinou = True
 
     avg_trainloss = running_loss / (len(trainloader) * epochs)
     return avg_trainloss
 
-def train_disc(gen, disc, trainloader, epochs, device, optim, cid, round, dataset="mnist", latent_dim=128):
+def train_disc(gen, disc, trainloader, feature_extractor, epochs, device, optim, dataset="mnist", latent_dim=128):
     """Train the network on the training set."""
     if dataset == "mnist":
       image = "image"
     elif dataset == "cifar10":
       image = "img"
     else:
-        raise ValueError(f"{dataset} nao identificado")
+        raise ValueError(f"{dataset} nao identificado, deveria ser mnist ou cifar10")
     
     gen.to(device)  # move model to GPU if available
     disc.to(device)  # move model to GPU if available
@@ -1234,6 +1240,8 @@ def train_disc(gen, disc, trainloader, epochs, device, optim, cid, round, datase
             if batch_size == 1:
                 print("Batch size is 1, skipping batch")
                 continue
+
+            images = feature_extractor(images)
             
             real_ident = torch.full((batch_size, 1), 1., device=device)
             fake_ident = torch.full((batch_size, 1), 0., device=device)
@@ -1331,6 +1339,7 @@ def test(net, testloader, device, dataset, level):
     return loss, accuracy
     
 def local_test(net: nn.Module,
+               feature_extractor: nn.Module,
                testloader: DataLoader,
                device: str,
                acc_filepath: str,
@@ -1347,6 +1356,7 @@ def local_test(net: nn.Module,
     predictions_counter = defaultdict(int)
 
     net.eval()
+    net.to(device)
 
     if dataset == "mnist":
         image = "image"
@@ -1358,6 +1368,9 @@ def local_test(net: nn.Module,
     with torch.no_grad():
         for batch in testloader:
             images, labels = batch[image].to(device), batch["label"].to(device)
+            if feature_extractor:
+                feature_extractor.eval()
+                images = feature_extractor(images)
             outputs = net(images)
             _, predicted = torch.max(outputs, 1)
 

@@ -1,6 +1,18 @@
-- Alterar valor self.newlvl ao finalizar level da GAN (antes ou depois da geracao dos embeddings para os clientes por exemplo)
+Para rodar:
+- Alterar valor self.newlvl e self.lvl ao finalizar level da GAN (antes ou depois da geracao dos embeddings para os clientes por exemplo)
+- criar self.embds ao final do level.
 - adicionar lgica de class_head e fe no cnfigure_fit
 - diferenciar parametros da gen e disc a enviar para clientes no configure fit
 - diferenciar parametros da gan ao enviar dos clientes ao servidor
 
-PAREI NO AGGREGATEFIT (NO COMECO)
+Para deixar tiny:
+- add rodada de transicao do alvo
+- Usar classes diferentes para gen e disc
+- compartilhar somente embeddings
+- compartilhar somente updates
+- add tempo de carregamento dados e modelos (acertar medidas de tempo)
+- ver se counts deixar no context é mais eficiente
+- ver se deixar dataset inteiro no context é mais eficiente
+
+Para testar:
+- Nao compartilhar discs

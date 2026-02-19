@@ -22,10 +22,14 @@ from flwr.server.client_proxy import ClientProxy
 from flwr.server.strategy.aggregate import aggregate, aggregate_inplace, weighted_loss_avg
 
 from Simulation.FLEG.task import (
+    ClassifierHead1, ClassifierHead2, ClassifierHead3, ClassifierHead4,
+    ClassifierHead1_Cifar, ClassifierHead2_Cifar, ClassifierHead3_Cifar, ClassifierHead4_Cifar,
     Net,
     Net_Cifar,
     EmbeddingGAN1, EmbeddingGAN2, EmbeddingGAN3, EmbeddingGAN4,
     EmbeddingGAN1_Cifar, EmbeddingGAN2_Cifar, EmbeddingGAN3_Cifar, EmbeddingGAN4_Cifar,
+    FeatureExtractor1, FeatureExtractor2, FeatureExtractor3, FeatureExtractor4,
+    FeatureExtractor1_Cifar, FeatureExtractor2_Cifar, FeatureExtractor3_Cifar, FeatureExtractor4_Cifar,
     GeneratedAssetDataset,
     set_weights,
     train_G,
@@ -117,9 +121,11 @@ class FLEG(Strategy):
         lr_gen: float = 0.0002,
         folder: str = ".",
         num_chunks: int = 1,
+        patience: int = 10,
         gen,
         optimG_state_dict = None,
-        continue_epoch:int = 0
+        continue_epoch:int = 0,
+        valloader
     ) -> None:
         super().__init__()
 
@@ -160,6 +166,10 @@ class FLEG(Strategy):
         self.num_chunks = num_chunks
         self.freq_save = self.num_chunks // 10 if self.num_chunks >= 10 else 1
         self.continue_epoch = continue_epoch
+        self.lvl = 0,
+        self.best_accuracy = 0,
+        self.patience = patience
+        self.valloader = valloader
         self.size_classifier = {
             'cifar10': {1: 0.25, 2: 0.248, 3: 0.238, 4: 0.045, 5: 0.004},
             'mnist': {1: 0.18, 2: 0.179, 3: 0.169, 4: 0.045, 5: 0.004}
@@ -173,15 +183,15 @@ class FLEG(Strategy):
         self.training_gan = False
         self.metrics_dict = {
                         "g_loss_chunk": [],
-                        "g_loss_epoch": [],
                         "d_loss_chunk": [],
-                        "d_loss_epoch": [],
                         "net_loss_epoch": [],
                         "local_acc_epoch": [],
-                        "test_acc_epoch": [],
+                        "val_acc_epoch": [],
                         "time_chunk_gan": [],
                         "time_epoch": [],
                         "time_epoch_gan": [],
+                        "net_time": [],
+                        "global_net_eval_time": [],
                         "disc_time": [],
                         "gen_time": [],
                         "img_syn_time": [],
@@ -274,6 +284,8 @@ class FLEG(Strategy):
         """Configure the next round of training."""
         if self.newlvl:
             self.init_lvl_time = time.time()
+            self.epoch = 0
+            self.round = 0
         
         self.init_round_time = time.time()
 
@@ -290,14 +302,22 @@ class FLEG(Strategy):
         )
 
         fit_instructions = []
-        config = {}
-        if self.newlvl:
-            config["embds"] = pickle.dumps(self.embds)
-            self.newlvl = False
+        config = {"level": self.lvl}
         
         if self.training_gan:
+            config["model"] = "gan"
+            config["round"] = self.round
             fit_ins = FitIns(parameters=self.parameters_gen, config=config)
+            self.round += 1
+            if self.round % self.num_chunks == 0:
+                self.epoch += 1
         else:
+            config["model"] = "classifier"
+            if self.newlvl:
+                config["embds"] = pickle.dumps(self.embds)
+                self.newlvl = False
+            if self.epochs_no_improve == 0:
+                config["best_model"] = True
             fit_ins = FitIns(parameters=self.parameters_alvo, config=config)
 
         for c in clients:
@@ -314,14 +334,14 @@ class FLEG(Strategy):
         # Do not configure federated evaluation if fraction eval is 0.
         if self.fraction_evaluate_alvo == 0.0:
             return []
-    
-        if server_round % self.num_chunks != 0:
+
+        if self.training_gan:
             round_time = time.time() - self.init_round_time
             self.metrics_dict["time_chunk"].append(round_time)
             return None
 
         # Parameters and config
-        config = {"round": server_round}
+        config = {"round": server_round, "level": self.lvl}
         if self.on_evaluate_config_fn is not None:
             # Custom evaluation config function provided
             config = self.on_evaluate_config_fn(server_round)
@@ -355,10 +375,8 @@ class FLEG(Strategy):
         if self.training_gan:
              # Define os pesos do modelo
             disc_ndarrays = {fit_res.metrics["cid"]: parameters_to_ndarrays(fit_res.parameters) for _, fit_res in results}
-            if self.dataset == "mnist":
-                self.discs = [F2U_GAN().to(self.device) for _ in range(len(disc_ndarrays))]
-            elif self.dataset == "cifar10":
-                self.discs = [F2U_GAN_CIFAR().to(self.device) for _ in range(len(disc_ndarrays))] 
+            gan_class = self.gen.__class__
+            self.discs = [gan_class().to(self.device) for _ in range(len(disc_ndarrays))]
             for i, disc in enumerate(self.discs):
                 set_weights(disc, disc_ndarrays[i])
 
@@ -377,14 +395,87 @@ class FLEG(Strategy):
 
             self.metrics_dict["g_loss_chunk"].append(g_loss)
             self.metrics_dict["gen_time_chunk"].append(gen_time)
+            
+            avg_d_loss = weighted_loss_avg(
+                [
+                    (fit_res.num_examples, fit_res.metrics["avg_d_loss"])
+                    for _, fit_res in results
+                ]
+            )
 
-            discs_state_dict = {
-                cid: disc.state_dict() for cid, disc in enumerate(self.discs)
-            }
-            optimDs_state_dict = {
-                fit_res.metrics["cid"]: pickle.loads(fit_res.metrics["optimDs_state_dict"])
-                for _, fit_res in results
-            }
+            self.metrics_dict["d_loss_chunks"].append(avg_d_loss)
+
+            disc_times = [fit_res.metrics["tempo_treino_disc"] for _, fit_res in results]
+
+            max_disc_time = max(disc_times)
+           
+            self.metrics_dict["disc_time"].append(max_disc_time)
+
+            if self.epoch == 25:
+                checkpoint = {
+                    'global_net_state_dict': self.global_net.state_dict(),
+                    'generated_dataset' : self.embds,
+                }
+                checkpoint_file = f"{self.folder}/checkpoint_level{self.lvl}.pth"
+                torch.save(checkpoint, checkpoint_file)
+                print(f"Global net saved to {checkpoint_file}")
+
+
+                self.metrics_dict["local_acc_epoch"].append(accuracy_aggregated)
+                epoch_time = time.time() - self.init_epoch_time
+                self.metrics_dict["time_epoch_gan"].append(epoch_time)
+                round_time = time.time() - self.init_round_time
+                self.metrics_dict["time_chunk"].append(round_time)
+
+                metrics_filename = f"{self.folder}/metrics.json"
+
+                try:
+                    with open(metrics_filename, 'w', encoding='utf-8') as f:
+                        json.dump(existing_metrics, f, ensure_ascii=False, indent=4) # indent makes it readable
+                    print(f"Losses dict successfully saved to {metrics_filename}")
+                except Exception as e:
+                    print(f"Error saving losses dict to JSON: {e}")
+
+
+            # Aggregate custom metrics if aggregation fn was provided
+            
+
+
+            # for key, val in list(self.metrics_dict.items()):
+            #     if key.endswith("time_chunk") and key != "time_chunk":
+            #         epoch_key = key.replace("chunk", "epoch")
+            #         sum_value = sum(val)
+            #         self.metrics_dict[epoch_key].append(sum_value)
+
+            #     if key.endswith("epoch") or "time" in key:
+            #         continue
+
+            #     epoch_key = key.replace('_chunk', '_epoch')
+
+            #     mean_value = sum(val) / len(val)
+
+            #     self.metrics_dict[epoch_key].append(mean_value)
+                
+
+            # try:
+            #     with open(metrics_filename, 'r', encoding='utf-8') as f:
+            #         # Load the dictionary from the JSON file
+            #         existing_metrics = json.load(f)
+            # except (FileNotFoundError, json.JSONDecodeError):
+            #     # If the file is not found or is not valid JSON, we start fresh
+            #     existing_metrics = {}
+            #     print("Metrics file not found or invalid. A new one will be created.")
+            #     print(metrics_filename)
+
+            # for key, new_values in self.metrics_dict.items():
+            #     # Get the list that already exists for this key, or an empty list if the key is new
+            #     existing_list = existing_metrics.get(key, [])
+                
+            #     # Use .extend() to add the new items to the existing list
+            #     existing_list.extend(new_values)
+                
+            #     # Update the dictionary with the newly extended list
+            #     existing_metrics[key] = existing_list
         
         else:
             if self.inplace:
@@ -410,30 +501,69 @@ class FLEG(Strategy):
             if self.fit_metrics_aggregation_fn:
                 fit_metrics = [(res.num_examples, res.metrics) for _, res in results]
                 metrics_aggregated = self.fit_metrics_aggregation_fn(fit_metrics)
-                self.metrics_dict["d_loss_chunk"].append(metrics_aggregated["d_loss_chunk"])
-                self.metrics_dict["net_loss_chunk"].append(metrics_aggregated["net_loss_chunk"])
-                # Simple mean of times
-                net_times = [m["tempo_treino_alvo"]/len(fit_metrics) for _, m in fit_metrics]
-                disc_times = [m["tempo_treino_disc"]/len(fit_metrics) for _, m in fit_metrics]
-                img_syn_times = [m["img_syn_time"]/len(fit_metrics) for _, m in fit_metrics]
-                self.metrics_dict["net_time_chunk"].append(sum(net_times))
-                self.metrics_dict["disc_time_chunk"].append(sum(disc_times))
-                self.metrics_dict["img_syn_time_chunk"].append(sum(img_syn_times))
             elif server_round == 1:  # Only log this warning once
                 log(WARNING, "No fit_metrics_aggregation_fn provided")
 
+            avg_net_loss = weighted_loss_avg(
+                [
+                    (fit_res.num_examples, fit_res.metrics["train_loss"])
+                    for _, fit_res in results
+                ]
+            )
+
+            self.metrics_dict["net_loss_epoch"].append(avg_net_loss)
+
+            net_times = [fit_res.metrics["tempo_treino_alvo"] for _, fit_res in results]
+
+            max_net_time = max(net_times)
+           
+            self.metrics_dict["net_time"].append(max_net_time)
 
             if parameters_aggregated is not None:
                 # Salva o modelo após a agregação
                 # Cria uma instância do modelo
                 if self.dataset == "mnist":
-                    self.classifier = Net()
+                    self.global_net = Net()
+                    self.best_model = Net()
+                    image = "image"
                 elif self.dataset == "cifar10":
-                    self.classifier = Net_CIFAR()
+                    self.global_net = Net_Cifar()
+                    self.best_model = Net_Cifar()
+                    image = "img"
                 else:
                     raise ValueError(f"Dataset {self.dataset} nao identificado. Deveria ser 'mnist' ou 'cifar10'")
                 # Define os pesos do modelo
-                set_weights(self.classifier, aggregated_ndarrays)
+                set_weights(self.global_net, aggregated_ndarrays)
+
+                criterion = torch.nn.CrossEntropyLoss()
+
+                # Avaliacao global
+                correct, loss = 0, 0.0
+                net_global_eval_start_time = time.time()
+                with torch.no_grad():
+                    for batch in self.valloader:
+                        images = batch[image].to(self.device)
+                        labels = batch["label"].to(self.device)
+                        outputs = self.global_net(images)
+                        loss += criterion(outputs, labels).item()
+                        correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
+                accuracy = correct / len(self.valloader.dataset)
+
+                self.metrics_dict["global_net_eval_time"].append(time.time() - net_global_eval_start_time)
+                self.metrics_dict["val_acc"].append(accuracy)
+
+                if accuracy > self.best_accuracy:
+                    self.best_accuracy = accuracy
+                    self.epochs_no_improve = 0
+                    self.best_model.load_state_dict(self.global_net.state_dict())
+                else:
+                    self.epochs_no_improve += 1
+                    print(f"Sem melhorias por {self.epochs_no_improve} épocas. Melhor acurácia: {best_accuracy:.4f}")
+                
+                if self.epochs_no_improve > self.patience:
+                    self.epochs_no_improve = 0
+                    self.training_gan = True
+                    self.global_net.load_state_dict(self.best_model.state_dict())
 
             return parameters_aggregated, metrics_aggregated
 
@@ -457,6 +587,9 @@ class FLEG(Strategy):
                 for _, evaluate_res in results
             ]
         )
+
+        local_test_times = [evaluate_res.metrics["local_test_time"]/len(results) for _, evaluate_res in results]
+        self.metrics_dict["local_test_time"].append(sum(local_test_times))
         # accuracies = [
         #     evaluate_res.metrics["accuracy"] * evaluate_res.num_examples
         #     for _, evaluate_res in results
@@ -465,122 +598,12 @@ class FLEG(Strategy):
         # accuracy_aggregated = (
         #     sum(accuracies) / sum(examples) if sum(examples) != 0 else 0
         # )
-        accuracy_aggregated = weighted_loss_avg(
-            [
-                (evaluate_res.num_examples, evaluate_res.metrics["local accuracy"])
-                for _, evaluate_res in results
-            ]
-        )
-
-        net_global_eval_start_time = time.time()
-        test(net=self.classifier, testloader=self.testloader, device=self.device, dataset=self.dataset, level=self.level)
-        with torch.no_grad():
-            for batch in testloader:
-                images = batch[image].to(device)
-                labels = batch["label"].to(device)
-                if level == 0:
-                    outputs = global_net(images)
-                else:
-                    outputs = class_head(feature_extractor(images))
-                loss += criterion(outputs, labels).item()
-                correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
-        accuracy = correct / len(testloader.dataset)
-        metrics_dict["net_global_eval_time"].append(time.time() - net_global_eval_start_time)
-        metrics_dict["net_acc"].append(accuracy)
-
-        metrics_dict["time_epoch_classifier"].append(time.time() - epoch_start_time)
-
-        checkpoint = {
-                'classifier_state_dict': self.classifier.state_dict(),
-                'gen_state_dict': self.gen.state_dict(),
-                'optim_G_state_dict': self.optimG_state_dict,
-                'discs_state_dict': discs_state_dict,
-                'optimDs_state_dict': optimDs_state_dict
-            }
-        checkpoint_file = f"{self.folder}/checkpoint_epoch{int(server_round/self.num_chunks)+self.continue_epoch}.pth"
-        torch.save(checkpoint, checkpoint_file)
-        print(f"Global net saved to {checkpoint_file}")
-
-        if accuracy > self.best_accuracy:
-            self.best_accuracy = accuracy
-            self.epochs_no_improve = 0
-            if self.level == 0:
-                self.best_model.load_state_dict(self.classifier.state_dict())
-            else:
-                self.best_model.load_state_dict(self.class_head.state_dict(), strict=False)
-        else:
-            self.epochs_no_improve += 1
-            print(f"No improvement for {self.epochs_no_improve} epoch(s). Best accuracy: {self.best_accuracy:.4f}")
-        
-        if self.epochs_no_improve > self.patience:
-            self.epochs_no_improve = 0
-            self.training_gan = True
-
-        self.global_net.load_state_dict(self.best_model.state_dict())
-
-
-        self.metrics_dict["local_acc_epoch"].append(accuracy_aggregated)
-
-
-        # Aggregate custom metrics if aggregation fn was provided
-        metrics_aggregated = {"loss": loss_aggregated, "local_accuracy": accuracy_aggregated}
-        if server_round % self.num_chunks == 0:
-            generate_plot(net=self.gen, device=self.device, round_number=int(server_round/self.num_chunks+self.continue_epoch), folder=self.folder, latent_dim=self.latent_dim)
-        
-        test_times = [evaluate_res.metrics["test_time"]/len(results) for _, evaluate_res in results]
-        local_test_times = [evaluate_res.metrics["local_test_time"]/len(results) for _, evaluate_res in results]
-        self.metrics_dict["test_time"].append(sum(test_times))
-        self.metrics_dict["local_test_time"].append(sum(local_test_times))
-
-        epoch_time = time.time() - self.init_epoch_time
-        self.metrics_dict["time_epoch"].append(epoch_time)
-        round_time = time.time() - self.init_round_time
-        self.metrics_dict["time_chunk"].append(round_time)
-
-        metrics_filename = f"{self.folder}/metrics.json"
-
-        for key, val in list(self.metrics_dict.items()):
-            if key.endswith("time_chunk") and key != "time_chunk":
-                epoch_key = key.replace("chunk", "epoch")
-                sum_value = sum(val)
-                self.metrics_dict[epoch_key].append(sum_value)
-
-            if key.endswith("epoch") or "time" in key:
-                continue
-
-            epoch_key = key.replace('_chunk', '_epoch')
-
-            mean_value = sum(val) / len(val)
-
-            self.metrics_dict[epoch_key].append(mean_value)
-            
-
-        try:
-            with open(metrics_filename, 'r', encoding='utf-8') as f:
-                # Load the dictionary from the JSON file
-                existing_metrics = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            # If the file is not found or is not valid JSON, we start fresh
-            existing_metrics = {}
-            print("Metrics file not found or invalid. A new one will be created.")
-            print(metrics_filename)
-
-        for key, new_values in self.metrics_dict.items():
-            # Get the list that already exists for this key, or an empty list if the key is new
-            existing_list = existing_metrics.get(key, [])
-            
-            # Use .extend() to add the new items to the existing list
-            existing_list.extend(new_values)
-            
-            # Update the dictionary with the newly extended list
-            existing_metrics[key] = existing_list
-
-        try:
-            with open(metrics_filename, 'w', encoding='utf-8') as f:
-                json.dump(existing_metrics, f, ensure_ascii=False, indent=4) # indent makes it readable
-            print(f"Losses dict successfully saved to {metrics_filename}")
-        except Exception as e:
-            print(f"Error saving losses dict to JSON: {e}")
+        # accuracy_aggregated = weighted_loss_avg(
+        #     [
+        #         (evaluate_res.num_examples, evaluate_res.metrics["local accuracy"])
+        #         for _, evaluate_res in results
+        #     ]
+        # )
 
         return loss_aggregated, metrics_aggregated
 
