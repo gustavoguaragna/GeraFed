@@ -426,7 +426,7 @@ class FlowerClient(NumPyClient):
 
         # Avalia o modelo classificador localmente
         local_test_start_time = time.time()
-        local_test(
+        local_acc = local_test(
             net=self.net,
             feature_extractor=self.feature_extractor,
             testloader=self.testloader_local,
@@ -444,6 +444,7 @@ class FlowerClient(NumPyClient):
                 len(self.testloader_local.dataset),
                 {
                  "local_test_time": local_test_time
+                 "local_accuracy": local_acc
                  }
             )
 

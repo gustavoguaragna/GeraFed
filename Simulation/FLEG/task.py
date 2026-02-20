@@ -15,6 +15,7 @@ from typing import Optional, List, Union
 from datasets import Dataset
 import numpy as np
 import random
+import io
 
 class Net(nn.Module):
     def __init__(self, seed=None):
@@ -1439,6 +1440,8 @@ def local_test(net: nn.Module,
 
     print("Results saved to accuracy_report.txt")
 
+    return results_metrics["overall_accuracy"]
+
 def get_weights(net):
     return [val.cpu().numpy() for _, val in net.state_dict().items()]
 
@@ -1450,3 +1453,8 @@ def set_weights(net, parameters):
     params_dict = zip(net.state_dict().keys(), parameters)
     state_dict = OrderedDict({k: torch.tensor(v).to(device) for k, v in params_dict})
     net.load_state_dict(state_dict, strict=True)
+
+def get_model_size_mb(params, divisor=10**6):
+    buffer = io.BytesIO()
+    np.savez(buffer, *params)
+    return len(buffer.getvalue()) / divisor

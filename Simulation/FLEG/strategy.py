@@ -34,12 +34,14 @@ from Simulation.FLEG.task import (
     set_weights,
     train_G,
     get_weights,
+    get_model_size_mb
 )
 import torch
 import pickle
 import time
 import json
 import numpy as np
+import math
 
 WARNING_MIN_AVAILABLE_CLIENTS_TOO_LOW = """
     Setting `min_available_clients` lower than `min_fit_clients` or
@@ -125,6 +127,8 @@ class FLEG(Strategy):
         gen,
         optimG_state_dict = None,
         continue_epoch:int = 0,
+        syn_input: str = "dynamic",
+        levels: int = 4,
         valloader
     ) -> None:
         super().__init__()
@@ -166,9 +170,13 @@ class FLEG(Strategy):
         self.num_chunks = num_chunks
         self.freq_save = self.num_chunks // 10 if self.num_chunks >= 10 else 1
         self.continue_epoch = continue_epoch
-        self.lvl = 0,
-        self.best_accuracy = 0,
+        self.lvl = 0
+        self.best_accuracy = 0
+        self.net_epochs = 0
         self.patience = patience
+        self.syn_input = syn_input
+        self.levels = levels
+        self.finished = False
         self.valloader = valloader
         self.size_classifier = {
             'cifar10': {1: 0.25, 2: 0.248, 3: 0.238, 4: 0.045, 5: 0.004},
@@ -181,28 +189,38 @@ class FLEG(Strategy):
         self.embds = GeneratedAssetDataset(generator=gen, num_samples=0)
         self.newlvl= True
         self.training_gan = False
+        if self.dataset == "mnist":
+            self.global_net = Net()
+            self.best_model = Net()
+            self.image = "image"
+        elif self.dataset == "cifar10":
+            self.global_net = Net_Cifar()
+            self.best_model = Net_Cifar()
+            self.image = "img"
+        else:
+            raise ValueError(f"Dataset {self.dataset} nao identificado. Deveria ser 'mnist' ou 'cifar10'")
         self.metrics_dict = {
                         "g_loss_chunk": [],
                         "d_loss_chunk": [],
                         "net_loss_epoch": [],
                         "local_acc_epoch": [],
-                        "val_acc_epoch": [],
+                        "val_acc": [],
                         "time_chunk_gan": [],
                         "time_epoch": [],
                         "time_epoch_gan": [],
-                        "net_time": [],
+                        "max_net_time": [],
                         "global_net_eval_time": [],
-                        "disc_time": [],
+                        "max_disc_time": [],
                         "gen_time": [],
                         "img_syn_time": [],
-                        "test_time": [],
-                        "local_test_time": [],
+                        "max_local_test_time": [],
                         "level_time": [],
-                        "MB_transmission": [],
-                        "traffic_cost_classifier": [],
+                        "traffic_cost_net_down": [],
+                        "traffic_cost_net_up": [],
                         "traffic_cost_embeddings": [],
+                        "traffic_cost_generator": [],
                         "traffic_cost_discriminator": [],
-                        "accuracy_transition": [],
+                        "epoch_transition": [],
                     },
         self.fe= {
             "mnist": {
@@ -282,49 +300,59 @@ class FLEG(Strategy):
         self, server_round: int, parameters: Parameters, client_manager: ClientManager
     ) -> list[tuple[ClientProxy, FitIns]]:
         """Configure the next round of training."""
-        if self.newlvl:
-            self.init_lvl_time = time.time()
-            self.epoch = 0
-            self.round = 0
-        
-        self.init_round_time = time.time()
-
-        if self.on_fit_config_fn is not None:
-            # Custom fit config function provided
-            config = self.on_fit_config_fn(server_round)
-
-        # Sample clients
-        sample_size, min_num_clients = self.num_fit_clients(
-            client_manager.num_available()
-        )
-        clients = client_manager.sample(
-            num_clients=sample_size, min_num_clients=min_num_clients
-        )
-
-        fit_instructions = []
-        config = {"level": self.lvl}
-        
-        if self.training_gan:
-            config["model"] = "gan"
-            config["round"] = self.round
-            fit_ins = FitIns(parameters=self.parameters_gen, config=config)
-            self.round += 1
-            if self.round % self.num_chunks == 0:
-                self.epoch += 1
-        else:
-            config["model"] = "classifier"
+        if self.finished:
+            return []
+        else:    
             if self.newlvl:
-                config["embds"] = pickle.dumps(self.embds)
-                self.newlvl = False
-            if self.epochs_no_improve == 0:
-                config["best_model"] = True
-            fit_ins = FitIns(parameters=self.parameters_alvo, config=config)
+                self.init_lvl_time = time.time()
+                self.epoch_gan = 0
+                self.round_gan = 0
+            
+            self.init_round_time = time.time()
 
-        for c in clients:
-            fit_instructions.append((c, fit_ins))
+            if self.on_fit_config_fn is not None:
+                # Custom fit config function provided
+                config = self.on_fit_config_fn(server_round)
 
-        # Return client/config pairs
-        return fit_instructions
+            # Sample clients
+            sample_size, min_num_clients = self.num_fit_clients(
+                client_manager.num_available()
+            )
+            clients = client_manager.sample(
+                num_clients=sample_size, min_num_clients=min_num_clients
+            )
+
+            fit_instructions = []
+            config = {"level": self.lvl}
+            
+            if self.training_gan:
+                if self.round_gan == 0:
+                    self.init_epoch_time = time.time()
+
+                config["model"] = "gan"
+                config["round"] = self.round_gan
+                fit_ins = FitIns(parameters=self.parameters_gen, config=config)
+                gen_size = get_model_size_mb(self.parameters_gen)
+                self.metrics_dict["traffic_cost_generator"].append(gen_size)
+                self.round_gan += 1
+                if self.round_gan % self.num_chunks == 0:
+                    self.epoch_gan += 1
+            else:
+                config["model"] = "classifier"
+                if self.newlvl:
+                    config["embds"] = pickle.dumps(self.embds)
+                    self.newlvl = False
+                if self.epochs_no_improve == 0:
+                    config["best_model"] = True
+                fit_ins = FitIns(parameters=self.parameters_alvo, config=config)
+                net_size = get_model_size_mb(self.parameters_alvo)
+                self.metrics_dict["traffic_cost_net_down"].append(net_size)
+                
+            for c in clients:
+                fit_instructions.append((c, fit_ins))
+
+            # Return client/config pairs
+            return fit_instructions
 
 
     def configure_evaluate(
@@ -332,13 +360,8 @@ class FLEG(Strategy):
     ) -> list[tuple[ClientProxy, EvaluateIns]]:
         """Configure the next round of evaluation."""
         # Do not configure federated evaluation if fraction eval is 0.
-        if self.fraction_evaluate_alvo == 0.0:
+        if self.fraction_evaluate_alvo == 0.0 or self.training_gan or self.finished:
             return []
-
-        if self.training_gan:
-            round_time = time.time() - self.init_round_time
-            self.metrics_dict["time_chunk"].append(round_time)
-            return None
 
         # Parameters and config
         config = {"round": server_round, "level": self.lvl}
@@ -366,7 +389,7 @@ class FLEG(Strategy):
         failures: list[Union[tuple[ClientProxy, FitRes], BaseException]],
     ) -> tuple[Optional[Parameters], dict[str, Scalar]]:
         """Aggregate fit results using weighted average."""
-        if not results:
+        if not results or self.finished:
             return None, {}
         # Do not aggregate if there are failures and failures are not accepted
         if not self.accept_failures and failures:
@@ -394,7 +417,7 @@ class FLEG(Strategy):
             gen_time = time.time() - gen_time_start
 
             self.metrics_dict["g_loss_chunk"].append(g_loss)
-            self.metrics_dict["gen_time_chunk"].append(gen_time)
+            self.metrics_dict["gen_time"].append(gen_time)
             
             avg_d_loss = weighted_loss_avg(
                 [
@@ -409,9 +432,34 @@ class FLEG(Strategy):
 
             max_disc_time = max(disc_times)
            
-            self.metrics_dict["disc_time"].append(max_disc_time)
+            self.metrics_dict["max_disc_time"].append(max_disc_time)
 
-            if self.epoch == 25:
+            discs_sizes = sum([get_model_size_mb(fit_res.parameters) for _, fit_res in results])
+            self.metrics_dict["traffic_cost_discriminator"].append(discs_sizes)
+
+            D = sum([fit_res.num_examples for _, fit_res in results])
+            num_partitions = len(results)
+            
+            if self.syn_input == "dynamic":
+                num_samples = int(math.ceil(D/num_partitions)/self.levels*(self.lvl+1))
+            elif self.syn_input == "fixed":
+                num_samples = D
+            else:
+                raise ValueError(f"input strategy should be fixed or dynamic. Got {self.syn_input}")
+            
+            start_img_syn_time = time.time()
+            self.embds = GeneratedAssetDataset(
+                generator=self.gen, 
+                num_samples=num_samples, 
+                latent_dim=self.latent_dim, 
+                num_classes=10, 
+                asset_shape=(self.gen.embedding_dim,),
+                asset_col_name=self.image,
+                device=self.device
+            )
+            self.metrics_dict["img_syn_time"].append(time.time() - start_img_syn_time)
+
+            if self.epoch_gan == 25:
                 checkpoint = {
                     'global_net_state_dict': self.global_net.state_dict(),
                     'generated_dataset' : self.embds,
@@ -420,14 +468,14 @@ class FLEG(Strategy):
                 torch.save(checkpoint, checkpoint_file)
                 print(f"Global net saved to {checkpoint_file}")
 
-
-                self.metrics_dict["local_acc_epoch"].append(accuracy_aggregated)
                 epoch_time = time.time() - self.init_epoch_time
                 self.metrics_dict["time_epoch_gan"].append(epoch_time)
-                round_time = time.time() - self.init_round_time
-                self.metrics_dict["time_chunk"].append(round_time)
 
                 metrics_filename = f"{self.folder}/metrics.json"
+
+                self.newlvl= True
+
+                self.metrics_dict["level_time"].append(time.time() - self.init_lvl_time)
 
                 try:
                     with open(metrics_filename, 'w', encoding='utf-8') as f:
@@ -517,21 +565,12 @@ class FLEG(Strategy):
 
             max_net_time = max(net_times)
            
-            self.metrics_dict["net_time"].append(max_net_time)
+            self.metrics_dict["max_net_time"].append(max_net_time)
+
+            nets_sizes = sum([get_model_size_mb(fit_res.parameters) for _, fit_res in results])
+            self.metrics_dict["traffic_cost_net_up"].append(nets_sizes)
 
             if parameters_aggregated is not None:
-                # Salva o modelo após a agregação
-                # Cria uma instância do modelo
-                if self.dataset == "mnist":
-                    self.global_net = Net()
-                    self.best_model = Net()
-                    image = "image"
-                elif self.dataset == "cifar10":
-                    self.global_net = Net_Cifar()
-                    self.best_model = Net_Cifar()
-                    image = "img"
-                else:
-                    raise ValueError(f"Dataset {self.dataset} nao identificado. Deveria ser 'mnist' ou 'cifar10'")
                 # Define os pesos do modelo
                 set_weights(self.global_net, aggregated_ndarrays)
 
@@ -542,7 +581,7 @@ class FLEG(Strategy):
                 net_global_eval_start_time = time.time()
                 with torch.no_grad():
                     for batch in self.valloader:
-                        images = batch[image].to(self.device)
+                        images = batch[self.image].to(self.device)
                         labels = batch["label"].to(self.device)
                         outputs = self.global_net(images)
                         loss += criterion(outputs, labels).item()
@@ -561,9 +600,15 @@ class FLEG(Strategy):
                     print(f"Sem melhorias por {self.epochs_no_improve} épocas. Melhor acurácia: {best_accuracy:.4f}")
                 
                 if self.epochs_no_improve > self.patience:
-                    self.epochs_no_improve = 0
-                    self.training_gan = True
-                    self.global_net.load_state_dict(self.best_model.state_dict())
+                    if self.lvl < self.levels:
+                        self.epochs_no_improve = 0
+                        self.training_gan = True
+                        self.global_net.load_state_dict(self.best_model.state_dict())
+                        self.metrics_dict["epoch_transition"].append(self.net_epochs)
+
+                    else:
+                        self.finished = True
+                self.net_epochs += 1
 
             return parameters_aggregated, metrics_aggregated
 
@@ -574,12 +619,15 @@ class FLEG(Strategy):
         failures: list[Union[tuple[ClientProxy, EvaluateRes], BaseException]],
     ) -> tuple[Optional[float], dict[str, Scalar]]:
         """Aggregate evaluation losses using weighted average."""
-        if not results:
+        if not results or self.finished:
+            if self.training_gan:
+                round_time = time.time() - self.init_round_time
+                self.metrics_dict["time_chunk_gan"].append(round_time)
             return None, {}
         # Do not aggregate if there are failures and failures are not accepted
         if not self.accept_failures and failures:
             return None, {}
-
+        
         # Aggregate loss
         loss_aggregated = weighted_loss_avg(
             [
@@ -588,8 +636,23 @@ class FLEG(Strategy):
             ]
         )
 
-        local_test_times = [evaluate_res.metrics["local_test_time"]/len(results) for _, evaluate_res in results]
-        self.metrics_dict["local_test_time"].append(sum(local_test_times))
+        local_test_times = [evaluate_res.metrics["local_test_time"] for _, evaluate_res in results]
+
+        max_local_test_time = max(local_test_times)
+        
+        self.metrics_dict["local_test_time"].append(max_local_test_time)
+
+        accuracy_aggregated = weighted_loss_avg(
+                [
+                    (evaluate_res.num_examples, evaluate_res.metrics["local accuracy"])
+                    for _, evaluate_res in results
+                ]
+            )
+
+        self.metrics_dict["local_acc_epoch"].append(accuracy_aggregated)
+
+        self.metrics_dict["time_epoch"].append(time.time() - self.init_round_time)
+        
         # accuracies = [
         #     evaluate_res.metrics["accuracy"] * evaluate_res.num_examples
         #     for _, evaluate_res in results
@@ -597,12 +660,6 @@ class FLEG(Strategy):
         # examples = [evaluate_res.num_examples for _, evaluate_res in results]
         # accuracy_aggregated = (
         #     sum(accuracies) / sum(examples) if sum(examples) != 0 else 0
-        # )
-        # accuracy_aggregated = weighted_loss_avg(
-        #     [
-        #         (evaluate_res.num_examples, evaluate_res.metrics["local accuracy"])
-        #         for _, evaluate_res in results
-        #     ]
         # )
 
         return loss_aggregated, metrics_aggregated

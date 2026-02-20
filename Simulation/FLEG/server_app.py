@@ -69,6 +69,8 @@ def server_fn(context: Context):
     continue_epoch    = context.run_config["continue_epoch"]
     seed              = context.run_config["seed"]
     patience          = context.run_config["patience"]
+    syn_input         = context.run_config["syn_input"]
+    levels            = context.run_config["levels"]
     folder            = f"{context.run_config['Exp_name_folder']}FedGenIA_F2U/{dataset}/{partitioner}/{strategy}/{num_partitions}_clients"
     os.makedirs(folder, exist_ok=True)
     
@@ -95,6 +97,8 @@ def server_fn(context: Context):
             num_chunks=1,
             alpha_dir=alpha_dir
         )
+    
+    print(f"Tamanho dataset")
 
     if continue_epoch != 0:
         checkpoint = torch.load(f"{folder}/checkpoint_epoch{continue_epoch}.pth", map_location=torch.device("cuda:0" if torch.cuda.is_available() else "cpu"))
@@ -128,6 +132,8 @@ def server_fn(context: Context):
         num_chunks=num_chunks,
         continue_epoch=continue_epoch,
         patience=patience,
+        syn_input=syn_input,
+        levels=levels,
         valloader=valloader
     )
     config = ServerConfig(num_rounds=num_rounds)

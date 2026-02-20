@@ -8,13 +8,13 @@ Para rodar:
 Para deixar tiny:
 - add rodada de transicao do alvo
 - Usar classes diferentes para gen e disc
-- compartilhar somente embeddings
-- compartilhar somente updates
+- compartilhar somente embeddings e adaptar traffic cost metrics
+- compartilhar somente updates e adaptar traffic cost metrics
 - add tempo de carregamento dados e modelos (acertar medidas de tempo)
 - ver se counts deixar no context é mais eficiente
 - ver se deixar dataset inteiro no context é mais eficiente
+- ver se o self.finished no aggregate nao eh redundante com not results
 
 Para testar:
 - Nao compartilhar discs
 
-ESTOU AVALIANDO AS METRICAS DO METRICS_DICT. PAREI NO NET_LOSS, ESTAVA AVALIANDO MATEMATICAMENTE O CALCULO DA LOSS
