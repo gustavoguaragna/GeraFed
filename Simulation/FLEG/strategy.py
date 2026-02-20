@@ -344,6 +344,8 @@ class FLEG(Strategy):
                     self.newlvl = False
                 if self.epochs_no_improve == 0:
                     config["best_model"] = True
+                else:
+                    config["best_model"] = False
                 fit_ins = FitIns(parameters=self.parameters_alvo, config=config)
                 net_size = get_model_size_mb(self.parameters_alvo)
                 self.metrics_dict["traffic_cost_net_down"].append(net_size)

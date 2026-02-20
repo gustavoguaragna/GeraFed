@@ -18,6 +18,7 @@ from Simulation.FLEG.task import (
     get_label_counts,
     get_weights,
     load_data, 
+    local_test,
     set_weights,
     test, 
     train_alvo, 
@@ -324,7 +325,7 @@ class FlowerClient(NumPyClient):
             # Add to a context
             self.client_state.parameters_records["net_parameters"] = net_record
 
-            # --- Save discriminator model parameters ---
+            # --- Save model parameters ---
             buf_net = io.BytesIO()
             torch.save(self.net.state_dict(), buf_net)
 
@@ -410,13 +411,13 @@ class FlowerClient(NumPyClient):
 
         set_weights(self.net, parameters)
 
-        # --- Restore discriminator model parameters ---
+        # --- Restore model parameters ---
         if "net_state_dict" in self.client_state.parameters_records:
             rec_net = self.client_state.parameters_records["net_state_dict"]
             arr_net = rec_net["state_bytes"].numpy()
             buf_net = io.BytesIO(arr_net.tobytes())
             state_dict = torch.load(buf_net, map_location=self.device)
-            self.feature_extractor.load_state_dict(state_dict)
+            self.net.load_state_dict(state_dict, strict=False)
 
         # test_time_start = time.time()
 
@@ -428,7 +429,6 @@ class FlowerClient(NumPyClient):
         local_test_start_time = time.time()
         local_acc = local_test(
             net=self.net,
-            feature_extractor=self.feature_extractor,
             testloader=self.testloader_local,
             device=self.device,
             acc_filepath=f"{self.folder}/accuracy_report.txt",
@@ -443,7 +443,7 @@ class FlowerClient(NumPyClient):
         return (0.0,
                 len(self.testloader_local.dataset),
                 {
-                 "local_test_time": local_test_time
+                 "local_test_time": local_test_time,
                  "local_accuracy": local_acc
                  }
             )

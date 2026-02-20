@@ -2,6 +2,8 @@ Para rodar:
 - adicionar lgica de class_head e fe no cnfigure_fit
 - diferenciar parametros da gen e disc a enviar para clientes no configure fit
 - diferenciar parametros da gan ao enviar dos clientes ao servidor
+- optim do adam no class tambem.
+- guardar embds no context do cliente
 
 Para deixar tiny:
 - add rodada de transicao do alvo
@@ -12,7 +14,13 @@ Para deixar tiny:
 - ver se counts deixar no context é mais eficiente
 - ver se deixar dataset inteiro no context é mais eficiente
 - ver se o self.finished no aggregate nao eh redundante com not results
+- Nao é melhor fazer a avaliacao do teste local no fit antes de treinar, para evitar compartilhar paramentro duas vezes por rodada?
+- checkpoint controller
 
 Para testar:
 - Nao compartilhar discs
+- deixar dados no context?
+
+
+AVALIANDO PRIMEIRO ITEM DO RODAR, ESOTU PASSADNO PELO FLUXO DE FORMA GERAL, PAREI BEM NO COMECO AO ESTAR RODANDO NIVEL 0 NO CLASSIFIER, O QUE ACONTECE QUANDO ESTOURAR O PATIENCE?
 

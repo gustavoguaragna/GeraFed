@@ -1340,7 +1340,6 @@ def test(net, testloader, device, dataset, level):
     return loss, accuracy
     
 def local_test(net: nn.Module,
-               feature_extractor: nn.Module,
                testloader: DataLoader,
                device: str,
                acc_filepath: str,
@@ -1369,9 +1368,6 @@ def local_test(net: nn.Module,
     with torch.no_grad():
         for batch in testloader:
             images, labels = batch[image].to(device), batch["label"].to(device)
-            if feature_extractor:
-                feature_extractor.eval()
-                images = feature_extractor(images)
             outputs = net(images)
             _, predicted = torch.max(outputs, 1)
 
