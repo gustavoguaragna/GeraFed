@@ -446,18 +446,6 @@ class FLEG(Strategy):
                 num_samples = D
             else:
                 raise ValueError(f"input strategy should be fixed or dynamic. Got {self.syn_input}")
-            
-            start_img_syn_time = time.time()
-            self.embds = GeneratedAssetDataset(
-                generator=self.gen, 
-                num_samples=num_samples, 
-                latent_dim=self.latent_dim, 
-                num_classes=10, 
-                asset_shape=(self.gen.embedding_dim,),
-                asset_col_name=self.image,
-                device=self.device
-            )
-            self.metrics_dict["img_syn_time"].append(time.time() - start_img_syn_time)
 
             if self.epoch_gan == 25:
                 checkpoint = {
@@ -473,7 +461,20 @@ class FLEG(Strategy):
 
                 metrics_filename = f"{self.folder}/metrics.json"
 
+                start_img_syn_time = time.time()
+                self.embds = GeneratedAssetDataset(
+                    generator=self.gen, 
+                    num_samples=num_samples, 
+                    latent_dim=self.latent_dim, 
+                    num_classes=10, 
+                    asset_shape=(self.gen.embedding_dim,),
+                    asset_col_name=self.image,
+                    device=self.device
+                )
+                self.metrics_dict["img_syn_time"].append(time.time() - start_img_syn_time)
+
                 self.newlvl= True
+                self.lvl += 1
 
                 self.metrics_dict["level_time"].append(time.time() - self.init_lvl_time)
 
