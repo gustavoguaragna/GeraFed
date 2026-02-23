@@ -1448,7 +1448,7 @@ def set_weights(net, parameters):
     device = next(net.parameters()).device
     params_dict = zip(net.state_dict().keys(), parameters)
     state_dict = OrderedDict({k: torch.tensor(v).to(device) for k, v in params_dict})
-    net.load_state_dict(state_dict, strict=True)
+    net.load_state_dict(state_dict, strict=False)
 
 def get_model_size_mb(params, divisor=10**6):
     buffer = io.BytesIO()

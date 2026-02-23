@@ -613,7 +613,7 @@ class FLEG(Strategy):
                         self.finished = True
                 self.net_epochs += 1
 
-            return parameters_aggregated, metrics_aggregated
+        return parameters_aggregated, metrics_aggregated
 
     def aggregate_evaluate(
         self,

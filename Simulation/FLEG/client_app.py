@@ -90,6 +90,18 @@ class FlowerClient(NumPyClient):
         self.num_classes = 10 if dataset in ["mnist", "cifar10"] else None
         self.seed = seed
         self.teste = teste
+        
+        self.trainloader, self.testloader, self.testloader_local = load_data(
+            partition_id=self.cid,
+            num_partitions=self.num_partitions,
+            batch_size=self.batch_size,
+            dataset=self.dataset,
+            teste=self.teste,
+            partitioner_type=self.partitioner,
+            num_chunks=1,
+            alpha_dir=self.alpha_dir
+        )
+
 
 
     def fit(self, parameters, config):
@@ -207,7 +219,7 @@ class FlowerClient(NumPyClient):
 
             # Save all elements of the state_dict into a single RecordSet
             p_record = ParametersRecord()
-            for k, v in self.net_disc.state_dict().items():
+            for k, v in self.disc.state_dict().items():
                 # Convert to NumPy, then to Array. Add to self.client_state
                 p_record[k] = array_from_numpy(v.detach().cpu().numpy())
             # Add to a context
@@ -225,7 +237,7 @@ class FlowerClient(NumPyClient):
             # Save optimizer state_dict fully (state + param_groups)
             # --- Save discriminator model parameters ---
             buf_model = io.BytesIO()
-            torch.save(self.net_disc.state_dict(), buf_model)
+            torch.save(self.disc.state_dict(), buf_model)
 
             # Convert bytes → numpy array (uint8)
             arr_model = np.frombuffer(buf_model.getvalue(), dtype=np.uint8)
@@ -245,7 +257,7 @@ class FlowerClient(NumPyClient):
             self.client_state.parameters_records["disc_optim_state_dict"] = rec_optim
 
 
-            disc_params = get_weights(self.net_disc)
+            disc_params = get_weights(self.disc)
 
             return (
             disc_params,
@@ -337,17 +349,6 @@ class FlowerClient(NumPyClient):
             rec_net["state_bytes"] = array_from_numpy(arr_net)
             self.client_state.parameters_records["net_state_dict"] = rec_model
         
-        trainloader, testloader, testloader_local = load_data(
-            partition_id=self.cid,
-            num_partitions=self.num_partitions,
-            batch_size=self.batch_size,
-            dataset=self.dataset,
-            teste=self.teste,
-            partitioner_type=self.partitioner,
-            num_chunks=1,
-            alpha_dir=self.alpha_dir
-        )
-
         # Synthetic Data Augmentation
         # if checkpoint_level is not None and level == checkpoint_level:
         #     generated_dataset = checkpoint_loaded['generated_dataset']
@@ -409,8 +410,6 @@ class FlowerClient(NumPyClient):
 
     def evaluate(self, parameters, config):
 
-        set_weights(self.net, parameters)
-
         # --- Restore model parameters ---
         if "net_state_dict" in self.client_state.parameters_records:
             rec_net = self.client_state.parameters_records["net_state_dict"]
@@ -418,6 +417,8 @@ class FlowerClient(NumPyClient):
             buf_net = io.BytesIO(arr_net.tobytes())
             state_dict = torch.load(buf_net, map_location=self.device)
             self.net.load_state_dict(state_dict, strict=False)
+
+        set_weights(self.net, parameters)
 
         # test_time_start = time.time()
 
