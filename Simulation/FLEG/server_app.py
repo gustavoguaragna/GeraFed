@@ -134,7 +134,8 @@ def server_fn(context: Context):
         patience=patience,
         syn_input=syn_input,
         levels=levels,
-        valloader=valloader
+        valloader=valloader,
+        seed=seed
     )
     config = ServerConfig(num_rounds=num_rounds)
 

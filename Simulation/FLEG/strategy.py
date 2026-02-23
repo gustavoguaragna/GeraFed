@@ -129,7 +129,8 @@ class FLEG(Strategy):
         continue_epoch:int = 0,
         syn_input: str = "dynamic",
         levels: int = 4,
-        valloader
+        valloader,
+        seed: int = 42
     ) -> None:
         super().__init__()
 
@@ -178,6 +179,7 @@ class FLEG(Strategy):
         self.levels = levels
         self.finished = False
         self.valloader = valloader
+        self.seed = seed
         self.size_classifier = {
             'cifar10': {1: 0.25, 2: 0.248, 3: 0.238, 4: 0.045, 5: 0.004},
             'mnist': {1: 0.18, 2: 0.179, 3: 0.169, 4: 0.045, 5: 0.004}
@@ -477,6 +479,23 @@ class FLEG(Strategy):
 
                 self.newlvl= True
                 self.lvl += 1
+                if self.lvl == 1:
+                    if self.dataset == "mnist":
+                        self.gen = EmbeddingGAN2(seed=self.seed).to(self.device)
+                    elif self.dataset == "cifar10":
+                        self.gen = EmbeddingGAN2_Cifar(seed=self.seed).to(self.device)
+                elif self.lvl == 2:
+                    if self.dataset == "mnist":
+                        self.gen = EmbeddingGAN3(seed=self.seed).to(self.device)
+                    elif self.dataset == "cifar10":
+                        self.gen = EmbeddingGAN3_Cifar(seed=self.seed).to(self.device)
+                elif self.lvl == 3:
+                    if self.dataset == "mnist":
+                        self.gen = EmbeddingGAN4(seed=self.seed).to(self.device)
+                    elif self.dataset == "cifar10":
+                        self.gen = EmbeddingGAN4_Cifar(seed=self.seed).to(self.device)
+                else:
+                    raise ValueError(f"Levels should be between 0 and 3. Got {self.lvl}")
 
                 self.metrics_dict["level_time"].append(time.time() - self.init_lvl_time)
 
