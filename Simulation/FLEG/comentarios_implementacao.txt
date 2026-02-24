@@ -1,5 +1,4 @@
 Para rodar:
-- adicionar lgica de class_head e fe no cnfigure_fit
 - diferenciar parametros da gen e disc a enviar para clientes no configure fit
 - diferenciar parametros da gan ao enviar dos clientes ao servidor
 - optim do adam no class tambem.
@@ -22,5 +21,4 @@ Para testar:
 - deixar dados no context?
 
 
-AVALIANDO PRIMEIRO ITEM DO RODAR, ESOTU PASSADNO PELO FLUXO DE FORMA GERAL, PAREI NO TREINAMENTO DA gan NIVEL 0, o que acontece apos 25 epocas?
 

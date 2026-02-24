@@ -341,13 +341,15 @@ class FLEG(Strategy):
                     self.epoch_gan += 1
             else:
                 config["model"] = "classifier"
+                config["use_best_model"] = False
+                config["best_model"] = False
                 if self.newlvl:
                     config["embds"] = pickle.dumps(self.embds)
                     self.newlvl = False
-                if self.epochs_no_improve == 0:
-                    config["best_model"] = True
+                    config["use_best_model"] = True
                 else:
-                    config["best_model"] = False
+                    if self.epochs_no_improve == 0:
+                        config["best_model"] = True
                 fit_ins = FitIns(parameters=self.parameters_alvo, config=config)
                 net_size = get_model_size_mb(self.parameters_alvo)
                 self.metrics_dict["traffic_cost_net_down"].append(net_size)
@@ -501,10 +503,10 @@ class FLEG(Strategy):
 
                 try:
                     with open(metrics_filename, 'w', encoding='utf-8') as f:
-                        json.dump(existing_metrics, f, ensure_ascii=False, indent=4) # indent makes it readable
-                    print(f"Losses dict successfully saved to {metrics_filename}")
+                        json.dump(self.metrics_dict, f, ensure_ascii=False, indent=4) # indent makes it readable
+                    print(f"Metrics dict successfully saved to {metrics_filename}")
                 except Exception as e:
-                    print(f"Error saving losses dict to JSON: {e}")
+                    print(f"Error saving metrics dict to JSON: {e}")
 
 
             # Aggregate custom metrics if aggregation fn was provided
@@ -645,6 +647,8 @@ class FLEG(Strategy):
             if self.training_gan:
                 round_time = time.time() - self.init_round_time
                 self.metrics_dict["time_chunk_gan"].append(round_time)
+                if self.epoch_gan == 25:
+                    self.training_gan = False
             return None, {}
         # Do not aggregate if there are failures and failures are not accepted
         if not self.accept_failures and failures:

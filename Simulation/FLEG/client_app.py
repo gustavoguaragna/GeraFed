@@ -268,13 +268,15 @@ class FlowerClient(NumPyClient):
         )
 
         elif config["model"] == "classifier":
+            if self.dataset == "mnist":
+                self.net = Net(seed=self.seed)
+            elif self.dataset == "cifar10":
+                self.net = Net_Cifar(seed=self.seed)
             if config["level"] == 0:
                 if self.dataset == "mnist":
-                    self.net = Net(seed=self.seed)
-                    self.feature_extractor = None
+                    self.classifier = Net(seed=self.seed)
                 elif self.dataset == "cifar10":
-                    self.net = Net_Cifar(seed=self.seed)
-                    self.feature_extractor = None
+                    self.classifier = Net_Cifar(seed=self.seed)
                 else:
                     raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {self.dataset} não reconhecido") 
 
@@ -320,93 +322,109 @@ class FlowerClient(NumPyClient):
             
             else:
                 raise ValueError(f"Treino da GAN vai até nível 3 (4° nível), não deveria receber config['level'] {config['level']}.")
+            
+
+            # Atualiza pesos do modelo classificador
+            set_weights(self.classifier, parameters)
+
+            # --- Restore model parameters ---
+            if "net_state_dict" in self.client_state.parameters_records:
+                rec_net = self.client_state.parameters_records["net_state_dict"]
+                arr_net = rec_net["state_bytes"].numpy()
+                buf_net = io.BytesIO(arr_net.tobytes())
+                state_dict = torch.load(buf_net, map_location=self.device)
+                self.net.load_state_dict(state_dict)
+                if config["level"] > 0:
+                    self.feature_extractor.load_state_dict(state_dict, strict=False)
+                if config["use_best_model"]:
+                    self.classifier.load_state_dict(state_dict, strict=False)
+            
+
+            if config["best_model"]:
+                set_weights(self.net, parameters)
+                # Save all elements of the state_dict into a single RecordSet
+                net_record = ParametersRecord()
+                for k, v in self.net.state_dict().items():
+                    # Convert to NumPy, then to Array. Add to self.client_state
+                    net_record[k] = array_from_numpy(v.detach().cpu().numpy())
+
+                # Add to a context
+                self.client_state.parameters_records["net_parameters"] = net_record
+
+                # --- Save model parameters ---
+                buf_net = io.BytesIO()
+                torch.save(self.net.state_dict(), buf_net)
+
+                # Convert bytes → numpy array (uint8)
+                arr_net = np.frombuffer(buf_net.getvalue(), dtype=np.uint8)
+
+                # Store in ParametersRecord
+                rec_net = ParametersRecord()
+                rec_net["state_bytes"] = array_from_numpy(arr_net)
+                self.client_state.parameters_records["net_state_dict"] = rec_net
+            
+            # Synthetic Data Augmentation
+            # if checkpoint_level is not None and level == checkpoint_level:
+            #     generated_dataset = checkpoint_loaded['generated_dataset']
+
+            if len(config["embds"]) > 0:    
+                all_embeddings = []
+                all_labels = []
+
+                counts = get_label_counts(self.trainloader.dataset)
+                
+                with torch.no_grad():
+                    self.feature_extractor.eval()
+                    for batch in self.trainloader:
+                        images, labels = unpack_batch(batch, dataset=self.dataset)
+                        embeddings = self.feature_extractor(images.to(self.device))
+                        embeddings = embeddings.view(embeddings.size(0), -1)
+                        all_embeddings.append(embeddings)
+                        all_labels.append(labels.to(self.device))
+                final_embeddings = torch.cat(all_embeddings, dim=0)
+                final_labels = torch.cat(all_labels, dim=0)
+                embedding_dataset = EmbeddingPairDataset(final_embeddings, final_labels,
+                                                asset_col_name=config["embds"].asset_col_name,
+                                                label_col_name=config["embds"].label_col_name)
+            
+                combined_ds, stats = augment_client_with_generated(
+                    client_train=embedding_dataset,
+                    gen_dataset=config["embds"],
+                    counts=counts,    
+                    strategy='threshold', 
+                    fill_to=int(len(embedding_dataset)/10),
+                    threshold=int(len(embedding_dataset)/10),
+                    rng_seed=42
+                )
+
+                print(f"Cliente {self.cid}: adicionou {stats['gen_selected_count']} amostras geradas para as classes {stats['desired_labels']}")
+                
+                trainloader_aug = DataLoader(combined_ds, batch_size=self.batch_size, shuffle=True)
+            else:
+                trainloader_aug = self.trainloader
+
+            # Treina o modelo classificador
+            train_alvo_start_time = time.time()
+            train_loss = train_alvo(
+                net=self.classifier,
+                trainloader=trainloader_aug,
+                epochs=self.local_epochs_alvo,
+                lr=self.lr_alvo,
+                device=self.device,
+                dataset=self.dataset
+            )
+            train_classifier_time  = time.time() - train_alvo_start_time
+
+            return (
+                get_weights(self.classifier),
+                len(self.trainloader.dataset),
+                {"train_loss": train_loss,
+                "tempo_treino_alvo": train_classifier_time,
+                },
+            )
 
         else:
             raise ValueError(f"config[model] deveria ser 'gan' ou 'classifier', mas obteve {config['model']}")
-        
-        # Atualiza pesos do modelo classificador
-        set_weights(self.net, parameters)
-
-        if config["best_model"]:
-            # Save all elements of the state_dict into a single RecordSet
-            net_record = ParametersRecord()
-            for k, v in self.net.state_dict().items():
-                # Convert to NumPy, then to Array. Add to self.client_state
-                net_record[k] = array_from_numpy(v.detach().cpu().numpy())
-
-            # Add to a context
-            self.client_state.parameters_records["net_parameters"] = net_record
-
-            # --- Save model parameters ---
-            buf_net = io.BytesIO()
-            torch.save(self.net.state_dict(), buf_net)
-
-            # Convert bytes → numpy array (uint8)
-            arr_net = np.frombuffer(buf_net.getvalue(), dtype=np.uint8)
-
-            # Store in ParametersRecord
-            rec_net = ParametersRecord()
-            rec_net["state_bytes"] = array_from_numpy(arr_net)
-            self.client_state.parameters_records["net_state_dict"] = rec_model
-        
-        # Synthetic Data Augmentation
-        # if checkpoint_level is not None and level == checkpoint_level:
-        #     generated_dataset = checkpoint_loaded['generated_dataset']
-
-
-        if len(config["embds"]) > 0:    
-            all_embeddings = []
-            all_labels = []
-
-            counts = get_label_counts(trainloader.dataset)
-            
-            with torch.no_grad():
-                self.feature_extractor.eval()
-                for batch in trainloader:
-                    images, labels = unpack_batch(batch, dataset=self.dataset)
-                    embeddings = self.feature_extractor(images.to(self.device))
-                    embeddings = embeddings.view(embeddings.size(0), -1)
-                    all_embeddings.append(embeddings)
-                    all_labels.append(labels.to(self.device))
-            final_embeddings = torch.cat(all_embeddings, dim=0)
-            final_labels = torch.cat(all_labels, dim=0)
-            embedding_dataset = EmbeddingPairDataset(final_embeddings, final_labels,
-                                            asset_col_name=config["embds"].asset_col_name,
-                                            label_col_name=config["embds"].label_col_name)
-        
-            combined_ds, stats = augment_client_with_generated(
-                client_train=embedding_dataset,
-                gen_dataset=config["embds"],
-                counts=counts,    
-                strategy='threshold', 
-                fill_to=int(len(embedding_dataset)/10),
-                threshold=int(len(embedding_dataset)/10),
-                rng_seed=42
-            )
-
-            print(f"Cliente {self.cid}: adicionou {stats['gen_selected_count']} amostras geradas para as classes {stats['desired_labels']}")
-            
-            trainloader = DataLoader(combined_ds, batch_size=self.batch_size, shuffle=True)
-
-        # Treina o modelo classificador
-        train_alvo_start_time = time.time()
-        train_loss = train_alvo(
-            net=self.net,
-            trainloader=trainloader,
-            epochs=self.local_epochs_alvo,
-            lr=self.lr_alvo,
-            device=self.device,
-            dataset=self.dataset
-        )
-        train_classifier_time  = time.time() - train_alvo_start_time
-
-        return (
-            get_weights(self.net),
-            len(trainloader.dataset),
-            {"train_loss": train_loss,
-            "tempo_treino_alvo": train_classifier_time,
-            },
-        )
 
     def evaluate(self, parameters, config):
 
