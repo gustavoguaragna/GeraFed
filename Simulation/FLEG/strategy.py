@@ -33,7 +33,7 @@ from Simulation.FLEG.task import (
     GeneratedAssetDataset,
     set_weights,
     train_G,
-    get_weights,
+    get_weights_gen,
     get_model_size_mb
 )
 import torch
@@ -468,7 +468,7 @@ class FLEG(Strategy):
                 metrics_filename = f"{self.folder}/metrics.json"
 
                 start_img_syn_time = time.time()
-                self.embds = GeneratedAssetDataset(
+                generated_embeddings = GeneratedAssetDataset(
                     generator=self.gen, 
                     num_samples=num_samples, 
                     latent_dim=self.latent_dim, 
@@ -478,6 +478,14 @@ class FLEG(Strategy):
                     device=self.device
                 )
                 self.metrics_dict["img_syn_time"].append(time.time() - start_img_syn_time)
+                self.parameters_gen = ndarrays_to_parameters(get_weights_gen(self.gen))
+
+                assets_numpy = generated_embeddings.assets.detach().cpu().numpy()
+                labels_numpy = generated_embeddings.labels.detach().cpu().numpy()
+                self.embds = {
+                    "assets": assets_numpy,
+                    "labels": labels_numpy
+                }
 
                 self.newlvl= True
                 self.lvl += 1

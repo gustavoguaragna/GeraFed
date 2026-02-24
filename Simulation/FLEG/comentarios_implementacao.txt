@@ -1,9 +1,3 @@
-Para rodar:
-- diferenciar parametros da gen e disc a enviar para clientes no configure fit
-- diferenciar parametros da gan ao enviar dos clientes ao servidor
-- optim do adam no class tambem.
-- guardar embds no context do cliente
-
 Para deixar tiny:
 - add rodada de transicao do alvo
 - Usar classes diferentes para gen e disc
@@ -15,6 +9,7 @@ Para deixar tiny:
 - ver se o self.finished no aggregate nao eh redundante com not results
 - Nao é melhor fazer a avaliacao do teste local no fit antes de treinar, para evitar compartilhar paramentro duas vezes por rodada?
 - checkpoint controller
+- optim do adam no class tambem.
 
 Para testar:
 - Nao compartilhar discs

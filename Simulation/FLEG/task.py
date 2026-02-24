@@ -713,6 +713,33 @@ class GeneratedAssetDataset(torch.utils.data.Dataset):
             self.label_col_name: int(self.labels[idx])
         }
 
+class DictTensorDataset(Dataset):
+    def __init__(self, assets, labels, asset_col_name="image", label_col_name="label"):
+        """
+        Wrapper leve que simula o GeneratedAssetDataset.
+        """
+        self.assets = assets
+        self.labels = labels
+        
+        # --- AQUI ESTÁ A ABORDAGEM PURISTA ---
+        # Salvamos os nomes das colunas como atributos da instância,
+        # exatamente como a sua classe original fazia.
+        self.asset_col_name = asset_col_name
+        self.label_col_name = label_col_name
+
+    def __len__(self):
+        return self.assets.shape[0]
+
+    def __getitem__(self, idx):
+        if idx >= len(self):
+            raise IndexError("Dataset index out of range")
+        
+        # Usamos os próprios atributos para montar o dicionário
+        return {
+            self.asset_col_name: self.assets[idx],
+            self.label_col_name: int(self.labels[idx])
+        }
+
 class ClassPartitioner(Partitioner):
     """Partitions a dataset by class, ensuring each class appears in exactly one partition.
 
@@ -1442,6 +1469,9 @@ def get_weights(net):
     return [val.cpu().numpy() for _, val in net.state_dict().items()]
 
 def get_weights_gen(net):
+    return [val.cpu().numpy() for key, val in net.state_dict().items() if 'generator' in key or 'label' in key]
+
+def get_weights_disc(net):
     return [val.cpu().numpy() for key, val in net.state_dict().items() if 'discriminator' in key or 'label' in key]
 
 def set_weights(net, parameters):

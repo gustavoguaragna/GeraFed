@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import Context, ParametersRecord, array_from_numpy
 from Simulation.FLEG.task import (
+    DictTensorDataset,
     augment_client_with_generated,
     Net,
     Net_Cifar,
@@ -17,6 +18,7 @@ from Simulation.FLEG.task import (
     FeatureExtractor1_Cifar, FeatureExtractor2_Cifar, FeatureExtractor3_Cifar, FeatureExtractor4_Cifar,
     get_label_counts,
     get_weights,
+    get_weights_disc,
     load_data, 
     local_test,
     set_weights,
@@ -257,7 +259,7 @@ class FlowerClient(NumPyClient):
             self.client_state.parameters_records["disc_optim_state_dict"] = rec_optim
 
 
-            disc_params = get_weights(self.disc)
+            disc_params = get_weights_disc(self.disc)
 
             return (
             disc_params,
@@ -270,8 +272,10 @@ class FlowerClient(NumPyClient):
         elif config["model"] == "classifier":
             if self.dataset == "mnist":
                 self.net = Net(seed=self.seed)
+                asset_name = "image"
             elif self.dataset == "cifar10":
                 self.net = Net_Cifar(seed=self.seed)
+                asset_name = "img"
             if config["level"] == 0:
                 if self.dataset == "mnist":
                     self.classifier = Net(seed=self.seed)
@@ -339,7 +343,6 @@ class FlowerClient(NumPyClient):
                 if config["use_best_model"]:
                     self.classifier.load_state_dict(state_dict, strict=False)
             
-
             if config["best_model"]:
                 set_weights(self.net, parameters)
                 # Save all elements of the state_dict into a single RecordSet
@@ -365,9 +368,34 @@ class FlowerClient(NumPyClient):
             
             # Synthetic Data Augmentation
             # if checkpoint_level is not None and level == checkpoint_level:
-            #     generated_dataset = checkpoint_loaded['generated_dataset']
+                # generated_dataset = checkpoint_loaded['generated_dataset']
 
-            if len(config["embds"]) > 0:    
+            # 1. Carrega os dados recebidos via pickle (arrays puros)
+            dados_recebidos = pickle.loads(config["embds"])
+
+            if len(dados_recebidos["assets"]) > 0:    
+                
+                # 2. Converte para Tensores
+                gen_assets = torch.from_numpy(dados_recebidos["assets"]).to(self.device)
+                gen_labels = torch.from_numpy(dados_recebidos["labels"]).to(self.device)
+
+                #Salvar no contexto
+                record_data = ParametersRecord()
+                record_data["assets"] = array_from_numpy(dados_recebidos["assets"])
+                record_data["labels"] = array_from_numpy(dados_recebidos["labels"])
+                self.client_state.parameters_records["emb_sin"] = record_data
+
+                
+                # 3. Instancia o Wrapper (você define os nomes aqui UMA única vez)
+
+                embds_wrapper = DictTensorDataset(
+                    assets=gen_assets,
+                    labels=gen_labels,
+                    asset_col_name=asset_name, # Ajuste se no seu caso original era "embedding"
+                    label_col_name="label"
+                )
+
+                # Junta com dados locais
                 all_embeddings = []
                 all_labels = []
 
@@ -381,15 +409,77 @@ class FlowerClient(NumPyClient):
                         embeddings = embeddings.view(embeddings.size(0), -1)
                         all_embeddings.append(embeddings)
                         all_labels.append(labels.to(self.device))
+                        
                 final_embeddings = torch.cat(all_embeddings, dim=0)
                 final_labels = torch.cat(all_labels, dim=0)
-                embedding_dataset = EmbeddingPairDataset(final_embeddings, final_labels,
-                                                asset_col_name=config["embds"].asset_col_name,
-                                                label_col_name=config["embds"].label_col_name)
-            
+                
+                # 4. USO PURISTA: Puxando os atributos diretamente da instância do wrapper!
+                # Repare que isso é 100% idêntico ao seu código original.
+                embedding_dataset = EmbeddingPairDataset(
+                    final_embeddings, 
+                    final_labels,
+                    asset_col_name=embds_wrapper.asset_col_name, 
+                    label_col_name=embds_wrapper.label_col_name   
+                )
+
                 combined_ds, stats = augment_client_with_generated(
                     client_train=embedding_dataset,
-                    gen_dataset=config["embds"],
+                    gen_dataset=embds_wrapper,
+                    counts=counts,    
+                    strategy='threshold', 
+                    fill_to=int(len(embedding_dataset)/10),
+                    threshold=int(len(embedding_dataset)/10),
+                    rng_seed=42
+                )
+
+                print(f"Cliente {self.cid}: adicionou {stats['gen_selected_count']} amostras geradas para as classes {stats['desired_labels']}")
+                
+                trainloader_aug = DataLoader(combined_ds, batch_size=self.batch_size, shuffle=True)
+            elif "emb_sin" in self.client_state.parameters_records:
+                record_data = self.client_state.parameters_records["emb_sin"]
+            
+                # Recupera para PyTorch
+                assets_tensor = torch.from_numpy(record_data["assets"].numpy()).to(self.device)
+                labels_tensor = torch.from_numpy(record_data["labels"].numpy()).to(self.device)
+                
+                # Cria um dataset simples do PyTorch para ser usado no DataLoader
+                embds_wrapper = DictTensorDataset(
+                    assets=assets_tensor, 
+                    labels=labels_tensor,
+                    asset_col_name=asset_name, # Ajuste se você usou nomes diferentes na classe original
+                    label_col_name="label"
+                )
+                print(f"Dataset recuperado do contexto! Total de amostras: {len(dataset)}")
+
+                all_embeddings = []
+                all_labels = []
+
+                counts = get_label_counts(self.trainloader.dataset)
+                
+                with torch.no_grad():
+                    self.feature_extractor.eval()
+                    for batch in self.trainloader:
+                        images, labels = unpack_batch(batch, dataset=self.dataset)
+                        embeddings = self.feature_extractor(images.to(self.device))
+                        embeddings = embeddings.view(embeddings.size(0), -1)
+                        all_embeddings.append(embeddings)
+                        all_labels.append(labels.to(self.device))
+                        
+                final_embeddings = torch.cat(all_embeddings, dim=0)
+                final_labels = torch.cat(all_labels, dim=0)
+                
+                # 4. USO PURISTA: Puxando os atributos diretamente da instância do wrapper!
+                # Repare que isso é 100% idêntico ao seu código original.
+                embedding_dataset = EmbeddingPairDataset(
+                    final_embeddings, 
+                    final_labels,
+                    asset_col_name=embds_wrapper.asset_col_name, 
+                    label_col_name=embds_wrapper.label_col_name   
+                )
+
+                combined_ds, stats = augment_client_with_generated(
+                    client_train=embedding_dataset,
+                    gen_dataset=embds_wrapper,
                     counts=counts,    
                     strategy='threshold', 
                     fill_to=int(len(embedding_dataset)/10),
