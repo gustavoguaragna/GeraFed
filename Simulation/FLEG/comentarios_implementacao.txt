@@ -1,4 +1,5 @@
-Para deixar tiny:
+Para melhorar:
+- alterar metodo de instanciacao de classe do client_app para evitar if e elses, como em strategy
 - add rodada de transicao do alvo
 - Usar classes diferentes para gen e disc
 - compartilhar somente embeddings e adaptar traffic cost metrics
@@ -10,10 +11,11 @@ Para deixar tiny:
 - Nao é melhor fazer a avaliacao do teste local no fit antes de treinar, para evitar compartilhar paramentro duas vezes por rodada?
 - checkpoint controller
 - optim do adam no class tambem.
-
-Para testar:
+- limpar codigo
 - Nao compartilhar discs
 - deixar dados no context?
+- adicionar teste apos finetunning
+- mudar nomes das gans para ficar de acordo com o level
 
 
 

@@ -61,15 +61,16 @@ class FlowerClient(NumPyClient):
                 lr_disc: UserConfigValue,
                 latent_dim: UserConfigValue, 
                 context: Context,
+                trainloader,
+                testloader_local,
                 folder: UserConfigValue = ".",
                 num_chunks: UserConfigValue = 1,
                 num_partitions: UserConfigValue = 4,
                 partitioner: UserConfigValue = "ClassPartitioner",
                 alpha: Union(float, None) = None,
                 continue_epoch: UserConfigValue = 0,
-                num_epochs: UserConfigValue = 100,
                 seed: UserConfigValue = 42,
-                teste: UserConfigValue = False):
+                ):
         self.cid=cid
         self.local_epochs_alvo = local_epochs_alvo
         self.local_epochs_disc = local_epochs_disc
@@ -88,22 +89,11 @@ class FlowerClient(NumPyClient):
         self.partitioner = partitioner
         self.alpha = alpha
         self.continue_epoch = continue_epoch
-        self.num_epochs = num_epochs
         self.num_classes = 10 if dataset in ["mnist", "cifar10"] else None
         self.seed = seed
-        self.teste = teste
         
-        self.trainloader, self.testloader, self.testloader_local = load_data(
-            partition_id=self.cid,
-            num_partitions=self.num_partitions,
-            batch_size=self.batch_size,
-            dataset=self.dataset,
-            teste=self.teste,
-            partitioner_type=self.partitioner,
-            num_chunks=1,
-            alpha_dir=self.alpha_dir
-        )
-
+        self.trainloader = trainloader
+        self.testloader_local = testloader_local       
 
 
     def fit(self, parameters, config):
@@ -576,6 +566,7 @@ def client_fn(context: Context):
     continue_epoch     = context.run_config["continue_epoch"]
     dataset            = context.run_config["dataset"]
     strategy           = context.run_config["strategy"]
+    syn_input         = context.run_config["syn_input"]
 
     local_epochs_alvo  = context.run_config["epocas_alvo"]
     local_epochs_disc  = context.run_config["epocas_disc"]
@@ -591,14 +582,24 @@ def client_fn(context: Context):
         trial = 3
     else:
         trial = seed
-    folder             = f"{context.run_config['Exp_name_folder']}FLEG/{dataset}_{partitioner}_{strategy}_numchunks{num_chunks}_ganepochs{local_epochs_disc}_trial{trial}"
-    num_epochs         = context.run_config["num_epocas"]
+    folder             = f"{context.run_config['Exp_name_folder']}FLEG/{dataset}_{partitioner}_{strategy}_numchunks{num_chunks}_ganepochs{local_epochs_disc}_{syn_input}_fleg_trial{trial}"
 
 
     if continue_epoch != 0:
         checkpoint = torch.load(f"{folder}/checkpoint_epoch{continue_epoch}.pth", map_location=torch.device("cuda:0" if torch.cuda.is_available() else "cpu"))
         gan.load_state_dict(checkpoint['discs_state_dict'][partition_id])
         optim_D.load_state_dict(checkpoint['optimDs_state_dict'][partition_id])
+
+    trainloader, _, testloader_local = load_data(
+            partition_id=self.cid,
+            num_partitions=self.num_partitions,
+            batch_size=self.batch_size,
+            dataset=self.dataset,
+            teste=self.teste,
+            partitioner_type=self.partitioner,
+            num_chunks=1,
+            alpha_dir=self.alpha_dir
+        )
 
 
     # Return Client instance
@@ -617,9 +618,9 @@ def client_fn(context: Context):
                         partitioner=partitioner,
                         alpha=alpha_dir,
                         continue_epoch=continue_epoch,
-                        num_epochs=num_epochs,
                         seed=seed,
-                        teste=teste).to_client()
+                        trainloader=trainloader,
+                        testloader_local=testloader_local).to_client()
 
 
 # Flower ClientApp

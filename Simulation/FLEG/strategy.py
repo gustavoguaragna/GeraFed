@@ -22,14 +22,10 @@ from flwr.server.client_proxy import ClientProxy
 from flwr.server.strategy.aggregate import aggregate, aggregate_inplace, weighted_loss_avg
 
 from Simulation.FLEG.task import (
-    ClassifierHead1, ClassifierHead2, ClassifierHead3, ClassifierHead4,
-    ClassifierHead1_Cifar, ClassifierHead2_Cifar, ClassifierHead3_Cifar, ClassifierHead4_Cifar,
     Net,
     Net_Cifar,
-    EmbeddingGAN1, EmbeddingGAN2, EmbeddingGAN3, EmbeddingGAN4,
-    EmbeddingGAN1_Cifar, EmbeddingGAN2_Cifar, EmbeddingGAN3_Cifar, EmbeddingGAN4_Cifar,
-    FeatureExtractor1, FeatureExtractor2, FeatureExtractor3, FeatureExtractor4,
-    FeatureExtractor1_Cifar, FeatureExtractor2_Cifar, FeatureExtractor3_Cifar, FeatureExtractor4_Cifar,
+    EmbeddingGAN2, EmbeddingGAN3, EmbeddingGAN4,
+    EmbeddingGAN2_Cifar, EmbeddingGAN3_Cifar, EmbeddingGAN4_Cifar,
     GeneratedAssetDataset,
     set_weights,
     train_G,
@@ -118,12 +114,13 @@ class FLEG(Strategy):
         img_size: int = 28,
         latent_dim: int = 128,
         gan_arq: str = "f2u_gan",
-        gen_epochs: int = 2,
+        gen_iter: int = 2,
         teste: bool = False,
         lr_gen: float = 0.0002,
         folder: str = ".",
         num_chunks: int = 1,
         patience: int = 10,
+        gan_epochs: int = 25,
         gen,
         optimG_state_dict = None,
         continue_epoch:int = 0,
@@ -161,7 +158,7 @@ class FLEG(Strategy):
         self.img_size = img_size
         self.latent_dim = latent_dim
         self.gan_arq = gan_arq
-        self.gen_epochs = gen_epochs
+        self.gen_iter = gen_iter
         self.teste = teste
         self.lr_gen = lr_gen
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -169,8 +166,8 @@ class FLEG(Strategy):
         self.gen = gen.to(self.device)
         self.optimG_state_dict = optimG_state_dict if optimG_state_dict else None
         self.num_chunks = num_chunks
-        self.freq_save = self.num_chunks // 10 if self.num_chunks >= 10 else 1
         self.continue_epoch = continue_epoch
+        self.gan_epochs = gan_epochs
         self.lvl = 0
         self.best_accuracy = 0
         self.net_epochs = 0
@@ -180,14 +177,6 @@ class FLEG(Strategy):
         self.finished = False
         self.valloader = valloader
         self.seed = seed
-        self.size_classifier = {
-            'cifar10': {1: 0.25, 2: 0.248, 3: 0.238, 4: 0.045, 5: 0.004},
-            'mnist': {1: 0.18, 2: 0.179, 3: 0.169, 4: 0.045, 5: 0.004}
-        }
-        self.size_disc = {
-            'cifar10': {1: 18.12, 2: 3.79, 3: 0.79, 4: 0.23},
-            'mnist': {1: 5.69, 2: 1.08, 3: 0.8, 4: 0.23}
-        }
         self.embds = GeneratedAssetDataset(generator=gen, num_samples=0)
         self.newlvl= True
         self.training_gan = False
@@ -224,41 +213,20 @@ class FLEG(Strategy):
                         "traffic_cost_discriminator": [],
                         "epoch_transition": [],
                     },
-        self.fe= {
-            "mnist": {
-                1: FeatureExtractor1, 2: FeatureExtractor2,
-                3: FeatureExtractor3, 4: FeatureExtractor4,
-            },
-            "cifar10": {
-                1: FeatureExtractor1_Cifar, 2: FeatureExtractor2_Cifar,
-                3: FeatureExtractor3_Cifar, 4: FeatureExtractor4_Cifar,
-            },
-        },
-        self.ch = {
-            "mnist": {
-                1: ClassifierHead1, 2: ClassifierHead2,
-                3: ClassifierHead3, 4: ClassifierHead4,
-            },
-            "cifar10": {
-                1: ClassifierHead1_Cifar, 2: ClassifierHead2_Cifar,
-                3: ClassifierHead3_Cifar, 4: ClassifierHead4_Cifar,
-            },
-        }
+
         self.gan = {
             "mnist": {
-                1: EmbeddingGAN1, 2: EmbeddingGAN2, 3: EmbeddingGAN3, 4: EmbeddingGAN4,
+                1: EmbeddingGAN2, 2: EmbeddingGAN3, 3: EmbeddingGAN4,
             },
             "cifar10": {
-                1: EmbeddingGAN1_Cifar, 2: EmbeddingGAN2_Cifar,
-                3: EmbeddingGAN3_Cifar, 4: EmbeddingGAN4_Cifar,
+                1: EmbeddingGAN2_Cifar, 2: EmbeddingGAN3_Cifar, 3: EmbeddingGAN4_Cifar,
             },
         }
-
 
             
     def __repr__(self) -> str:
         """Compute a string representation of the strategy."""
-        rep = f"GeraFed(accept_failures={self.accept_failures})"
+        rep = f"FLEG(accept_failures={self.accept_failures})"
         return rep
 
 
@@ -307,7 +275,7 @@ class FLEG(Strategy):
         else:    
             if self.newlvl:
                 self.init_lvl_time = time.time()
-                self.epoch_gan = 0
+                self.epoch_gan = 1
                 self.round_gan = 0
             
             self.init_round_time = time.time()
@@ -345,6 +313,8 @@ class FLEG(Strategy):
                 config["best_model"] = False
                 if self.newlvl:
                     config["embds"] = pickle.dumps(self.embds)
+                    tamanho_embds = get_model_size_mb([self.embds["assets"], self.embds["labels"]])
+                    self.metrics_dict["traffic_cost_embeddings"].append(tamanho_embds)
                     self.newlvl = False
                     config["use_best_model"] = True
                 else:
@@ -370,7 +340,7 @@ class FLEG(Strategy):
             return []
 
         # Parameters and config
-        config = {"round": server_round, "level": self.lvl}
+        config = {"round": self.net_epochs, "level": self.lvl}
         if self.on_evaluate_config_fn is not None:
             # Custom evaluation config function provided
             config = self.on_evaluate_config_fn(server_round)
@@ -402,7 +372,7 @@ class FLEG(Strategy):
             return None, {}
 
         if self.training_gan:
-             # Define os pesos do modelo
+            # Define os pesos do modelo
             disc_ndarrays = {fit_res.metrics["cid"]: parameters_to_ndarrays(fit_res.parameters) for _, fit_res in results}
             gan_class = self.gen.__class__
             self.discs = [gan_class().to(self.device) for _ in range(len(disc_ndarrays))]
@@ -413,7 +383,7 @@ class FLEG(Strategy):
             g_loss, self.optimG_state_dict = train_G(
             net=self.gen,
             discs=self.discs,
-            epochs=self.gen_epochs,
+            epochs=self.gen_iter,
             lr=self.lr_gen,
             device=self.device,
             latent_dim=self.latent_dim,
@@ -454,13 +424,6 @@ class FLEG(Strategy):
                 raise ValueError(f"input strategy should be fixed or dynamic. Got {self.syn_input}")
 
             if self.epoch_gan == 25:
-                checkpoint = {
-                    'global_net_state_dict': self.global_net.state_dict(),
-                    'generated_dataset' : self.embds,
-                }
-                checkpoint_file = f"{self.folder}/checkpoint_level{self.lvl}.pth"
-                torch.save(checkpoint, checkpoint_file)
-                print(f"Global net saved to {checkpoint_file}")
 
                 epoch_time = time.time() - self.init_epoch_time
                 self.metrics_dict["time_epoch_gan"].append(epoch_time)
@@ -487,25 +450,17 @@ class FLEG(Strategy):
                     "labels": labels_numpy
                 }
 
+                checkpoint = {
+                    'global_net_state_dict': self.global_net.state_dict(),
+                    'generated_dataset' : self.embds,
+                }
+                checkpoint_file = f"{self.folder}/checkpoint_level{self.lvl}.pth"
+                torch.save(checkpoint, checkpoint_file)
+                print(f"Global net saved to {checkpoint_file}")
+
                 self.newlvl= True
                 self.lvl += 1
-                if self.lvl == 1:
-                    if self.dataset == "mnist":
-                        self.gen = EmbeddingGAN2(seed=self.seed).to(self.device)
-                    elif self.dataset == "cifar10":
-                        self.gen = EmbeddingGAN2_Cifar(seed=self.seed).to(self.device)
-                elif self.lvl == 2:
-                    if self.dataset == "mnist":
-                        self.gen = EmbeddingGAN3(seed=self.seed).to(self.device)
-                    elif self.dataset == "cifar10":
-                        self.gen = EmbeddingGAN3_Cifar(seed=self.seed).to(self.device)
-                elif self.lvl == 3:
-                    if self.dataset == "mnist":
-                        self.gen = EmbeddingGAN4(seed=self.seed).to(self.device)
-                    elif self.dataset == "cifar10":
-                        self.gen = EmbeddingGAN4_Cifar(seed=self.seed).to(self.device)
-                else:
-                    raise ValueError(f"Levels should be between 0 and 3. Got {self.lvl}")
+                self.gen = self.gan[self.dataset][self.lvl](seed=self.seed).to(self.device)
 
                 self.metrics_dict["level_time"].append(time.time() - self.init_lvl_time)
 
@@ -629,7 +584,7 @@ class FLEG(Strategy):
                     self.best_model.load_state_dict(self.global_net.state_dict())
                 else:
                     self.epochs_no_improve += 1
-                    print(f"Sem melhorias por {self.epochs_no_improve} épocas. Melhor acurácia: {best_accuracy:.4f}")
+                    print(f"Sem melhorias por {self.epochs_no_improve} épocas. Melhor acurácia: {self.best_accuracy:.4f}")
                 
                 if self.epochs_no_improve > self.patience:
                     if self.lvl < self.levels:
@@ -686,15 +641,8 @@ class FLEG(Strategy):
         self.metrics_dict["local_acc_epoch"].append(accuracy_aggregated)
 
         self.metrics_dict["time_epoch"].append(time.time() - self.init_round_time)
-        
-        # accuracies = [
-        #     evaluate_res.metrics["accuracy"] * evaluate_res.num_examples
-        #     for _, evaluate_res in results
-        # ]
-        # examples = [evaluate_res.num_examples for _, evaluate_res in results]
-        # accuracy_aggregated = (
-        #     sum(accuracies) / sum(examples) if sum(examples) != 0 else 0
-        # )
+
+        metrics_aggregated = {"loss": loss_aggregated, "accuracy": accuracy_aggregated}
 
         return loss_aggregated, metrics_aggregated
 

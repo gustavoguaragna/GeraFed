@@ -55,7 +55,8 @@ def server_fn(context: Context):
     latent_dim        = context.run_config["tam_ruido"]
     gan_arq           = context.run_config["gan_arq"]
     lr_gen            = context.run_config["learn_rate_gen"]
-    gen_epochs        = context.run_config["epocas_gen"]
+    gen_iter        = context.run_config["epocas_gen"]
+    gan_epochs = context.run_config["epocas_disc"]
     teste             = context.run_config["teste"]
     num_partitions    = context.run_config["num_clients"]
     partitioner       = context.run_config["partitioner"]
@@ -71,7 +72,15 @@ def server_fn(context: Context):
     patience          = context.run_config["patience"]
     syn_input         = context.run_config["syn_input"]
     levels            = context.run_config["levels"]
-    folder            = f"{context.run_config['Exp_name_folder']}FedGenIA_F2U/{dataset}/{partitioner}/{strategy}/{num_partitions}_clients"
+    if seed == 42:
+        trial = 1
+    elif seed == 30:
+        trial = 2
+    elif seed == 20:
+        trial = 3
+    else:
+        trial = seed
+    folder            = f"{context.run_config['Exp_name_folder']}FLEG/{dataset}_{partitioner}_{strategy}_numchunks{num_chunks}_ganepochs{gan_epochs}_{syn_input}_fleg_trial{trial}"
     os.makedirs(folder, exist_ok=True)
     
     # Initialize model parameters
@@ -97,15 +106,12 @@ def server_fn(context: Context):
             num_chunks=1,
             alpha_dir=alpha_dir
         )
-    
-    print(f"Tamanho dataset")
 
-    if continue_epoch != 0:
-        checkpoint = torch.load(f"{folder}/checkpoint_epoch{continue_epoch}.pth", map_location=torch.device("cuda:0" if torch.cuda.is_available() else "cpu"))
-        classifier.load_state_dict(checkpoint['classifier_state_dict'])
-        gen.load_state_dict(checkpoint['gen_state_dict'])
-        optimGstate_dict = checkpoint['optim_G_state_dict']
-
+    # if continue_epoch != 0:
+    #     checkpoint = torch.load(f"{folder}/checkpoint_epoch{continue_epoch}.pth", map_location=torch.device("cuda:0" if torch.cuda.is_available() else "cpu"))
+    #     classifier.load_state_dict(checkpoint['classifier_state_dict'])
+    #     gen.load_state_dict(checkpoint['gen_state_dict'])
+    #     optimGstate_dict = checkpoint['optim_G_state_dict']
     
     ndarrays_alvo = get_weights(classifier)
     ndarrays_gen  = get_weights(gen)
@@ -126,7 +132,8 @@ def server_fn(context: Context):
         img_size=img_size,
         latent_dim=latent_dim,
         gan_arq=gan_arq,
-        gen_epochs=gen_epochs,
+        gen_iter=gen_iter,
+        gan_epochs=gan_epochs,
         teste=teste,
         folder=folder,
         num_chunks=num_chunks,

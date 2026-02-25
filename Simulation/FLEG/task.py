@@ -1105,13 +1105,13 @@ def load_data(partition_id: int,
               alpha_dir: float = 0.1, 
               num_chunks: int = 1) -> tuple[Union[DataLoader, List], DataLoader, DataLoader]:
     
-    """Carrega MNIST com splits de treino e teste separados. Se syn_samples > 0, inclui dados gerados."""
+    """Carrega dataset com splits de treino e teste separados."""
    
     global fds
 
     if fds is None:
         print(f"Carregamento dos Dados - {dataset}")
-        if partitioner_type == "Dir":
+        if "Dir" in partitioner_type:
             print("Dados por Dirichlet")
             partitioner = DirichletPartitioner(
                 num_partitions=num_partitions,
@@ -1120,7 +1120,7 @@ def load_data(partition_id: int,
                 min_partition_size=0,
                 self_balancing=False
             )
-        elif partitioner_type == "Class":
+        elif "Class" in partitioner_type:
             print("Dados por classe")
             partitioner = ClassPartitioner(num_partitions=num_partitions, seed=42)
         else:
