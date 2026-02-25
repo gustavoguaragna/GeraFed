@@ -17,5 +17,5 @@ Para melhorar:
 - adicionar teste apos finetunning
 - mudar nomes das gans para ficar de acordo com o level
 
-
+ESTOU LENDO O CLIENT_APP, LI SÓ O INIT, PAREI NO FIT
 
