@@ -11,8 +11,8 @@ from Simulation.FLEG.task import (
     Net_Cifar,
     ClassifierHead1, ClassifierHead2, ClassifierHead3, ClassifierHead4,
     ClassifierHead1_Cifar, ClassifierHead2_Cifar, ClassifierHead3_Cifar, ClassifierHead4_Cifar,
-    EmbeddingGAN0, EmbeddingGAN2, EmbeddingGAN3, EmbeddingGAN4,
-    EmbeddingGAN0_Cifar, EmbeddingGAN2_Cifar, EmbeddingGAN3_Cifar, EmbeddingGAN4_Cifar,
+    EmbeddingGAN0, EmbeddingGAN1, EmbeddingGAN2, EmbeddingGAN3,
+    EmbeddingGAN0_Cifar, EmbeddingGAN1_Cifar, EmbeddingGAN2_Cifar, EmbeddingGAN3_Cifar,
     EmbeddingPairDataset,
     FeatureExtractor1, FeatureExtractor2, FeatureExtractor3, FeatureExtractor4,
     FeatureExtractor1_Cifar, FeatureExtractor2_Cifar, FeatureExtractor3_Cifar, FeatureExtractor4_Cifar,
@@ -109,6 +109,16 @@ class FlowerClient(NumPyClient):
 
             elif config["level"] == 1:
                 if self.dataset == "mnist":
+                    self.gen = EmbeddingGAN1(seed=self.seed)
+                    self.disc = EmbeddingGAN1(seed=self.seed)
+                elif self.dataset == "cifar10":
+                    self.gen = EmbeddingGAN1_Cifar(seed=self.seed)
+                    self.disc = EmbeddingGAN1_Cifar(seed=self.seed)
+                else:
+                    raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {self.dataset} não reconhecido")
+
+            elif config["level"] == 2:
+                if self.dataset == "mnist":
                     self.gen = EmbeddingGAN2(seed=self.seed)
                     self.disc = EmbeddingGAN2(seed=self.seed)
                 elif self.dataset == "cifar10":
@@ -117,23 +127,13 @@ class FlowerClient(NumPyClient):
                 else:
                     raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {self.dataset} não reconhecido")
 
-            elif config["level"] == 2:
+            elif config["level"] == 3:
                 if self.dataset == "mnist":
                     self.gen = EmbeddingGAN3(seed=self.seed)
                     self.disc = EmbeddingGAN3(seed=self.seed)
                 elif self.dataset == "cifar10":
                     self.gen = EmbeddingGAN3_Cifar(seed=self.seed)
                     self.disc = EmbeddingGAN3_Cifar(seed=self.seed)
-                else:
-                    raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {self.dataset} não reconhecido")
-
-            elif config["level"] == 3:
-                if self.dataset == "mnist":
-                    self.gen = EmbeddingGAN4(seed=self.seed)
-                    self.disc = EmbeddingGAN4(seed=self.seed)
-                elif self.dataset == "cifar10":
-                    self.gen = EmbeddingGAN4_Cifar(seed=self.seed)
-                    self.disc = EmbeddingGAN4_Cifar(seed=self.seed)
                 else:
                     raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {self.dataset} não reconhecido")
             
@@ -280,7 +280,7 @@ class FlowerClient(NumPyClient):
                     raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {self.dataset} não reconhecido")
             
             else:
-                raise ValueError(f"Treino da GAN vai até nível 3 (4° nível), não deveria receber config['level'] {config['level']}.")
+                raise ValueError(f"Treino vai até nível 4 (5° nível), não deveria receber config['level'] {config['level']}.")
             
 
             # Atualiza pesos do modelo classificador
@@ -368,8 +368,7 @@ class FlowerClient(NumPyClient):
                 final_embeddings = torch.cat(all_embeddings, dim=0)
                 final_labels = torch.cat(all_labels, dim=0)
                 
-                # 4. USO PURISTA: Puxando os atributos diretamente da instância do wrapper!
-                # Repare que isso é 100% idêntico ao seu código original.
+                # 4. Puxando os atributos diretamente da instância do wrapper
                 embedding_dataset = EmbeddingPairDataset(
                     final_embeddings, 
                     final_labels,
@@ -390,6 +389,7 @@ class FlowerClient(NumPyClient):
                 print(f"Cliente {self.cid}: adicionou {stats['gen_selected_count']} amostras geradas para as classes {stats['desired_labels']}")
                 
                 trainloader_aug = DataLoader(combined_ds, batch_size=self.batch_size, shuffle=True)
+
             elif "emb_sin" in self.client_state.parameters_records:
                 record_data = self.client_state.parameters_records["emb_sin"]
             
@@ -556,13 +556,13 @@ def client_fn(context: Context):
         optim_D.load_state_dict(checkpoint['optimDs_state_dict'][partition_id])
 
     trainloader, _, testloader_local = load_data(
-            partition_id=self.cid,
-            num_partitions=self.num_partitions,
-            batch_size=self.batch_size,
-            dataset=self.dataset,
-            teste=self.teste,
-            partitioner_type=self.partitioner,
-            num_chunks=1,
+            partition_id=partition_id,
+            num_partitions=num_partitions,
+            batch_size=batch_size,
+            dataset=dataset,
+            teste=teste,
+            partitioner_type=partitioner,
+            num_chunks=num_chunks,
             alpha_dir=self.alpha_dir
         )
 

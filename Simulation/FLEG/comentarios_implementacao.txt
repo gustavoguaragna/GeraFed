@@ -1,4 +1,5 @@
 Para melhorar:
+- ao inves de salvar os dados sinteticos recebidos no contexto do cliente, salvar conjunto aumentado para evitar a filtragem toda rodada.
 - alterar metodo de instanciacao de classe do client_app para evitar if e elses, como em strategy
 - add rodada de transicao do alvo
 - Usar classes diferentes para gen e disc
@@ -9,13 +10,12 @@ Para melhorar:
 - ver se deixar dataset inteiro no context é mais eficiente
 - ver se o self.finished no aggregate nao eh redundante com not results
 - Nao é melhor fazer a avaliacao do teste local no fit antes de treinar, para evitar compartilhar paramentro duas vezes por rodada?
-- checkpoint controller
+- checkpoint controller/continue epoch
 - optim do adam no class tambem.
 - limpar codigo
 - Nao compartilhar discs
 - deixar dados no context?
 - adicionar teste apos finetunning
-- mudar levels para ir de 1 a 5 ao inves de 0 a 4
 - adicionar teste global
 - adicionar f1
 - adicionar auc
@@ -24,5 +24,6 @@ Para melhorar:
 - inverter ordem de if no fit client_app.py para vir primeiro parte do classificador e depois generativo. No aggregate_fit do strategy.py tb
 - entender necessidade de compartilhar o tamanho do dataset após treinar a disacriminadora. Acho que precisa compartilhar um valor pelo flwr, mas como acho que não uso no strategy, pode ser 1.
 
-ESTOU LENDO O CLIENT_APP, ESTOU NO FIT ANTES DE COMEÇAR O ELID MODEL = CLASSIFIER
+
+
 

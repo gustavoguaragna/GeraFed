@@ -355,10 +355,10 @@ class BaseEmbeddingGAN(nn.Module):
         return self.adv_loss(output, label)
 
 # --- GAN NÍVEL 1 (Embedding Dim: 864) ---
-class EmbeddingGAN1(BaseEmbeddingGAN):
+class EmbeddingGAN0(BaseEmbeddingGAN):
     def __init__(self, latent_dim=128, embedding_dim=864, condition=True, seed=42):
         if seed is not None: torch.manual_seed(seed)
-        super(EmbeddingGAN1, self).__init__()
+        super(EmbeddingGAN0, self).__init__()
         self.latent_dim = latent_dim
         self.embedding_dim = embedding_dim
         self.condition = condition
@@ -386,10 +386,10 @@ class EmbeddingGAN1(BaseEmbeddingGAN):
         )
 
 # --- GAN NÍVEL 2 (Embedding Dim: 256) ---
-class EmbeddingGAN2(BaseEmbeddingGAN):
+class EmbeddingGAN1(BaseEmbeddingGAN):
     def __init__(self, latent_dim=128, embedding_dim=256, condition=True, seed=42):
         if seed is not None: torch.manual_seed(seed)
-        super(EmbeddingGAN2, self).__init__()
+        super(EmbeddingGAN1, self).__init__()
         self.latent_dim = latent_dim
         self.embedding_dim = embedding_dim # 16 * 4 * 4 = 256
         self.condition = condition
@@ -417,10 +417,10 @@ class EmbeddingGAN2(BaseEmbeddingGAN):
         )
 
 # --- GAN NÍVEL 3 (Embedding Dim: 120) ---
-class EmbeddingGAN3(BaseEmbeddingGAN):
+class EmbeddingGAN2(BaseEmbeddingGAN):
     def __init__(self, latent_dim=128, embedding_dim=120, condition=True, seed=42):
         if seed is not None: torch.manual_seed(seed)
-        super(EmbeddingGAN3, self).__init__()
+        super(EmbeddingGAN2, self).__init__()
         self.latent_dim = latent_dim
         self.embedding_dim = embedding_dim
         self.condition = condition
@@ -448,10 +448,10 @@ class EmbeddingGAN3(BaseEmbeddingGAN):
         )
 
 # --- GAN NÍVEL 4 (Embedding Dim: 84) ---
-class EmbeddingGAN4(BaseEmbeddingGAN):
+class EmbeddingGAN3(BaseEmbeddingGAN):
     def __init__(self, latent_dim=128, embedding_dim=84, condition=True, seed=42):
         if seed is not None: torch.manual_seed(seed)
-        super(EmbeddingGAN4, self).__init__()
+        super(EmbeddingGAN3, self).__init__()
         self.latent_dim = latent_dim
         self.embedding_dim = embedding_dim
         self.condition = condition
@@ -479,10 +479,10 @@ class EmbeddingGAN4(BaseEmbeddingGAN):
         )
 
 # --- GAN NÍVEL 1 CIFAR (Embedding Dim: 1176) ---
-class EmbeddingGAN1_Cifar(BaseEmbeddingGAN):
+class EmbeddingGAN0_Cifar(BaseEmbeddingGAN):
     def __init__(self, latent_dim=128, embedding_dim=1176, condition=True, seed=42):
         if seed is not None: torch.manual_seed(seed)
-        super(EmbeddingGAN1_Cifar, self).__init__()
+        super(EmbeddingGAN0_Cifar, self).__init__()
         self.latent_dim = latent_dim
         self.embedding_dim = embedding_dim
         self.condition = condition
@@ -511,10 +511,10 @@ class EmbeddingGAN1_Cifar(BaseEmbeddingGAN):
             nn.Linear(1024, 1)
         )
 
-class EmbeddingGAN2_Cifar(BaseEmbeddingGAN):
+class EmbeddingGAN1_Cifar(BaseEmbeddingGAN):
     def __init__(self, latent_dim=128, embedding_dim=400, condition=True, seed=42):
         if seed is not None: torch.manual_seed(seed)
-        super(EmbeddingGAN2_Cifar, self).__init__()
+        super(EmbeddingGAN1_Cifar, self).__init__()
         self.latent_dim = latent_dim
         self.embedding_dim = embedding_dim
         self.condition = condition
@@ -541,10 +541,10 @@ class EmbeddingGAN2_Cifar(BaseEmbeddingGAN):
             nn.Linear(512, 1)
         )
 
-class EmbeddingGAN3_Cifar(BaseEmbeddingGAN):
+class EmbeddingGAN2_Cifar(BaseEmbeddingGAN):
     def __init__(self, latent_dim=128, embedding_dim=120, condition=True, seed=42):
         if seed is not None: torch.manual_seed(seed)
-        super(EmbeddingGAN3_Cifar, self).__init__()
+        super(EmbeddingGAN2_Cifar, self).__init__()
         self.latent_dim = latent_dim
         self.embedding_dim = embedding_dim
         self.condition = condition
@@ -571,10 +571,10 @@ class EmbeddingGAN3_Cifar(BaseEmbeddingGAN):
             nn.Linear(256, 1)
         )
     
-class EmbeddingGAN4_Cifar(BaseEmbeddingGAN):
+class EmbeddingGAN3_Cifar(BaseEmbeddingGAN):
     def __init__(self, latent_dim=128, embedding_dim=84, condition=True, seed=42):
         if seed is not None: torch.manual_seed(seed)
-        super(EmbeddingGAN4_Cifar, self).__init__()
+        super(EmbeddingGAN3_Cifar, self).__init__()
         self.latent_dim = latent_dim
         self.embedding_dim = embedding_dim
         self.condition = condition
