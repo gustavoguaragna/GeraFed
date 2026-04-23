@@ -169,7 +169,7 @@ class FlowerClient(NumPyClient):
                 trainloader_chunk = self.trainloader
 
             train_disc_start_time = time.time()
-            # Treina o modelo generativo
+            # Treina a discriminadora
             avg_d_loss = train_disc(
             disc=self.disc,
             gen=self.gen,
@@ -190,15 +190,6 @@ class FlowerClient(NumPyClient):
                 p_record[k] = array_from_numpy(v.detach().cpu().numpy())
             # Add to a context
             self.client_state.parameters_records["disc_parameters"] = p_record
-
-            # # Save all elements of the optim.state_dict into a single RecordSet    
-            # optim_records = [ParametersRecord() for _ in self.optim_D.state_dict()['state'].keys()]
-            # for p in self.optim_D.state_dict()['state'].keys():
-            #     for k, v in self.optim_D.state_dict()['state'][p].items():
-            #         # Convert to NumPy, then to Array. Add to self.client_state
-            #         optim_records[p][k] = array_from_numpy(v.detach().cpu().numpy())
-            #     # Add to a context
-            #     self.client_state.parameters_records[f"optim_parameter{p}"] = optim_records[p]
             
             # Save optimizer state_dict fully (state + param_groups)
             # --- Save discriminator model parameters ---

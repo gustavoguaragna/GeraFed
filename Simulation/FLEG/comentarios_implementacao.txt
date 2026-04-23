@@ -21,7 +21,8 @@ Para melhorar:
 - adicionar auc
 - salvar embeddings gerados para posteriores analises
 - verificar seeds
-- inverter ordem de if no fit client app para vir primeiro parte do classificador e depois generativo
+- inverter ordem de if no fit client_app.py para vir primeiro parte do classificador e depois generativo. No aggregate_fit do strategy.py tb
+- entender necessidade de compartilhar o tamanho do dataset após treinar a disacriminadora. Acho que precisa compartilhar um valor pelo flwr, mas como acho que não uso no strategy, pode ser 1.
 
-ESTOU LENDO O CLIENT_APP, LI SÓ O INIT, PAREI NO FIT
+ESTOU LENDO O CLIENT_APP, ESTOU NO FIT ANTES DE COMEÇAR O ELID MODEL = CLASSIFIER
 
