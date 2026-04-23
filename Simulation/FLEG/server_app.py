@@ -6,8 +6,8 @@ from flwr.server import ServerApp, ServerAppComponents, ServerConfig
 from Simulation.FLEG.task import(
     Net, 
     Net_Cifar, 
-    EmbeddingGAN1,
-    EmbeddingGAN1_Cifar,
+    EmbeddingGAN0,
+    EmbeddingGAN0_Cifar,
     get_weights,
     load_data
 )
@@ -18,7 +18,6 @@ import torch
 
 # import random
 # import numpy as np
-# import torch
 # from collections import Counter
  
 # SEED = 42
@@ -86,12 +85,12 @@ def server_fn(context: Context):
     # Initialize model parameters
     if dataset == "mnist":
         classifier = Net(seed=seed)
-        gen = EmbeddingGAN1(
+        gen = EmbeddingGAN0(
                 seed=seed
                 )
     elif dataset == "cifar10":
         classifier = Net_Cifar(seed=seed)
-        gen = EmbeddingGAN1_Cifar(
+        gen = EmbeddingGAN0_Cifar(
             seed=seed
         )
 
@@ -103,7 +102,7 @@ def server_fn(context: Context):
             dataset=dataset,
             teste=teste,
             partitioner_type=partitioner,
-            num_chunks=1,
+            num_chunks=num_chunks,
             alpha_dir=alpha_dir
         )
 

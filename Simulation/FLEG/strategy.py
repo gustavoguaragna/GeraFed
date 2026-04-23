@@ -24,8 +24,8 @@ from flwr.server.strategy.aggregate import aggregate, aggregate_inplace, weighte
 from Simulation.FLEG.task import (
     Net,
     Net_Cifar,
-    EmbeddingGAN2, EmbeddingGAN3, EmbeddingGAN4,
-    EmbeddingGAN2_Cifar, EmbeddingGAN3_Cifar, EmbeddingGAN4_Cifar,
+    EmbeddingGAN1, EmbeddingGAN2, EmbeddingGAN3,
+    EmbeddingGAN1_Cifar, EmbeddingGAN2_Cifar, EmbeddingGAN3_Cifar,
     GeneratedAssetDataset,
     set_weights,
     train_G,
@@ -36,15 +36,8 @@ import torch
 import pickle
 import time
 import json
-import numpy as np
 import math
 
-WARNING_MIN_AVAILABLE_CLIENTS_TOO_LOW = """
-    Setting `min_available_clients` lower than `min_fit_clients` or
-    `min_evaluate_clients` can cause the server to fail when there are too few clients
-    connected to the server. `min_available_clients` must be set to a value larger
-    than or equal to the values of `min_fit_clients` and `min_evaluate_clients`.
-    """
 class FLEG(Strategy):
 
     """FLEG Strategy.
@@ -130,12 +123,7 @@ class FLEG(Strategy):
         seed: int = 42
     ) -> None:
         super().__init__()
-
-        if (
-            min_fit_clients > min_available_clients
-            or min_evaluate_clients > min_available_clients
-        ):
-            log(WARNING, WARNING_MIN_AVAILABLE_CLIENTS_TOO_LOW)
+  
 
         self.fraction_fit_alvo = fraction_fit_alvo
         self.fraction_fit_gen = fraction_fit_gen
@@ -216,10 +204,10 @@ class FLEG(Strategy):
 
         self.gan = {
             "mnist": {
-                1: EmbeddingGAN2, 2: EmbeddingGAN3, 3: EmbeddingGAN4,
+                1: EmbeddingGAN1, 2: EmbeddingGAN2, 3: EmbeddingGAN3,
             },
             "cifar10": {
-                1: EmbeddingGAN2_Cifar, 2: EmbeddingGAN3_Cifar, 3: EmbeddingGAN4_Cifar,
+                1: EmbeddingGAN1_Cifar, 2: EmbeddingGAN2_Cifar, 3: EmbeddingGAN3_Cifar,
             },
         }
 
