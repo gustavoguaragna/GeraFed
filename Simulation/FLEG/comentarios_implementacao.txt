@@ -1,21 +1,19 @@
 Para melhorar:
 - creio que num_samples pode ser definida dentro da if clause de self.epoch_gan == 25
 - reavaliar contabilizacao dos custos de rede se quero fazer total ou por cliente.
-- ao inves de salvar os dados sinteticos recebidos no contexto do cliente, salvar conjunto aumentado para evitar a filtragem toda rodada.
+- ver se deixar dataset inteiro no context é mais eficiente, ao inves de salvar os dados sinteticos recebidos no contexto do cliente, salvar conjunto aumentado para evitar a filtragem toda rodada.
 - alterar metodo de instanciacao de classe do client_app para evitar if e elses, como em strategy
-- add rodada de transicao do alvo
-- Usar classes diferentes para gen e disc
-- compartilhar somente embeddings e adaptar traffic cost metrics
-- compartilhar somente updates e adaptar traffic cost metrics
 - add tempo de carregamento dados e modelos (acertar medidas de tempo)
+- inverter ordem de if no fit client_app.py para vir primeiro parte do classificador e depois generativo. No aggregate_fit e configure_fit do strategy.py tb
+- Nao compartilhar discs
+- checkpoint controller/continue epoch
+- compartilhar somente embeddings e adaptar traffic cost metrics
+- Usar classes diferentes para gen e disc
+- compartilhar somente updates e adaptar traffic cost metrics
 - ver se counts deixar no context é mais eficiente
-- ver se deixar dataset inteiro no context é mais eficiente
 - ver se o self.finished no aggregate nao eh redundante com not results
 - Nao é melhor fazer a avaliacao do teste local no fit antes de treinar, para evitar compartilhar paramentro duas vezes por rodada?
-- checkpoint controller/continue epoch
 - optim do adam no class tambem.
-- limpar codigo
-- Nao compartilhar discs
 - deixar dados no context?
 - adicionar teste apos finetunning
 - adicionar teste global
@@ -23,13 +21,10 @@ Para melhorar:
 - adicionar auc
 - salvar embeddings gerados para posteriores analises
 - verificar seeds
-- inverter ordem de if no fit client_app.py para vir primeiro parte do classificador e depois generativo. No aggregate_fit e configure_fit do strategy.py tb
 - entender necessidade de compartilhar o tamanho do dataset após treinar a disacriminadora. Acho que precisa compartilhar um valor pelo flwr, mas como acho que não uso no strategy, pode ser 1.
 - manter fraction_fit constante sem ser hiperparametro, como esta no pyproject e no serverapp. Avaliar tambem outros valores para deixar de aparecerem como hiperparametros: latent_dim, lr, img_size, gan_arq.
-- adicionar docstrings nas funcoes e classes, assim como retorno das funcoes
-
-FINALIZEI O CLIETN_APP, serverapp e strategy, falta task
+- limpar codigo - adicionar docstrings nas funcoes e classes, assim como retorno das funcoes e ajeitar comentarios
 
 
-
+CORRIGINDO ERROS DE RODAGEM
 

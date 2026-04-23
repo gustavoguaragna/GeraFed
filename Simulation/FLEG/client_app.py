@@ -65,7 +65,7 @@ class FlowerClient(NumPyClient):
                 num_chunks: int = 1,
                 num_partitions: int = 4,
                 partitioner: str = "ClassPartitioner",
-                alpha: Union(float, None) = None,
+                alpha: Union[float, None] = None,
                 continue_epoch: int = 0,
                 seed: int = 42,
                 ):

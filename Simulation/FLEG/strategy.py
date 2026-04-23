@@ -21,6 +21,8 @@ from flwr.server.client_proxy import ClientProxy
 
 from flwr.server.strategy.aggregate import aggregate, aggregate_inplace, weighted_loss_avg
 
+from collections import defaultdict
+
 from Simulation.FLEG.task import (
     Net,
     Net_Cifar,
@@ -165,7 +167,7 @@ class FLEG(Strategy):
         self.finished = False
         self.valloader = valloader
         self.seed = seed
-        self.embds = GeneratedAssetDataset(generator=gen, num_samples=0)
+        self.embds = defaultdict(list)
         self.newlvl= True
         self.training_gan = False
         if self.dataset == "mnist":
