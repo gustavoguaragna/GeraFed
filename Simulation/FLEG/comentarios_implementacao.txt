@@ -15,7 +15,13 @@ Para melhorar:
 - Nao compartilhar discs
 - deixar dados no context?
 - adicionar teste apos finetunning
-- mudar nomes das gans para ficar de acordo com o level
+- mudar levels para ir de 1 a 5 ao inves de 0 a 4
+- adicionar teste global
+- adicionar f1
+- adicionar auc
+- salvar embeddings gerados para posteriores analises
+- verificar seeds
+- inverter ordem de if no fit client app para vir primeiro parte do classificador e depois generativo
 
 ESTOU LENDO O CLIENT_APP, LI SÓ O INIT, PAREI NO FIT
 

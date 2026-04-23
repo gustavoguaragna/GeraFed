@@ -11,8 +11,8 @@ from Simulation.FLEG.task import (
     Net_Cifar,
     ClassifierHead1, ClassifierHead2, ClassifierHead3, ClassifierHead4,
     ClassifierHead1_Cifar, ClassifierHead2_Cifar, ClassifierHead3_Cifar, ClassifierHead4_Cifar,
-    EmbeddingGAN1, EmbeddingGAN2, EmbeddingGAN3, EmbeddingGAN4,
-    EmbeddingGAN1_Cifar, EmbeddingGAN2_Cifar, EmbeddingGAN3_Cifar, EmbeddingGAN4_Cifar,
+    EmbeddingGAN0, EmbeddingGAN2, EmbeddingGAN3, EmbeddingGAN4,
+    EmbeddingGAN0_Cifar, EmbeddingGAN2_Cifar, EmbeddingGAN3_Cifar, EmbeddingGAN4_Cifar,
     EmbeddingPairDataset,
     FeatureExtractor1, FeatureExtractor2, FeatureExtractor3, FeatureExtractor4,
     FeatureExtractor1_Cifar, FeatureExtractor2_Cifar, FeatureExtractor3_Cifar, FeatureExtractor4_Cifar,
@@ -27,11 +27,9 @@ from Simulation.FLEG.task import (
     train_disc,
     unpack_batch
 )
-import math
 from flwr.common.typing import UserConfigValue
-from typing import Union, List
+from typing import Union
 import pickle
-import copy
 import time
 import io
 import numpy as np
@@ -52,24 +50,24 @@ import numpy as np
 # Define Flower Client and client_fn
 class FlowerClient(NumPyClient):
     def __init__(self,
-                cid: UserConfigValue, 
-                local_epochs_alvo: UserConfigValue, 
-                local_epochs_disc: UserConfigValue, 
-                dataset: UserConfigValue, 
-                batch_size: UserConfigValue,
-                lr_alvo: UserConfigValue,
-                lr_disc: UserConfigValue,
-                latent_dim: UserConfigValue, 
+                cid: int, 
+                local_epochs_alvo: int, 
+                local_epochs_disc: int, 
+                dataset: str, 
+                batch_size: int,
+                lr_alvo: float,
+                lr_disc: float,
+                latent_dim: int, 
                 context: Context,
-                trainloader,
-                testloader_local,
-                folder: UserConfigValue = ".",
-                num_chunks: UserConfigValue = 1,
-                num_partitions: UserConfigValue = 4,
-                partitioner: UserConfigValue = "ClassPartitioner",
+                trainloader: Union[DataLoader, list],
+                testloader_local: DataLoader,
+                folder: str = ".",
+                num_chunks: int = 1,
+                num_partitions: int = 4,
+                partitioner: str = "ClassPartitioner",
                 alpha: Union(float, None) = None,
-                continue_epoch: UserConfigValue = 0,
-                seed: UserConfigValue = 42,
+                continue_epoch: int = 0,
+                seed: int = 42,
                 ):
         self.cid=cid
         self.local_epochs_alvo = local_epochs_alvo
@@ -101,11 +99,11 @@ class FlowerClient(NumPyClient):
         if config["model"] == "gan":
             if config["level"] == 0:
                 if self.dataset == "mnist":
-                    self.gen = EmbeddingGAN1(seed=self.seed)
-                    self.disc = EmbeddingGAN1(seed=self.seed)
+                    self.gen = EmbeddingGAN0(seed=self.seed)
+                    self.disc = EmbeddingGAN0(seed=self.seed)
                 elif self.dataset == "cifar10":
-                    self.gen = EmbeddingGAN1_Cifar(seed=self.seed)
-                    self.disc = EmbeddingGAN1_Cifar(seed=self.seed)
+                    self.gen = EmbeddingGAN0_Cifar(seed=self.seed)
+                    self.disc = EmbeddingGAN0_Cifar(seed=self.seed)
                 else:
                     raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {self.dataset} não reconhecido")
 
@@ -162,30 +160,6 @@ class FlowerClient(NumPyClient):
                 buf_optim = io.BytesIO(arr_optim.tobytes())
                 optim_state_dict = torch.load(buf_optim, map_location=self.device)
                 self.optim_D.load_state_dict(optim_state_dict)
-
-            # # Cria state_dict para a disc
-            # state_dict = {}
-            # # Carrega parametros da disc do estado do cliente
-            # if "net_parameters" in self.client_state.parameters_records:
-            #     p_record = self.client_state.parameters_records["net_parameters"]
-
-            #     # Deserialize arrays
-            #     for k, v in p_record.items():
-            #         state_dict[k] = torch.from_numpy(v.numpy())
-
-            #     # Apply state dict to disc
-            #     self.net_disc.load_state_dict(state_dict)
-
-            # # Load optimizer state for the discriminator
-            # if "optim_parameter0" in self.client_state.parameters_records:
-
-            #     for p in self.optim_D.state_dict()['state'].keys():
-            #         # Carrega parametros do estado do parametro p do optim da disc
-            #         optim_record = self.client_state.parameters_records[f"optim_parameter{p}"]
-
-            #         # Deserialize arrays and substitute for current value
-            #         for _, v in optim_record.items():
-            #            self.optim_D.state_dict()['state'][p] = torch.from_numpy(v.numpy())
 
             # Define o dataloader
             if isinstance(self.trainloader, list):
