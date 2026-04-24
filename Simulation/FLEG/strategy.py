@@ -160,6 +160,7 @@ class FLEG(Strategy):
         self.gan_epochs = gan_epochs
         self.lvl = 0
         self.best_accuracy = 0
+        self.epochs_no_improve = 0
         self.net_epochs = 0
         self.patience = patience
         self.syn_input = syn_input
@@ -202,7 +203,7 @@ class FLEG(Strategy):
                         "traffic_cost_generator": [],
                         "traffic_cost_discriminator": [],
                         "epoch_transition": [],
-                    },
+                    }
 
         self.gan = {
             "mnist": {
@@ -292,7 +293,7 @@ class FLEG(Strategy):
                 config["model"] = "gan"
                 config["round"] = self.round_gan
                 fit_ins = FitIns(parameters=self.parameters_gen, config=config)
-                gen_size = get_model_size_mb(self.parameters_gen)
+                gen_size = get_model_size_mb(parameters_to_ndarrays(self.parameters_gen))
                 self.metrics_dict["traffic_cost_generator"].append(gen_size)
                 self.round_gan += 1
                 if self.round_gan % self.num_chunks == 0:
@@ -301,9 +302,10 @@ class FLEG(Strategy):
                 config["model"] = "classifier"
                 config["use_best_model"] = False
                 config["best_model"] = False
+                config["embds"] = pickle.dumps(self.embds)
                 if self.newlvl:
-                    config["embds"] = pickle.dumps(self.embds)
                     tamanho_embds = get_model_size_mb([self.embds["assets"], self.embds["labels"]])
+                    self.embds = defaultdict(list)
                     self.metrics_dict["traffic_cost_embeddings"].append(tamanho_embds)
                     self.newlvl = False
                     config["use_best_model"] = True
@@ -311,7 +313,7 @@ class FLEG(Strategy):
                     if self.epochs_no_improve == 0:
                         config["best_model"] = True
                 fit_ins = FitIns(parameters=self.parameters_alvo, config=config)
-                net_size = get_model_size_mb(self.parameters_alvo)
+                net_size = get_model_size_mb(parameters_to_ndarrays(self.parameters_alvo))
                 self.metrics_dict["traffic_cost_net_down"].append(net_size)
                 
             for c in clients:
@@ -400,7 +402,7 @@ class FLEG(Strategy):
            
             self.metrics_dict["max_disc_time"].append(max_disc_time)
 
-            discs_sizes = sum([get_model_size_mb(fit_res.parameters) for _, fit_res in results])
+            discs_sizes = sum([get_model_size_mb(parameters_to_ndarrays(fit_res.parameters)) for _, fit_res in results])
             self.metrics_dict["traffic_cost_discriminator"].append(discs_sizes)
 
             D = sum([fit_res.num_examples for _, fit_res in results])
@@ -544,7 +546,7 @@ class FLEG(Strategy):
            
             self.metrics_dict["max_net_time"].append(max_net_time)
 
-            nets_sizes = sum([get_model_size_mb(fit_res.parameters) for _, fit_res in results])
+            nets_sizes = sum([get_model_size_mb(parameters_to_ndarrays(fit_res.parameters)) for _, fit_res in results])
             self.metrics_dict["traffic_cost_net_up"].append(nets_sizes)
 
             if parameters_aggregated is not None:
@@ -619,11 +621,11 @@ class FLEG(Strategy):
 
         max_local_test_time = max(local_test_times)
         
-        self.metrics_dict["local_test_time"].append(max_local_test_time)
+        self.metrics_dict["max_local_test_time"].append(max_local_test_time)
 
         accuracy_aggregated = weighted_loss_avg(
                 [
-                    (evaluate_res.num_examples, evaluate_res.metrics["local accuracy"])
+                    (evaluate_res.num_examples, evaluate_res.metrics["local_accuracy"])
                     for _, evaluate_res in results
                 ]
             )

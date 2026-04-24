@@ -24,6 +24,7 @@ Para melhorar:
 - entender necessidade de compartilhar o tamanho do dataset após treinar a disacriminadora. Acho que precisa compartilhar um valor pelo flwr, mas como acho que não uso no strategy, pode ser 1.
 - manter fraction_fit constante sem ser hiperparametro, como esta no pyproject e no serverapp. Avaliar tambem outros valores para deixar de aparecerem como hiperparametros: latent_dim, lr, img_size, gan_arq.
 - limpar codigo - adicionar docstrings nas funcoes e classes, assim como retorno das funcoes e ajeitar comentarios
+- mudar evaluation metric fn 
 
 
 CORRIGINDO ERROS DE RODAGEM

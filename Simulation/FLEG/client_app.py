@@ -1,7 +1,7 @@
 """FLEG: um framework para balancear dados heterogêneos em aprendizado federado, com precupações com a privacidade."""
 
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, ConcatDataset
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import Context, ParametersRecord, array_from_numpy
 from Simulation.FLEG.task import (
@@ -27,7 +27,6 @@ from Simulation.FLEG.task import (
     train_disc,
     unpack_batch
 )
-from flwr.common.typing import UserConfigValue
 from typing import Union
 import pickle
 import time
@@ -91,7 +90,14 @@ class FlowerClient(NumPyClient):
         self.seed = seed
         
         self.trainloader = trainloader
-        self.testloader_local = testloader_local       
+        self.testloader_local = testloader_local     
+
+        if self.dataset == "mnist":
+            self.net = Net(seed=self.seed)
+            self.asset_name = "image"
+        elif self.dataset == "cifar10":
+            self.net = Net_Cifar(seed=self.seed)
+            self.asset_name = "img"  
 
 
     def fit(self, parameters, config):
@@ -225,12 +231,16 @@ class FlowerClient(NumPyClient):
         )
 
         elif config["model"] == "classifier":
-            if self.dataset == "mnist":
-                self.net = Net(seed=self.seed)
-                asset_name = "image"
-            elif self.dataset == "cifar10":
-                self.net = Net_Cifar(seed=self.seed)
-                asset_name = "img"
+
+            if isinstance(self.trainloader, list):
+                trainloader = DataLoader(
+                    ConcatDataset([dl.dataset for dl in self.trainloader]),
+                    batch_size=self.batch_size,
+                    shuffle=True
+                )
+            else:
+                trainloader = self.trainloader
+
             if config["level"] == 0:
                 if self.dataset == "mnist":
                     self.classifier = Net(seed=self.seed)
@@ -346,7 +356,7 @@ class FlowerClient(NumPyClient):
                 embds_wrapper = DictTensorDataset(
                     assets=gen_assets,
                     labels=gen_labels,
-                    asset_col_name=asset_name, # Ajuste se no seu caso original era "embedding"
+                    asset_col_name=self.asset_name, # Ajuste se no seu caso original era "embedding"
                     label_col_name="label"
                 )
 
@@ -354,11 +364,11 @@ class FlowerClient(NumPyClient):
                 all_embeddings = []
                 all_labels = []
 
-                counts = get_label_counts(self.trainloader.dataset)
+                counts = get_label_counts(trainloader.dataset)
                 
                 with torch.no_grad():
                     self.feature_extractor.eval()
-                    for batch in self.trainloader:
+                    for batch in trainloader:
                         images, labels = unpack_batch(batch, dataset=self.dataset)
                         embeddings = self.feature_extractor(images.to(self.device))
                         embeddings = embeddings.view(embeddings.size(0), -1)
@@ -401,7 +411,7 @@ class FlowerClient(NumPyClient):
                 embds_wrapper = DictTensorDataset(
                     assets=assets_tensor, 
                     labels=labels_tensor,
-                    asset_col_name=asset_name, # Ajuste se você usou nomes diferentes na classe original
+                    asset_col_name=self.asset_name, # Ajuste se você usou nomes diferentes na classe original
                     label_col_name="label"
                 )
                 print(f"Dataset recuperado do contexto! Total de amostras: {len(dataset)}")
@@ -409,11 +419,11 @@ class FlowerClient(NumPyClient):
                 all_embeddings = []
                 all_labels = []
 
-                counts = get_label_counts(self.trainloader.dataset)
+                counts = get_label_counts(trainloader.dataset)
                 
                 with torch.no_grad():
                     self.feature_extractor.eval()
-                    for batch in self.trainloader:
+                    for batch in trainloader:
                         images, labels = unpack_batch(batch, dataset=self.dataset)
                         embeddings = self.feature_extractor(images.to(self.device))
                         embeddings = embeddings.view(embeddings.size(0), -1)
@@ -446,7 +456,7 @@ class FlowerClient(NumPyClient):
                 
                 trainloader_aug = DataLoader(combined_ds, batch_size=self.batch_size, shuffle=True)
             else:
-                trainloader_aug = self.trainloader
+                trainloader_aug = trainloader
 
             # Treina o modelo classificador
             train_alvo_start_time = time.time()
@@ -462,7 +472,7 @@ class FlowerClient(NumPyClient):
 
             return (
                 get_weights(self.classifier),
-                len(self.trainloader.dataset),
+                len(trainloader.dataset),
                 {"train_loss": train_loss,
                 "tempo_treino_alvo": train_classifier_time,
                 },
@@ -563,7 +573,7 @@ def client_fn(context: Context):
             teste=teste,
             partitioner_type=partitioner,
             num_chunks=num_chunks,
-            alpha_dir=self.alpha_dir
+            alpha_dir=alpha_dir
         )
 
 
