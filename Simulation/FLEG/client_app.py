@@ -22,6 +22,7 @@ from Simulation.FLEG.task import (
     load_data, 
     local_test,
     set_weights,
+    set_weights_gen,
     test, 
     train_alvo, 
     train_disc,
@@ -107,9 +108,11 @@ class FlowerClient(NumPyClient):
                 if self.dataset == "mnist":
                     self.gen = EmbeddingGAN0(seed=self.seed)
                     self.disc = EmbeddingGAN0(seed=self.seed)
+                    self.feature_extractor = FeatureExtractor1(seed=self.seed)
                 elif self.dataset == "cifar10":
                     self.gen = EmbeddingGAN0_Cifar(seed=self.seed)
                     self.disc = EmbeddingGAN0_Cifar(seed=self.seed)
+                    self.feature_extractor = FeatureExtractor1_Cifar(seed=self.seed)
                 else:
                     raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {self.dataset} não reconhecido")
 
@@ -117,9 +120,11 @@ class FlowerClient(NumPyClient):
                 if self.dataset == "mnist":
                     self.gen = EmbeddingGAN1(seed=self.seed)
                     self.disc = EmbeddingGAN1(seed=self.seed)
+                    self.feature_extractor = FeatureExtractor2(seed=self.seed)
                 elif self.dataset == "cifar10":
                     self.gen = EmbeddingGAN1_Cifar(seed=self.seed)
                     self.disc = EmbeddingGAN1_Cifar(seed=self.seed)
+                    self.feature_extractor = FeatureExtractor2_Cifar(seed=self.seed)
                 else:
                     raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {self.dataset} não reconhecido")
 
@@ -127,9 +132,11 @@ class FlowerClient(NumPyClient):
                 if self.dataset == "mnist":
                     self.gen = EmbeddingGAN2(seed=self.seed)
                     self.disc = EmbeddingGAN2(seed=self.seed)
+                    self.feature_extractor = FeatureExtractor3(seed=self.seed)
                 elif self.dataset == "cifar10":
                     self.gen = EmbeddingGAN2_Cifar(seed=self.seed)
                     self.disc = EmbeddingGAN2_Cifar(seed=self.seed)
+                    self.feature_extractor = FeatureExtractor3_Cifar(seed=self.seed)
                 else:
                     raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {self.dataset} não reconhecido")
 
@@ -137,9 +144,11 @@ class FlowerClient(NumPyClient):
                 if self.dataset == "mnist":
                     self.gen = EmbeddingGAN3(seed=self.seed)
                     self.disc = EmbeddingGAN3(seed=self.seed)
+                    self.feature_extractor = FeatureExtractor4(seed=self.seed)
                 elif self.dataset == "cifar10":
                     self.gen = EmbeddingGAN3_Cifar(seed=self.seed)
                     self.disc = EmbeddingGAN3_Cifar(seed=self.seed)
+                    self.feature_extractor = FeatureExtractor4_Cifar(seed=self.seed)
                 else:
                     raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {self.dataset} não reconhecido")
             
@@ -149,10 +158,10 @@ class FlowerClient(NumPyClient):
             self.optim_D = torch.optim.Adam(list(self.disc.discriminator.parameters())+list(self.disc.label_embedding.parameters()), lr=self.lr_disc, betas=(0.5, 0.999))
 
             # Atualiza pesos do modelo generativo
-            set_weights(net=self.gen, parameters=parameters)
+            set_weights_gen(net=self.gen, parameters=parameters)
 
             # --- Restore discriminator model parameters ---
-            if "disc_state_dict" in self.client_state.parameters_records:
+            if "disc_state_dict" in self.client_state.parameters_records and not config["new_lvl"]:
                 rec_model = self.client_state.parameters_records["disc_state_dict"]
                 arr_model = rec_model["state_bytes"].numpy()
                 buf_model = io.BytesIO(arr_model.tobytes())
@@ -167,6 +176,14 @@ class FlowerClient(NumPyClient):
                 optim_state_dict = torch.load(buf_optim, map_location=self.device)
                 self.optim_D.load_state_dict(optim_state_dict)
 
+            # --- Restore feature extractor parameters ---
+            if "net_state_dict" in self.client_state.parameters_records:
+                rec_net = self.client_state.parameters_records["net_state_dict"]
+                arr_net = rec_net["state_bytes"].numpy()
+                buf_net = io.BytesIO(arr_net.tobytes())
+                state_dict = torch.load(buf_net, map_location=self.device)
+                self.feature_extractor.load_state_dict(state_dict, strict=False)
+
             # Define o dataloader
             if isinstance(self.trainloader, list):
                 chunk_idx = config["round"] % len(self.trainloader)
@@ -179,6 +196,7 @@ class FlowerClient(NumPyClient):
             avg_d_loss = train_disc(
             disc=self.disc,
             gen=self.gen,
+            feature_extractor=self.feature_extractor,
             trainloader=trainloader_chunk,
             epochs=self.local_epochs_disc,
             device=self.device,
@@ -225,8 +243,9 @@ class FlowerClient(NumPyClient):
             return (
             disc_params,
             len(trainloader_chunk.dataset),
-            {"train_loss": avg_d_loss,
+            {"train_d_loss": avg_d_loss,
             "tempo_treino_disc": train_disc_time,
+            "cid": self.cid,
             },
         )
 

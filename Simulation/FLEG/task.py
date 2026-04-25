@@ -1480,6 +1480,24 @@ def set_weights(net, parameters):
     state_dict = OrderedDict({k: torch.tensor(v).to(device) for k, v in params_dict})
     net.load_state_dict(state_dict, strict=False)
 
+def set_weights_disc(net, parameters):
+    """Injeta pesos apenas nas camadas do Discriminador e do Label Embedding"""
+    device = next(net.parameters()).device
+    # Filtra as chaves para pegar apenas o discriminador e as labels
+    valid_keys = [k for k in net.state_dict().keys() if 'discriminator' in k or 'label' in k]
+    params_dict = zip(valid_keys, parameters)
+    state_dict = OrderedDict({k: torch.tensor(v).to(device) for k, v in params_dict})
+    net.load_state_dict(state_dict, strict=False)
+
+def set_weights_gen(net, parameters):
+    """Injeta pesos apenas nas camadas do Gerador e do Label Embedding"""
+    device = next(net.parameters()).device
+    # Filtra as chaves para pegar apenas o gerador e as labels
+    valid_keys = [k for k in net.state_dict().keys() if 'generator' in k or 'label' in k]
+    params_dict = zip(valid_keys, parameters)
+    state_dict = OrderedDict({k: torch.tensor(v).to(device) for k, v in params_dict})
+    net.load_state_dict(state_dict, strict=False)
+
 def get_model_size_mb(params, divisor=10**6):
     buffer = io.BytesIO()
     np.savez(buffer, *params)

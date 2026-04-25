@@ -30,6 +30,7 @@ from Simulation.FLEG.task import (
     EmbeddingGAN1_Cifar, EmbeddingGAN2_Cifar, EmbeddingGAN3_Cifar,
     GeneratedAssetDataset,
     set_weights,
+    set_weights_disc,
     train_G,
     get_weights_gen,
     get_model_size_mb
@@ -264,6 +265,7 @@ class FLEG(Strategy):
         if self.finished:
             return []
         else:    
+            print(f"[DEBUG] Estado do Servidor -> Fase GAN: {self.training_gan} | Nível atual: {self.lvl}/{self.levels}")
             if self.newlvl:
                 self.init_lvl_time = time.time()
                 self.epoch_gan = 1
@@ -289,7 +291,8 @@ class FLEG(Strategy):
             if self.training_gan:
                 if self.round_gan == 0:
                     self.init_epoch_time = time.time()
-
+                
+                config["new_lvl"] = self.newlvl
                 config["model"] = "gan"
                 config["round"] = self.round_gan
                 fit_ins = FitIns(parameters=self.parameters_gen, config=config)
@@ -369,7 +372,7 @@ class FLEG(Strategy):
             gan_class = self.gen.__class__
             self.discs = [gan_class().to(self.device) for _ in range(len(disc_ndarrays))]
             for i, disc in enumerate(self.discs):
-                set_weights(disc, disc_ndarrays[i])
+                set_weights_disc(disc, disc_ndarrays[i])
 
             gen_time_start = time.time()
             g_loss, self.optimG_state_dict = train_G(
@@ -389,12 +392,12 @@ class FLEG(Strategy):
             
             avg_d_loss = weighted_loss_avg(
                 [
-                    (fit_res.num_examples, fit_res.metrics["avg_d_loss"])
+                    (fit_res.num_examples, fit_res.metrics["train_d_loss"])
                     for _, fit_res in results
                 ]
             )
 
-            self.metrics_dict["d_loss_chunks"].append(avg_d_loss)
+            self.metrics_dict["d_loss_chunk"].append(avg_d_loss)
 
             disc_times = [fit_res.metrics["tempo_treino_disc"] for _, fit_res in results]
 
@@ -415,7 +418,7 @@ class FLEG(Strategy):
             else:
                 raise ValueError(f"input strategy should be fixed or dynamic. Got {self.syn_input}")
 
-            if self.epoch_gan == 25:
+            if self.epoch_gan == self.gan_epochs + 1:
 
                 epoch_time = time.time() - self.init_epoch_time
                 self.metrics_dict["time_epoch_gan"].append(epoch_time)
@@ -433,7 +436,6 @@ class FLEG(Strategy):
                     device=self.device
                 )
                 self.metrics_dict["img_syn_time"].append(time.time() - start_img_syn_time)
-                self.parameters_gen = ndarrays_to_parameters(get_weights_gen(self.gen))
 
                 assets_numpy = generated_embeddings.assets.detach().cpu().numpy()
                 labels_numpy = generated_embeddings.labels.detach().cpu().numpy()
@@ -453,6 +455,7 @@ class FLEG(Strategy):
                 self.newlvl= True
                 self.lvl += 1
                 self.gen = self.gan[self.dataset][self.lvl](seed=self.seed).to(self.device)
+                self.parameters_gen = ndarrays_to_parameters(get_weights_gen(self.gen))
 
                 self.metrics_dict["level_time"].append(time.time() - self.init_lvl_time)
 
@@ -462,6 +465,9 @@ class FLEG(Strategy):
                     print(f"Metrics dict successfully saved to {metrics_filename}")
                 except Exception as e:
                     print(f"Error saving metrics dict to JSON: {e}")
+                
+            parameters_aggregated = None
+            metrics_aggregated = {}
 
 
             # Aggregate custom metrics if aggregation fn was provided
@@ -570,6 +576,8 @@ class FLEG(Strategy):
                 self.metrics_dict["global_net_eval_time"].append(time.time() - net_global_eval_start_time)
                 self.metrics_dict["val_acc"].append(accuracy)
 
+                print(f"[DEBUG antes] Acurácia atual: {accuracy:.4f} | Melhor: {self.best_accuracy:.4f} | Sem melhorar: {self.epochs_no_improve}/{self.patience}")
+
                 if accuracy > self.best_accuracy:
                     self.best_accuracy = accuracy
                     self.epochs_no_improve = 0
@@ -578,15 +586,8 @@ class FLEG(Strategy):
                     self.epochs_no_improve += 1
                     print(f"Sem melhorias por {self.epochs_no_improve} épocas. Melhor acurácia: {self.best_accuracy:.4f}")
                 
-                if self.epochs_no_improve > self.patience:
-                    if self.lvl < self.levels:
-                        self.epochs_no_improve = 0
-                        self.training_gan = True
-                        self.global_net.load_state_dict(self.best_model.state_dict())
-                        self.metrics_dict["epoch_transition"].append(self.net_epochs)
-
-                    else:
-                        self.finished = True
+                print(f"[DEBUG depois] Acurácia atual: {accuracy:.4f} | Melhor: {self.best_accuracy:.4f} | Sem melhorar: {self.epochs_no_improve}/{self.patience}")
+                
                 self.net_epochs += 1
 
         return parameters_aggregated, metrics_aggregated
@@ -635,6 +636,17 @@ class FLEG(Strategy):
         self.metrics_dict["time_epoch"].append(time.time() - self.init_round_time)
 
         metrics_aggregated = {"loss": loss_aggregated, "accuracy": accuracy_aggregated}
+
+        if self.epochs_no_improve > self.patience:
+            if self.lvl < self.levels:
+                self.epochs_no_improve = 0
+                self.training_gan = True
+                self.global_net.load_state_dict(self.best_model.state_dict())
+                self.metrics_dict["epoch_transition"].append(self.net_epochs)
+                print("INICIALIZANDO TREINAMENTO DA GAN")
+
+            else:
+                self.finished = True
 
         return loss_aggregated, metrics_aggregated
 
