@@ -332,6 +332,11 @@ class FLEG(Strategy):
         """Configure the next round of evaluation."""
         # Do not configure federated evaluation if fraction eval is 0.
         if self.fraction_evaluate_alvo == 0.0 or self.training_gan or self.finished:
+            if self.training_gan:
+                round_time = time.time() - self.init_round_time
+                self.metrics_dict["time_chunk_gan"].append(round_time)
+                if self.epoch_gan == self.gan_epochs + 1:
+                    self.training_gan = False
             return []
 
         # Parameters and config
@@ -454,8 +459,10 @@ class FLEG(Strategy):
 
                 self.newlvl= True
                 self.lvl += 1
+                print(f"Nível {self.lvl} ativado.")
                 self.gen = self.gan[self.dataset][self.lvl](seed=self.seed).to(self.device)
                 self.parameters_gen = ndarrays_to_parameters(get_weights_gen(self.gen))
+                self.optimG_state_dict = None
 
                 self.metrics_dict["level_time"].append(time.time() - self.init_lvl_time)
 
@@ -600,11 +607,6 @@ class FLEG(Strategy):
     ) -> tuple[Optional[float], dict[str, Scalar]]:
         """Aggregate evaluation losses using weighted average."""
         if not results or self.finished:
-            if self.training_gan:
-                round_time = time.time() - self.init_round_time
-                self.metrics_dict["time_chunk_gan"].append(round_time)
-                if self.epoch_gan == 25:
-                    self.training_gan = False
             return None, {}
         # Do not aggregate if there are failures and failures are not accepted
         if not self.accept_failures and failures:

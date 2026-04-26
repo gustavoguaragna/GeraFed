@@ -169,7 +169,7 @@ class FlowerClient(NumPyClient):
                 self.disc.load_state_dict(state_dict)
 
             # --- Restore optimizer state ---
-            if "disc_optim_state_dict" in self.client_state.parameters_records:
+            if "disc_optim_state_dict" in self.client_state.parameters_records and not config["new_lvl"]:
                 rec_optim = self.client_state.parameters_records["disc_optim_state_dict"]
                 arr_optim = rec_optim["state_bytes"].numpy()
                 buf_optim = io.BytesIO(arr_optim.tobytes())
