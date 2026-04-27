@@ -218,7 +218,7 @@ class FLEG(Strategy):
             },
         }
 
-        self.classifier = {
+        self.classifier_dict = {
             "mnist": {
                 1: ClassifierHead1, 2: ClassifierHead2, 3: ClassifierHead3, 4: ClassifierHead4,
             },
@@ -475,8 +475,8 @@ class FLEG(Strategy):
                 self.gen = self.gan[self.dataset][self.lvl](seed=self.seed).to(self.device)
                 self.parameters_gen = ndarrays_to_parameters(get_weights_gen(self.gen))
                 self.optimG_state_dict = None
-                new_classifier = self.classifier[self.dataset][self.lvl](seed=self.seed).to(self.device)
-                self.parameters_alvo = ndarrays_to_parameters(get_weights(new_classifier))
+                self.classifier = self.classifier_dict[self.dataset][self.lvl](seed=self.seed).to(self.device)
+                self.parameters_alvo = ndarrays_to_parameters(get_weights(self.classifier))
 
                 self.metrics_dict["level_time"].append(time.time() - self.init_lvl_time)
 
@@ -578,7 +578,11 @@ class FLEG(Strategy):
 
             if parameters_aggregated is not None:
                 # Define os pesos do modelo
-                set_weights(self.global_net, aggregated_ndarrays)
+                if self.lvl == 0:
+                    set_weights(self.global_net, aggregated_ndarrays)
+                else:
+                    set_weights(self.classifier, aggregated_ndarrays)
+                    self.global_net.load_state_dict(self.classifier.state_dict(), strict=False)
 
                 criterion = torch.nn.CrossEntropyLoss()
 
