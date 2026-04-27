@@ -328,7 +328,7 @@ class FlowerClient(NumPyClient):
                     self.classifier.load_state_dict(state_dict, strict=False)
             
             if config["best_model"]:
-                set_weights(self.net, parameters)
+                self.net.load_state_dict(self.classifier.state_dict(), strict=False)
                 # Save all elements of the state_dict into a single RecordSet
                 net_record = ParametersRecord()
                 for k, v in self.net.state_dict().items():
