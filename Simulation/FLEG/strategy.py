@@ -26,12 +26,15 @@ from collections import defaultdict
 from Simulation.FLEG.task import (
     Net,
     Net_Cifar,
+    ClassifierHead1, ClassifierHead2, ClassifierHead3, ClassifierHead4,
+    ClassifierHead1_Cifar, ClassifierHead2_Cifar, ClassifierHead3_Cifar, ClassifierHead4_Cifar,
     EmbeddingGAN1, EmbeddingGAN2, EmbeddingGAN3,
     EmbeddingGAN1_Cifar, EmbeddingGAN2_Cifar, EmbeddingGAN3_Cifar,
     GeneratedAssetDataset,
     set_weights,
     set_weights_disc,
     train_G,
+    get_weights,
     get_weights_gen,
     get_model_size_mb
 )
@@ -213,6 +216,15 @@ class FLEG(Strategy):
             "cifar10": {
                 1: EmbeddingGAN1_Cifar, 2: EmbeddingGAN2_Cifar, 3: EmbeddingGAN3_Cifar,
             },
+        }
+
+        self.classifier = {
+            "mnist": {
+                1: ClassifierHead1, 2: ClassifierHead2, 3: ClassifierHead3, 4: ClassifierHead4,
+            },
+            "cifar10": {
+                1: ClassifierHead1_Cifar, 2: ClassifierHead2_Cifar, 3: ClassifierHead3_Cifar, 4: ClassifierHead4_Cifar,
+            }
         }
 
             
@@ -463,6 +475,8 @@ class FLEG(Strategy):
                 self.gen = self.gan[self.dataset][self.lvl](seed=self.seed).to(self.device)
                 self.parameters_gen = ndarrays_to_parameters(get_weights_gen(self.gen))
                 self.optimG_state_dict = None
+                new_classifier = self.classifier[self.dataset][self.lvl](seed=self.seed).to(self.device)
+                self.parameters_alvo = ndarrays_to_parameters(get_weights(new_classifier))
 
                 self.metrics_dict["level_time"].append(time.time() - self.init_lvl_time)
 
