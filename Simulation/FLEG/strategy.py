@@ -277,7 +277,7 @@ class FLEG(Strategy):
         if self.finished:
             return []
         else:    
-            print(f"[DEBUG] Estado do Servidor -> Fase GAN: {self.training_gan} | Nível atual: {self.lvl}/{self.levels}")
+            print(f"Estado do Servidor -> Fase GAN: {self.training_gan} | Nível atual: {self.lvl}/{self.levels}")
             if self.newlvl:
                 self.init_lvl_time = time.time()
                 self.epoch_gan = 1
@@ -304,7 +304,6 @@ class FLEG(Strategy):
                 if self.round_gan == 0:
                     self.init_epoch_time = time.time()
                 
-                config["new_lvl"] = self.newlvl
                 config["model"] = "gan"
                 config["round"] = self.round_gan
                 fit_ins = FitIns(parameters=self.parameters_gen, config=config)
@@ -471,7 +470,7 @@ class FLEG(Strategy):
 
                 self.newlvl= True
                 self.lvl += 1
-                print(f"Nível {self.lvl} ativado.")
+                print(f"NÍVEL {self.lvl} ATIVADO")
                 self.gen = self.gan[self.dataset][self.lvl](seed=self.seed).to(self.device)
                 self.parameters_gen = ndarrays_to_parameters(get_weights_gen(self.gen))
                 self.optimG_state_dict = None
@@ -601,7 +600,7 @@ class FLEG(Strategy):
                 self.metrics_dict["global_net_eval_time"].append(time.time() - net_global_eval_start_time)
                 self.metrics_dict["val_acc"].append(accuracy)
 
-                print(f"[DEBUG antes] Acurácia atual: {accuracy:.4f} | Melhor: {self.best_accuracy:.4f} | Sem melhorar: {self.epochs_no_improve}/{self.patience}")
+                print(f"Acurácia atual: {accuracy:.4f} | Melhor: {self.best_accuracy:.4f} | Sem melhorar: {self.epochs_no_improve}/{self.patience}")
 
                 if accuracy > self.best_accuracy:
                     self.best_accuracy = accuracy
@@ -611,7 +610,7 @@ class FLEG(Strategy):
                     self.epochs_no_improve += 1
                     print(f"Sem melhorias por {self.epochs_no_improve} épocas. Melhor acurácia: {self.best_accuracy:.4f}")
                 
-                print(f"[DEBUG depois] Acurácia atual: {accuracy:.4f} | Melhor: {self.best_accuracy:.4f} | Sem melhorar: {self.epochs_no_improve}/{self.patience}")
+                print(f"Acurácia atual: {accuracy:.4f} | Melhor: {self.best_accuracy:.4f} | Sem melhorar: {self.epochs_no_improve}/{self.patience}")
                 
                 self.net_epochs += 1
 

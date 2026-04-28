@@ -1465,6 +1465,61 @@ def local_test(net: nn.Module,
 
     return results_metrics["overall_accuracy"]
 
+def get_model(dataset, level, seed):
+    if level == 0:
+        if dataset == "mnist":
+            classifier = Net(seed=seed)
+        elif dataset == "cifar10":
+            classifier = Net_Cifar(seed=seed)
+        else:
+            raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {dataset} não reconhecido") 
+        return classifier, None
+
+    elif level == 1:
+        if dataset == "mnist":
+            feature_extractor = FeatureExtractor1(seed=seed)
+            classifier = ClassifierHead1(seed=seed)
+        elif dataset == "cifar10":
+            feature_extractor = FeatureExtractor1_Cifar(seed=seed)
+            classifier = ClassifierHead1_Cifar(seed=seed)
+        else:
+            raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {dataset} não reconhecido")
+
+    elif level == 2:
+        if dataset == "mnist":
+            feature_extractor = FeatureExtractor2(seed=seed)
+            classifier = ClassifierHead2(seed=seed)
+        elif dataset == "cifar10":
+            feature_extractor = FeatureExtractor2_Cifar(seed=seed)
+            classifier = ClassifierHead2_Cifar(seed=seed)
+        else:
+            raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {dataset} não reconhecido")
+
+    elif level == 3:
+        if dataset == "mnist":
+            feature_extractor = FeatureExtractor3(seed=seed)
+            classifier = ClassifierHead3(seed=seed)
+        elif dataset == "cifar10":
+            feature_extractor = FeatureExtractor3_Cifar(seed=seed)
+            classifier = ClassifierHead3_Cifar(seed=seed)
+        else:
+            raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {dataset} não reconhecido")
+
+    elif level == 4:
+        if dataset == "mnist":
+            feature_extractor = FeatureExtractor4(seed=seed)
+            classifier = ClassifierHead4(seed=seed)
+        elif dataset == "cifar10":
+            feature_extractor = FeatureExtractor4_Cifar(seed=seed)
+            classifier = ClassifierHead4_Cifar(seed=seed)
+        else:
+            raise ValueError(f"dataset deveria ser mnist ou cifar10, {dataset} não reconhecido")
+    
+    else:
+        raise ValueError(f"Treino vai até nível 4 (5° nível), não deveria receber config['level'] {config['level']}.")
+    
+    return classifier, feature_extractor
+
 def get_weights(net):
     return [val.cpu().numpy() for _, val in net.state_dict().items()]
 

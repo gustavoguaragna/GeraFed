@@ -17,6 +17,7 @@ from Simulation.FLEG.task import (
     FeatureExtractor1, FeatureExtractor2, FeatureExtractor3, FeatureExtractor4,
     FeatureExtractor1_Cifar, FeatureExtractor2_Cifar, FeatureExtractor3_Cifar, FeatureExtractor4_Cifar,
     get_label_counts,
+    get_model,
     get_weights,
     get_weights_disc,
     load_data, 
@@ -161,7 +162,7 @@ class FlowerClient(NumPyClient):
             set_weights_gen(net=self.gen, parameters=parameters)
 
             # --- Restore discriminator model parameters ---
-            if "disc_state_dict" in self.client_state.parameters_records and not config["new_lvl"]:
+            if "disc_state_dict" in self.client_state.parameters_records and not config["round"] != 0:
                 rec_model = self.client_state.parameters_records["disc_state_dict"]
                 arr_model = rec_model["state_bytes"].numpy()
                 buf_model = io.BytesIO(arr_model.tobytes())
@@ -169,7 +170,7 @@ class FlowerClient(NumPyClient):
                 self.disc.load_state_dict(state_dict)
 
             # --- Restore optimizer state ---
-            if "disc_optim_state_dict" in self.client_state.parameters_records and not config["new_lvl"]:
+            if "disc_optim_state_dict" in self.client_state.parameters_records and not config["round"] != 0:
                 rec_optim = self.client_state.parameters_records["disc_optim_state_dict"]
                 arr_optim = rec_optim["state_bytes"].numpy()
                 buf_optim = io.BytesIO(arr_optim.tobytes())
@@ -207,15 +208,14 @@ class FlowerClient(NumPyClient):
 
             train_disc_time = time.time() - train_disc_start_time
 
-            # Save all elements of the state_dict into a single RecordSet
-            p_record = ParametersRecord()
-            for k, v in self.disc.state_dict().items():
-                # Convert to NumPy, then to Array. Add to self.client_state
-                p_record[k] = array_from_numpy(v.detach().cpu().numpy())
-            # Add to a context
-            self.client_state.parameters_records["disc_parameters"] = p_record
+            # # Save all elements of the state_dict into a single RecordSet
+            # p_record = ParametersRecord()
+            # for k, v in self.disc.state_dict().items():
+            #     # Convert to NumPy, then to Array. Add to self.client_state
+            #     p_record[k] = array_from_numpy(v.detach().cpu().numpy())
+            # # Add to a context
+            # self.client_state.parameters_records["disc_parameters"] = p_record
             
-            # Save optimizer state_dict fully (state + param_groups)
             # --- Save discriminator model parameters ---
             buf_model = io.BytesIO()
             torch.save(self.disc.state_dict(), buf_model)
@@ -260,58 +260,8 @@ class FlowerClient(NumPyClient):
             else:
                 trainloader = self.trainloader
 
-            if config["level"] == 0:
-                if self.dataset == "mnist":
-                    self.classifier = Net(seed=self.seed)
-                elif self.dataset == "cifar10":
-                    self.classifier = Net_Cifar(seed=self.seed)
-                else:
-                    raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {self.dataset} não reconhecido") 
-
-            elif config["level"] == 1:
-                if self.dataset == "mnist":
-                    self.feature_extractor = FeatureExtractor1(seed=self.seed)
-                    self.classifier = ClassifierHead1(seed=self.seed)
-                elif self.dataset == "cifar10":
-                    self.feature_extractor = FeatureExtractor1_Cifar(seed=self.seed)
-                    self.classifier = ClassifierHead1_Cifar(seed=self.seed)
-                else:
-                    raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {self.dataset} não reconhecido")
-
-            elif config["level"] == 2:
-                if self.dataset == "mnist":
-                    self.feature_extractor = FeatureExtractor2(seed=self.seed)
-                    self.classifier = ClassifierHead2(seed=self.seed)
-                elif self.dataset == "cifar10":
-                    self.feature_extractor = FeatureExtractor2_Cifar(seed=self.seed)
-                    self.classifier = ClassifierHead2_Cifar(seed=self.seed)
-                else:
-                    raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {self.dataset} não reconhecido")
-
-            elif config["level"] == 3:
-                if self.dataset == "mnist":
-                    self.feature_extractor = FeatureExtractor3(seed=self.seed)
-                    self.classifier = ClassifierHead3(seed=self.seed)
-                elif self.dataset == "cifar10":
-                    self.feature_extractor = FeatureExtractor3_Cifar(seed=self.seed)
-                    self.classifier = ClassifierHead3_Cifar(seed=self.seed)
-                else:
-                    raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {self.dataset} não reconhecido")
-
-            elif config["level"] == 4:
-                if self.dataset == "mnist":
-                    self.feature_extractor = FeatureExtractor4(seed=self.seed)
-                    self.classifier = ClassifierHead4(seed=self.seed)
-                elif self.dataset == "cifar10":
-                    self.feature_extractor = FeatureExtractor4_Cifar(seed=self.seed)
-                    self.classifier = ClassifierHead4_Cifar(seed=self.seed)
-                else:
-                    raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {self.dataset} não reconhecido")
+            self.classifier, self.feature_extractor = get_model(dataset=self.dataset, level=config["level"], seed=self.seed)
             
-            else:
-                raise ValueError(f"Treino vai até nível 4 (5° nível), não deveria receber config['level'] {config['level']}.")
-            
-
             # Atualiza pesos do modelo classificador
             set_weights(self.classifier, parameters)
 
@@ -329,14 +279,6 @@ class FlowerClient(NumPyClient):
             
             if config["best_model"]:
                 self.net.load_state_dict(self.classifier.state_dict(), strict=False)
-                # Save all elements of the state_dict into a single RecordSet
-                net_record = ParametersRecord()
-                for k, v in self.net.state_dict().items():
-                    # Convert to NumPy, then to Array. Add to self.client_state
-                    net_record[k] = array_from_numpy(v.detach().cpu().numpy())
-
-                # Add to a context
-                self.client_state.parameters_records["net_parameters"] = net_record
 
                 # --- Save model parameters ---
                 buf_net = io.BytesIO()
@@ -433,7 +375,7 @@ class FlowerClient(NumPyClient):
                     asset_col_name=self.asset_name, # Ajuste se você usou nomes diferentes na classe original
                     label_col_name="label"
                 )
-                print(f"Dataset recuperado do contexto! Total de amostras: {len(dataset)}")
+                print(f"Dataset recuperado do contexto! Total de amostras: {len(embds_wrapper)}")
 
                 all_embeddings = []
                 all_labels = []
@@ -510,7 +452,10 @@ class FlowerClient(NumPyClient):
             state_dict = torch.load(buf_net, map_location=self.device)
             self.net.load_state_dict(state_dict, strict=False)
 
-        set_weights(self.net, parameters)
+        self.classifier, _ = get_model(dataset=self.dataset, level=config["level"], seed=self.seed)
+
+        set_weights(self.classifier, parameters)
+        self.net.load_state_dict(self.classifier.state_dict(), strict=False)
 
         # test_time_start = time.time()
 
