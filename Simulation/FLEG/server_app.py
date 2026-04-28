@@ -52,7 +52,6 @@ def server_fn(context: Context):
     dataset           = context.run_config["dataset"]
     img_size          = context.run_config["tam_img"]
     latent_dim        = context.run_config["tam_ruido"]
-    gan_arq           = context.run_config["gan_arq"]
     lr_gen            = context.run_config["learn_rate_gen"]
     gen_iter          = context.run_config["epocas_gen"]
     gan_epochs        = context.run_config["epocas_disc"]
@@ -130,7 +129,6 @@ def server_fn(context: Context):
         dataset=dataset,
         img_size=img_size,
         latent_dim=latent_dim,
-        gan_arq=gan_arq,
         gen_iter=gen_iter,
         gan_epochs=gan_epochs,
         teste=teste,

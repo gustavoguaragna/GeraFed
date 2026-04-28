@@ -162,7 +162,7 @@ class FlowerClient(NumPyClient):
             set_weights_gen(net=self.gen, parameters=parameters)
 
             # --- Restore discriminator model parameters ---
-            if "disc_state_dict" in self.client_state.parameters_records and not config["round"] != 0:
+            if "disc_state_dict" in self.client_state.parameters_records and config["round"] != 0:
                 rec_model = self.client_state.parameters_records["disc_state_dict"]
                 arr_model = rec_model["state_bytes"].numpy()
                 buf_model = io.BytesIO(arr_model.tobytes())
@@ -170,7 +170,7 @@ class FlowerClient(NumPyClient):
                 self.disc.load_state_dict(state_dict)
 
             # --- Restore optimizer state ---
-            if "disc_optim_state_dict" in self.client_state.parameters_records and not config["round"] != 0:
+            if "disc_optim_state_dict" in self.client_state.parameters_records and config["round"] != 0:
                 rec_optim = self.client_state.parameters_records["disc_optim_state_dict"]
                 arr_optim = rec_optim["state_bytes"].numpy()
                 buf_optim = io.BytesIO(arr_optim.tobytes())
@@ -227,6 +227,7 @@ class FlowerClient(NumPyClient):
             rec_model = ParametersRecord()
             rec_model["state_bytes"] = array_from_numpy(arr_model)
             self.client_state.parameters_records["disc_state_dict"] = rec_model
+            print(f"SALVOU DISC NO CLIENTE {self.cid} NA RODADA {config['round']} DO NÍVEL {config['level']}")
 
             # --- Save optimizer state (Adam, etc.) ---
             buf_optim = io.BytesIO()

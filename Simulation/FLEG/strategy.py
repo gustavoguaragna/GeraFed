@@ -28,8 +28,8 @@ from Simulation.FLEG.task import (
     Net_Cifar,
     ClassifierHead1, ClassifierHead2, ClassifierHead3, ClassifierHead4,
     ClassifierHead1_Cifar, ClassifierHead2_Cifar, ClassifierHead3_Cifar, ClassifierHead4_Cifar,
-    EmbeddingGAN1, EmbeddingGAN2, EmbeddingGAN3,
-    EmbeddingGAN1_Cifar, EmbeddingGAN2_Cifar, EmbeddingGAN3_Cifar,
+    EmbeddingGAN0, EmbeddingGAN1, EmbeddingGAN2, EmbeddingGAN3,
+    EmbeddingGAN0_Cifar, EmbeddingGAN1_Cifar, EmbeddingGAN2_Cifar, EmbeddingGAN3_Cifar,
     GeneratedAssetDataset,
     set_weights,
     set_weights_disc,
@@ -112,7 +112,6 @@ class FLEG(Strategy):
         dataset: str = "mnist",
         img_size: int = 28,
         latent_dim: int = 128,
-        gan_arq: str = "f2u_gan",
         gen_iter: int = 2,
         teste: bool = False,
         lr_gen: float = 0.0002,
@@ -151,13 +150,12 @@ class FLEG(Strategy):
         self.dataset = dataset
         self.img_size = img_size
         self.latent_dim = latent_dim
-        self.gan_arq = gan_arq
         self.gen_iter = gen_iter
         self.teste = teste
         self.lr_gen = lr_gen
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.folder = folder
-        self.gen = gen.to(self.device)
+        #self.gen = gen.to(self.device)
         self.optimG_state_dict = optimG_state_dict if optimG_state_dict else None
         self.num_chunks = num_chunks
         self.continue_epoch = continue_epoch
@@ -211,10 +209,10 @@ class FLEG(Strategy):
 
         self.gan = {
             "mnist": {
-                1: EmbeddingGAN1, 2: EmbeddingGAN2, 3: EmbeddingGAN3,
+                0: EmbeddingGAN0, 1: EmbeddingGAN1, 2: EmbeddingGAN2, 3: EmbeddingGAN3,
             },
             "cifar10": {
-                1: EmbeddingGAN1_Cifar, 2: EmbeddingGAN2_Cifar, 3: EmbeddingGAN3_Cifar,
+                0: EmbeddingGAN0_Cifar, 1: EmbeddingGAN1_Cifar, 2: EmbeddingGAN2_Cifar, 3: EmbeddingGAN3_Cifar,
             },
         }
 
@@ -471,9 +469,7 @@ class FLEG(Strategy):
                 self.newlvl= True
                 self.lvl += 1
                 print(f"NÍVEL {self.lvl} ATIVADO")
-                self.gen = self.gan[self.dataset][self.lvl](seed=self.seed).to(self.device)
-                self.parameters_gen = ndarrays_to_parameters(get_weights_gen(self.gen))
-                self.optimG_state_dict = None
+
                 self.classifier = self.classifier_dict[self.dataset][self.lvl](seed=self.seed).to(self.device)
                 self.parameters_alvo = ndarrays_to_parameters(get_weights(self.classifier))
 
@@ -660,6 +656,9 @@ class FLEG(Strategy):
             if self.lvl < self.levels:
                 self.epochs_no_improve = 0
                 self.training_gan = True
+                self.gen = self.gan[self.dataset][self.lvl](seed=self.seed).to(self.device)
+                self.parameters_gen = ndarrays_to_parameters(get_weights_gen(self.gen))
+                self.optimG_state_dict = None
                 self.global_net.load_state_dict(self.best_model.state_dict())
                 self.metrics_dict["epoch_transition"].append(self.net_epochs)
                 print("INICIALIZANDO TREINAMENTO DA GAN")
