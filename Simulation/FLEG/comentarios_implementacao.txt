@@ -28,5 +28,5 @@ Para melhorar:
 - add dp para compartilhamentos envolvendo generativo, dados sinteticos
 
 
-CORRIGINDO ERROS DE RODAGEM
+PORQUE net_loss_epoch TEM 25 REGISTROS, MAS NO accuracy_report TEM 28 EPOCAS?
 
