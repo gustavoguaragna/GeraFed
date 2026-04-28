@@ -189,9 +189,8 @@ class FLEG(Strategy):
                         "net_loss_epoch": [],
                         "local_acc_epoch": [],
                         "val_acc": [],
-                        "time_chunk_gan": [],
-                        "time_epoch": [],
-                        "time_epoch_gan": [],
+                        "chunk_gan_time": [],
+                        "net_round_time": [],
                         "max_net_time": [],
                         "global_net_eval_time": [],
                         "max_disc_time": [],
@@ -204,7 +203,7 @@ class FLEG(Strategy):
                         "traffic_cost_embeddings": [],
                         "traffic_cost_generator": [],
                         "traffic_cost_discriminator": [],
-                        "epoch_transition": [],
+                        "epoch_transition": []
                     }
 
         self.gan = {
@@ -299,8 +298,8 @@ class FLEG(Strategy):
             config = {"level": self.lvl}
             
             if self.training_gan:
-                if self.round_gan == 0:
-                    self.init_epoch_time = time.time()
+
+                self.init_chunk_time = time.time()
                 
                 config["model"] = "gan"
                 config["round"] = self.round_gan
@@ -343,7 +342,7 @@ class FLEG(Strategy):
         if self.fraction_evaluate_alvo == 0.0 or self.training_gan or self.finished:
             if self.training_gan:
                 round_time = time.time() - self.init_round_time
-                self.metrics_dict["time_chunk_gan"].append(round_time)
+                self.metrics_dict["chunk_gan_time"].append(round_time)
                 if self.epoch_gan == self.gan_epochs + 1:
                     self.training_gan = False
             return []
@@ -433,9 +432,6 @@ class FLEG(Strategy):
                 raise ValueError(f"input strategy should be fixed or dynamic. Got {self.syn_input}")
 
             if self.epoch_gan == self.gan_epochs + 1:
-
-                epoch_time = time.time() - self.init_epoch_time
-                self.metrics_dict["time_epoch_gan"].append(epoch_time)
 
                 metrics_filename = f"{self.folder}/metrics.json"
 
@@ -648,7 +644,7 @@ class FLEG(Strategy):
 
         self.metrics_dict["local_acc_epoch"].append(accuracy_aggregated)
 
-        self.metrics_dict["time_epoch"].append(time.time() - self.init_round_time)
+        self.metrics_dict["net_round_time"].append(time.time() - self.init_round_time)
 
         metrics_aggregated = {"loss": loss_aggregated, "accuracy": accuracy_aggregated}
 
@@ -665,6 +661,13 @@ class FLEG(Strategy):
 
             else:
                 self.finished = True
+                metrics_filename = f"{self.folder}/metrics.json"
+                try:
+                    with open(metrics_filename, 'w', encoding='utf-8') as f:
+                        json.dump(self.metrics_dict, f, ensure_ascii=False, indent=4) # indent makes it readable
+                    print(f"Metrics dict successfully saved to {metrics_filename}")
+                except Exception as e:
+                    print(f"Error saving metrics dict to JSON: {e}")
 
         return loss_aggregated, metrics_aggregated
 

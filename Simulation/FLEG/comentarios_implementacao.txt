@@ -26,7 +26,7 @@ Para melhorar:
 - mudar evaluation metric fn para melhores logs durante treinamento
 - compartilhar somente updates para reduzir custos de comunicacao e adaptar traffic cost metrics para alinhar no metrics.json
 - add dp para compartilhamentos envolvendo generativo, dados sinteticos
+- retirar envio de dataset vazio de embeddings no primeiro nivel (salva só 0.5kb, mas fica mais elegante kkk)
 
-
-PORQUE net_loss_epoch TEM 25 REGISTROS, MAS NO accuracy_report TEM 28 EPOCAS?
+TESTAR EM GPU
 
