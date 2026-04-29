@@ -1258,6 +1258,7 @@ def train_disc(gen, disc, trainloader, feature_extractor, epochs, device, optim,
     
     gen.to(device)  # move model to GPU if available
     disc.to(device)  # move model to GPU if available
+    feature_extractor.to(device)  # move model to GPU if available
 
     d_loss_b = 0
     total_samples = 0
@@ -1465,53 +1466,53 @@ def local_test(net: nn.Module,
 
     return results_metrics["overall_accuracy"]
 
-def get_model(dataset, level, seed):
+def get_model(dataset, level, seed, device):
     if level == 0:
         if dataset == "mnist":
-            classifier = Net(seed=seed)
+            classifier = Net(seed=seed).to(device)
         elif dataset == "cifar10":
-            classifier = Net_Cifar(seed=seed)
+            classifier = Net_Cifar(seed=seed).to(device)
         else:
             raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {dataset} não reconhecido") 
         return classifier, None
 
     elif level == 1:
         if dataset == "mnist":
-            feature_extractor = FeatureExtractor1(seed=seed)
-            classifier = ClassifierHead1(seed=seed)
+            feature_extractor = FeatureExtractor1(seed=seed).to(device)
+            classifier = ClassifierHead1(seed=seed).to(device)
         elif dataset == "cifar10":
-            feature_extractor = FeatureExtractor1_Cifar(seed=seed)
-            classifier = ClassifierHead1_Cifar(seed=seed)
+            feature_extractor = FeatureExtractor1_Cifar(seed=seed).to(device)
+            classifier = ClassifierHead1_Cifar(seed=seed).to(device)
         else:
             raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {dataset} não reconhecido")
 
     elif level == 2:
         if dataset == "mnist":
-            feature_extractor = FeatureExtractor2(seed=seed)
-            classifier = ClassifierHead2(seed=seed)
+            feature_extractor = FeatureExtractor2(seed=seed).to(device)
+            classifier = ClassifierHead2(seed=seed).to(device)
         elif dataset == "cifar10":
-            feature_extractor = FeatureExtractor2_Cifar(seed=seed)
-            classifier = ClassifierHead2_Cifar(seed=seed)
+            feature_extractor = FeatureExtractor2_Cifar(seed=seed).to(device)
+            classifier = ClassifierHead2_Cifar(seed=seed).to(device)
         else:
             raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {dataset} não reconhecido")
 
     elif level == 3:
         if dataset == "mnist":
-            feature_extractor = FeatureExtractor3(seed=seed)
-            classifier = ClassifierHead3(seed=seed)
+            feature_extractor = FeatureExtractor3(seed=seed).to(device)
+            classifier = ClassifierHead3(seed=seed).to(device)
         elif dataset == "cifar10":
-            feature_extractor = FeatureExtractor3_Cifar(seed=seed)
-            classifier = ClassifierHead3_Cifar(seed=seed)
+            feature_extractor = FeatureExtractor3_Cifar(seed=seed).to(device)
+            classifier = ClassifierHead3_Cifar(seed=seed).to(device)
         else:
             raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {dataset} não reconhecido")
 
     elif level == 4:
         if dataset == "mnist":
-            feature_extractor = FeatureExtractor4(seed=seed)
-            classifier = ClassifierHead4(seed=seed)
+            feature_extractor = FeatureExtractor4(seed=seed).to(device)
+            classifier = ClassifierHead4(seed=seed).to(device)
         elif dataset == "cifar10":
-            feature_extractor = FeatureExtractor4_Cifar(seed=seed)
-            classifier = ClassifierHead4_Cifar(seed=seed)
+            feature_extractor = FeatureExtractor4_Cifar(seed=seed).to(device)
+            classifier = ClassifierHead4_Cifar(seed=seed).to(device)
         else:
             raise ValueError(f"dataset deveria ser mnist ou cifar10, {dataset} não reconhecido")
     

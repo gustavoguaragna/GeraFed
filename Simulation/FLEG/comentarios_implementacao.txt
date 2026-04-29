@@ -28,5 +28,5 @@ Para melhorar:
 - add dp para compartilhamentos envolvendo generativo, dados sinteticos
 - retirar envio de dataset vazio de embeddings no primeiro nivel (salva só 0.5kb, mas fica mais elegante kkk)
 
-TESTAR EM GPU
+RODOU NA GPU, CONFEREI EPOCAS DE TRANSICAO, TALVEZ TENHA DADO DIFERENTE DA CPU, VER SE FAZ SENTIDO
 
