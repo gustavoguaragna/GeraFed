@@ -8,6 +8,7 @@ from flwr_datasets import FederatedDataset
 from flwr_datasets.partitioner import IidPartitioner, DirichletPartitioner
 from torch.utils.data import DataLoader, Subset, random_split
 import math
+import time
 from torchvision.transforms import Compose, Normalize, ToTensor
 from flwr_datasets.partitioner import Partitioner
 from typing import Optional, List, Union
@@ -169,7 +170,7 @@ def load_data(partition_id: int,
 
     if fds is None:
         print(f"Carregamento dos Dados - {dataset}")
-        if partitioner_type == "Dir":
+        if "Dir" in partitioner_type:
             print("Dados por Dirichlet")
             partitioner = DirichletPartitioner(
                 num_partitions=num_partitions,
@@ -178,7 +179,7 @@ def load_data(partition_id: int,
                 min_partition_size=0,
                 self_balancing=False
             )
-        elif partitioner_type == "Class":
+        elif "Class" in partitioner_type:
             print("Dados por classe")
             partitioner = ClassPartitioner(num_partitions=num_partitions, seed=42)
         else:
@@ -262,8 +263,8 @@ def load_data(partition_id: int,
     else:
         trainloader_real = DataLoader(client_dataset["train"], batch_size=batch_size, shuffle=True)
     
-    testloader = DataLoader(test_partition, batch_size=batch_size, shuffle=True)
-    testloader_local = DataLoader(client_dataset["test"], batch_size=batch_size, shuffle=True)
+    testloader = DataLoader(test_partition, batch_size=64, shuffle=True)
+    testloader_local = DataLoader(client_dataset["test"], batch_size=64, shuffle=True)
 
     return trainloader_real, testloader, testloader_local
 
@@ -272,7 +273,7 @@ def train(net, trainloader, epochs, device, dataset, lr):
     """Train the model on the training set."""
     net.to(device)  # move model to GPU if available
     criterion = torch.nn.CrossEntropyLoss().to(device)
-    optimizer = torch.optim.Adam(net.parameters(), lr=lr)
+    optimizer = torch.optim.SGD(net.parameters(), lr=lr)
     net.train()
     if dataset == "mnist":
         image = "image"
@@ -318,10 +319,100 @@ def test(net, testloader, device, dataset):
     loss = loss / len(testloader)
     return loss, accuracy
 
+def local_test(net: nn.Module,
+               testloader: DataLoader,
+               device: str,
+               acc_filepath: str,
+               epoch: int,
+               cliente: str,
+               num_classes: int = 10,
+               continue_epoch: int = 0,
+               dataset: str = "mnist"):
+    client_eval_time = time.time()
+    class_correct = defaultdict(int)
+    class_total = defaultdict(int)
+    predictions_counter = defaultdict(int)
+
+    net.eval()
+    net.to(device)
+
+    if dataset == "mnist":
+        image = "image"
+    elif dataset == "cifar10":
+        image = "img"
+    else:
+        raise ValueError(f"dataset nao identificado")
+
+    with torch.no_grad():
+        for batch in testloader:
+            images, labels = batch[image].to(device), batch["label"].to(device)
+            outputs = net(images)
+            _, predicted = torch.max(outputs, 1)
+
+            for true_label, pred_label in zip(labels, predicted):
+                true_idx = true_label.item()
+                pred_idx = pred_label.item()
+
+                class_total[true_idx] += 1
+                predictions_counter[pred_idx] += 1
+
+                if true_idx == pred_idx:
+                    class_correct[true_idx] += 1
+
+        results_metrics = {
+            "class_metrics": {},
+            "overall_accuracy": None,
+            "prediction_distribution": dict(predictions_counter)
+        }
+
+        for i in range(num_classes):
+            metrics = {
+                "samples": class_total[i],
+                "predictions": predictions_counter[i],
+                "accuracy": class_correct[i] / class_total[i] if class_total[i] > 0 else "N/A"
+            }
+            results_metrics["class_metrics"][f"class_{i}"] = metrics
+
+        total_samples = sum(class_total.values())
+        results_metrics["overall_accuracy"] = (
+            sum(class_correct.values()) / total_samples if total_samples > 0 else 0.0
+        )
+
+        with open(acc_filepath, "a") as f:
+            f.write(f"Epoch {epoch+continue_epoch} - Client {cliente}\n")
+            f.write("{:<10} {:<10} {:<10} {:<10}\n".format(
+                "Class", "Accuracy", "Samples", "Predictions"))
+            f.write("-"*45 + "\n")
+
+            for cls in range(num_classes):
+                metrics = results_metrics["class_metrics"][f"class_{cls}"]
+                accuracy = (f"{metrics['accuracy']:.4f}"
+                            if isinstance(metrics['accuracy'], float)
+                            else "  N/A  ")
+
+                f.write("{:<10} {:<10} {:<10} {:<10}\n".format(
+                    f"Class {cls}",
+                    accuracy,
+                    metrics['samples'],
+                    metrics['predictions']
+                ))
+
+            f.write("\n{:<20} {:.4f}".format("Overall Accuracy:", results_metrics["overall_accuracy"]))
+            f.write("\n{:<20} {}".format("Total Samples:", total_samples))
+            f.write("\n{:<20} {}".format("Total Predictions:", sum(predictions_counter.values())))
+            f.write("\n{:<20} {:.4f}".format("Client Evaluation Time:", time.time() - client_eval_time))
+            f.write("\n")
+            f.write("\n")
+
+    print("Results saved to accuracy_report.txt")
+
+    return results_metrics["overall_accuracy"]
+
 def get_weights(net):
     return [val.cpu().numpy() for _, val in net.state_dict().items()]
 
 def set_weights(net, parameters):
+    device = next(net.parameters()).device
     params_dict = zip(net.state_dict().keys(), parameters)
-    state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
+    state_dict = OrderedDict({k: torch.tensor(v).to(device) for k, v in params_dict})
     net.load_state_dict(state_dict, strict=True)
