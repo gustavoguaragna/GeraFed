@@ -453,7 +453,7 @@ class FlowerClient(NumPyClient):
             state_dict = torch.load(buf_net, map_location=self.device)
             self.net.load_state_dict(state_dict, strict=False)
 
-        self.classifier, _ = get_model(dataset=self.dataset, level=config["level"], seed=self.seed)
+        self.classifier, _ = get_model(dataset=self.dataset, level=config["level"], seed=self.seed, device=self.device)
 
         set_weights(self.classifier, parameters)
         self.net.load_state_dict(self.classifier.state_dict(), strict=False)

@@ -1,6 +1,9 @@
 """GeraFed: um framework para balancear dados heterogêneos em aprendizado federado."""
 
+import os
+import time
 import torch
+from torch.utils.data import DataLoader, ConcatDataset
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import Context
 from Simulation.CNN.task import (
@@ -8,55 +11,96 @@ from Simulation.CNN.task import (
     Net_CIFAR,
     get_weights, 
     load_data, 
+    local_test,
     set_weights, 
-    test, 
     train
 )
 
 
 # Define Flower Client and client_fn
 class FlowerClient(NumPyClient):
-    def __init__(self, net, trainloader, testloader, local_epochs, dataset, lr):
+    def __init__(self,
+                 cid,
+                 net,
+                 trainloader,
+                 testloader_local,
+                 local_epochs,
+                 dataset,
+                 lr,
+                 batch_size,
+                 folder,
+                 continue_epoch):
+        self.cid = cid
         self.net = net
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.net.to(self.device)
         self.trainloader = trainloader
-        self.testloader = testloader
+        self.testloader_local = testloader_local
         self.local_epochs = local_epochs
         self.dataset = dataset
         self.lr = lr
+        self.batch_size = batch_size
+        self.folder = folder
+        self.continue_epoch = continue_epoch
 
     def fit(self, parameters, config):
 
         # Atualiza pesos do modelo classificador
         set_weights(self.net, parameters)
 
-         # Define o dataloader
+        # Define o dataloader como no FLEG: o classificador usa todos os chunks locais.
         if isinstance(self.trainloader, list):
-            chunk_idx = config["round"] % len(self.trainloader)
-            trainloader_chunk = self.trainloader[chunk_idx]
+            trainloader = DataLoader(
+                ConcatDataset([dl.dataset for dl in self.trainloader]),
+                batch_size=self.batch_size,
+                shuffle=True
+            )
         else:
-            trainloader_chunk = self.trainloader
+            trainloader = self.trainloader
 
+        train_start_time = time.time()
         train_loss = train(
             net=self.net,
-            trainloader=trainloader_chunk,
+            trainloader=trainloader,
             epochs=self.local_epochs,
             device=self.device,
             dataset=self.dataset,
             lr=self.lr
         )
+        train_time = time.time() - train_start_time
 
         return (
             get_weights(self.net),
-            len(trainloader_chunk.dataset),
-            {"train_loss": train_loss},
+            len(trainloader.dataset),
+            {
+                "train_loss": train_loss,
+                "tempo_treino_alvo": train_time,
+            },
         )
 
     def evaluate(self, parameters, config):
         set_weights(self.net, parameters)
-        loss, accuracy = test(self.net, self.testloader, self.device, dataset=self.dataset)
-        return loss, len(self.testloader.dataset), {"accuracy": accuracy}
+        local_test_start_time = time.time()
+        local_acc = local_test(
+            net=self.net,
+            testloader=self.testloader_local,
+            device=self.device,
+            acc_filepath=f"{self.folder}/accuracy_report.txt",
+            epoch=int(config["round"]),
+            cliente=self.cid,
+            continue_epoch=self.continue_epoch,
+            dataset=self.dataset
+        )
+        local_test_time = time.time() - local_test_start_time
+
+        return (
+            0.0,
+            len(self.testloader_local.dataset),
+            {
+                "local_test_time": local_test_time,
+                "local_accuracy": local_acc,
+            },
+        )
 
 
 def client_fn(context: Context):
@@ -77,6 +121,11 @@ def client_fn(context: Context):
     teste          = context.run_config["teste"]
     num_chunks     = context.run_config["num_chunks"]
     lr             = context.run_config["learn_rate_alvo"]
+    strategy       = context.run_config["strategy"]
+    num_clients    = context.run_config["num_clients"]
+    continue_epoch = context.run_config["continue_epoch"]
+    folder         = f"{context.run_config['Exp_name_folder']}CNN/{dataset}/{partitioner}/{strategy}/{num_clients}_clients"
+    os.makedirs(folder, exist_ok=True)
 
     if dataset == "mnist":
         net = Net(seed=seed)
@@ -85,26 +134,31 @@ def client_fn(context: Context):
     else:
         raise ValueError(f"Dataset {dataset} nao identificado. Deveria ser 'mnist' ou 'cifar10'")
 
-    trainloader, testloader, testloader_local = load_data(partition_id=partition_id,
-                                       num_partitions=num_partitions,
-                                       dataset=dataset,
-                                       teste=teste,
-                                       partitioner_type=partitioner,
-                                       num_chunks=num_chunks,
-                                       batch_size=batch_size
-                                      )
+    trainloader, _, testloader_local = load_data(
+        partition_id=partition_id,
+        num_partitions=num_partitions,
+        dataset=dataset,
+        teste=teste,
+        partitioner_type=partitioner,
+        num_chunks=num_chunks,
+        batch_size=batch_size,
+        alpha_dir=alpha_dir
+    )
 
     # Return Client instance
-    return FlowerClient(net, 
-                        trainloader, 
-                        testloader, 
-                        local_epochs,
+    return FlowerClient(cid=partition_id,
+                        net=net,
+                        trainloader=trainloader,
+                        testloader_local=testloader_local,
+                        local_epochs=local_epochs,
                         dataset=dataset,
-                        lr=lr).to_client()
+                        lr=lr,
+                        batch_size=batch_size,
+                        folder=folder,
+                        continue_epoch=continue_epoch).to_client()
 
 
 # Flower ClientApp
 app = ClientApp(
     client_fn,
 )
-

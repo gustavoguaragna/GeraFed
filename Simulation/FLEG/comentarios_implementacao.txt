@@ -28,5 +28,26 @@ Para melhorar:
 - add dp para compartilhamentos envolvendo generativo, dados sinteticos
 - retirar envio de dataset vazio de embeddings no primeiro nivel (salva só 0.5kb, mas fica mais elegante kkk)
 
-TESTAR EM GPU
+Por algum motivo, a partir da troca de nivel as acurácias exatas do modelo treinado em gpu (thedeep) ou cpu (mac intel1.5) diferem
 
+Achei legal de colocar algo assim quando rodar:
+    print(f"""
+╔══════════════════════════════════════════════════════╗
+║           FLEG — Flower Simulation                   ║
+╠══════════════════════════════════════════════════════╣
+  Dataset       : {cfg.dataset}
+  Particionador : {cfg.partitioner}
+  Clientes      : {cfg.num_clients}
+  Estratégia    : {cfg.strategy}
+  Níveis        : {cfg.levels}
+  Paciência     : {cfg.patience}
+  Épocas GAN    : {cfg.gan_epochs}
+  Chunks        : {cfg.num_chunks}
+  Gen. iter./chunk: {cfg.gen_ite}
+  Latent dim    : {cfg.tam_ruido}
+  Num. sintéticas: {cfg.num_syn}
+  Seed          : {cfg.seed}
+╚══════════════════════════════════════════════════════╝
+""")
+
+ESTA RODANDO UM EXPERIMENTO COMPLETO NA THEDEEP2 PARA COMPARAR COM O RESULTADO DO FLEG SEM FLWR. ENQUANTO ISSO ESTOU LENDO O CODIGO DO CLAUDE

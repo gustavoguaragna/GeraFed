@@ -174,12 +174,12 @@ class FLEG(Strategy):
         self.newlvl= True
         self.training_gan = False
         if self.dataset == "mnist":
-            self.global_net = Net()
-            self.best_model = Net()
+            self.global_net = Net().to(self.device)
+            self.best_model = Net().to(self.device)
             self.image = "image"
         elif self.dataset == "cifar10":
-            self.global_net = Net_Cifar()
-            self.best_model = Net_Cifar()
+            self.global_net = Net_Cifar().to(self.device)
+            self.best_model = Net_Cifar().to(self.device)
             self.image = "img"
         else:
             raise ValueError(f"Dataset {self.dataset} nao identificado. Deveria ser 'mnist' ou 'cifar10'")

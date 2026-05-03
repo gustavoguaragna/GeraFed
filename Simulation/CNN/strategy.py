@@ -103,6 +103,8 @@ class GeraFed(Strategy):
         agg: str = "full",
         num_chunks: int = 1,
         folder: str = ".",
+        valloader = None,
+        model_save_interval: int = 10,
     ) -> None:
         super().__init__()
 
@@ -132,6 +134,53 @@ class GeraFed(Strategy):
         self.agg = agg
         self.num_chunks = num_chunks
         self.folder = folder
+        self.valloader = valloader
+        self.model_save_interval = model_save_interval
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if self.dataset == "mnist":
+            self.image = "image"
+        elif self.dataset == "cifar10":
+            self.image = "img"
+        else:
+            raise ValueError(f"Dataset {self.dataset} nao identificado. Deveria ser 'mnist' ou 'cifar10'")
+        self.metrics_dict = {
+            "time_round": [],
+            "net_loss_epoch": [],
+            "local_acc_epoch": [],
+            "val_acc": [],
+            "global_net_eval_time": [],
+            "max_net_time": [],
+            "max_local_test_time": [],
+        }
+        self._saved_metric_counts = {key: 0 for key in self.metrics_dict}
+
+    def _save_metrics(self) -> None:
+        metrics_filename = f"{self.folder}/metrics.json"
+
+        try:
+            with open(metrics_filename, 'r', encoding='utf-8') as f:
+                existing_metrics = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            existing_metrics = {}
+            print("Metrics file not found or invalid. A new one will be created.")
+            print(metrics_filename)
+
+        for key, values in self.metrics_dict.items():
+            saved_count = self._saved_metric_counts.get(key, 0)
+            new_values = values[saved_count:]
+            if not new_values:
+                continue
+            existing_list = existing_metrics.get(key, [])
+            existing_list.extend(new_values)
+            existing_metrics[key] = existing_list
+            self._saved_metric_counts[key] = len(values)
+
+        try:
+            with open(metrics_filename, 'w', encoding='utf-8') as f:
+                json.dump(existing_metrics, f, ensure_ascii=False, indent=4)
+            print(f"Metrics dict successfully saved to {metrics_filename}")
+        except Exception as e:
+            print(f"Error saving metrics dict to JSON: {e}")
 
     def __repr__(self) -> str:
         """Compute a string representation of the strategy."""
@@ -181,11 +230,6 @@ class GeraFed(Strategy):
     ) -> list[tuple[ClientProxy, FitIns]]:
         """Configure the next round of training."""
         self.init_round_time = time.time()
-        self.metrics_dict = {
-            "time_round": [],
-            "net_loss_chunk": [],
-            "net_acc_epoch": [],
-            }
         config = {}
         if self.on_fit_config_fn is not None:
             # Custom fit config function provided
@@ -235,12 +279,9 @@ class GeraFed(Strategy):
         # Do not configure federated evaluation if fraction eval is 0.
         if self.fraction_evaluate == 0.0:
             return []
-
-        if server_round % self.num_chunks != 0:
-            return None
         
         # Parameters and config
-        config = {}
+        config = {"round": server_round}
         if self.on_evaluate_config_fn is not None:
             # Custom evaluation config function provided
             config = self.on_evaluate_config_fn(server_round)
@@ -300,24 +341,54 @@ class GeraFed(Strategy):
         if self.fit_metrics_aggregation_fn:
             fit_metrics = [(res.num_examples, res.metrics) for _, res in results]
             metrics_aggregated = self.fit_metrics_aggregation_fn(fit_metrics)
-            self.metrics_dict["net_loss_chunk"].append(metrics_aggregated["net_loss_chunk"])
         elif server_round == 1:  # Only log this warning once
             log(WARNING, "No fit_metrics_aggregation_fn provided")
 
+        avg_net_loss = weighted_loss_avg(
+            [
+                (fit_res.num_examples, fit_res.metrics["train_loss"])
+                for _, fit_res in results
+            ]
+        )
+        self.metrics_dict["net_loss_epoch"].append(avg_net_loss)
+
+        net_times = [
+            fit_res.metrics["tempo_treino_alvo"]
+            for _, fit_res in results
+            if "tempo_treino_alvo" in fit_res.metrics
+        ]
+        if net_times:
+            self.metrics_dict["max_net_time"].append(max(net_times))
+
         if parameters_aggregated is not None:
-            # Salva o modelo após a agregação
-            # Cria uma instância do modelo
             if self.dataset == "mnist":
-                net = Net()
+                net = Net().to(self.device)
             elif self.dataset == "cifar10":
-                net = Net_CIFAR()
+                net = Net_CIFAR().to(self.device)
             else:
                 raise ValueError(f"Dataset {self.dataset} nao identificado. Deveria ser 'mnist' ou 'cifar10'")
-            # Define os pesos do modelo
+
             set_weights(net, aggregated_ndarrays)
-            # Salva o modelo no disco com o nome específico do dataset
-            if server_round % self.num_chunks == 0:
-                net_path = f"{self.folder}/modelo_epoch_{int(server_round/self.num_chunks)}.pth"
+
+            if self.valloader is not None:
+                criterion = torch.nn.CrossEntropyLoss()
+                correct, loss = 0, 0.0
+                net_global_eval_start_time = time.time()
+                net.eval()
+                with torch.no_grad():
+                    for batch in self.valloader:
+                        images = batch[self.image].to(self.device)
+                        labels = batch["label"].to(self.device)
+                        outputs = net(images)
+                        loss += criterion(outputs, labels).item()
+                        correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
+                accuracy = correct / len(self.valloader.dataset)
+                self.metrics_dict["global_net_eval_time"].append(time.time() - net_global_eval_start_time)
+                self.metrics_dict["val_acc"].append(accuracy)
+                print(f"Acurácia global no test set: {accuracy:.4f}")
+
+            if server_round % self.model_save_interval == 0:
+                net_path = f"{self.folder}/modelo_epoch_{server_round}.pth"
                 torch.save(net.state_dict(), net_path)
                 print(f"Modelo salvo em {net_path}")
 
@@ -357,18 +428,19 @@ class GeraFed(Strategy):
             ]
         )
 
-        accuracies = [
-            evaluate_res.metrics["accuracy"] * evaluate_res.num_examples
-            for _, evaluate_res in results
-        ]
-        examples = [evaluate_res.num_examples for _, evaluate_res in results]
-        accuracy_aggregated = (
-            sum(accuracies) / sum(examples) if sum(examples) != 0 else 0
+        local_test_times = [evaluate_res.metrics["local_test_time"] for _, evaluate_res in results]
+        self.metrics_dict["max_local_test_time"].append(max(local_test_times))
+
+        accuracy_aggregated = weighted_loss_avg(
+            [
+                (evaluate_res.num_examples, evaluate_res.metrics["local_accuracy"])
+                for _, evaluate_res in results
+            ]
         )
 
-        self.metrics_dict["net_acc_epoch"].append(accuracy_aggregated)
+        self.metrics_dict["local_acc_epoch"].append(accuracy_aggregated)
 
-        loss_file = f"losses.txt"
+        loss_file = f"{self.folder}/losses.txt"
         with open(loss_file, "a") as f:
             f.write(f"Rodada {server_round}, Perda: {loss_aggregated}, Acuracia: {accuracy_aggregated}\n")
         print(f"Perda da rodada {server_round} salva em {loss_file}")
@@ -384,34 +456,6 @@ class GeraFed(Strategy):
         round_time = time.time() - self.init_round_time
         self.metrics_dict["time_round"].append(round_time)
 
-        metrics_filename = f"{self.folder}/metrics.json"
-
-        try:
-            with open(metrics_filename, 'r', encoding='utf-8') as f:
-                # Load the dictionary from the JSON file
-                existing_metrics = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            # If the file is not found or is not valid JSON, we start fresh
-            existing_metrics = {}
-            print("Metrics file not found or invalid. A new one will be created.")
-            print(metrics_filename)
-
-        for key, new_values in self.metrics_dict.items():
-            # Get the list that already exists for this key, or an empty list if the key is new
-            existing_list = existing_metrics.get(key, [])
-            
-            # Use .extend() to add the new items to the existing list
-            existing_list.extend(new_values)
-            
-            # Update the dictionary with the newly extended list
-            existing_metrics[key] = existing_list
-
-        try:
-            with open(metrics_filename, 'w', encoding='utf-8') as f:
-                json.dump(existing_metrics, f, ensure_ascii=False, indent=4) # indent makes it readable
-            print(f"Losses dict successfully saved to {metrics_filename}")
-        except Exception as e:
-            print(f"Error saving losses dict to JSON: {e}")
+        self._save_metrics()
 
         return loss_aggregated, metrics_aggregated
-
