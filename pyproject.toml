@@ -23,7 +23,7 @@ dependencies = [
 
     # Utility & support
     "tqdm==4.67.1",
-    click = ">=8.1,<8.3"
+    "click >=8.1,<8.3"
 ]
 
 [tool.hatch.build.targets.wheel]
