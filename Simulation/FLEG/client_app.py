@@ -95,10 +95,10 @@ class FlowerClient(NumPyClient):
         self.testloader_local = testloader_local     
 
         if self.dataset == "mnist":
-            self.net = Net(seed=self.seed)
+            self.net = Net(seed=self.seed).to(self.device)
             self.asset_name = "image"
         elif self.dataset == "cifar10":
-            self.net = Net_Cifar(seed=self.seed)
+            self.net = Net_Cifar(seed=self.seed).to(self.device)
             self.asset_name = "img"  
 
 
@@ -107,49 +107,49 @@ class FlowerClient(NumPyClient):
         if config["model"] == "gan":
             if config["level"] == 0:
                 if self.dataset == "mnist":
-                    self.gen = EmbeddingGAN0(seed=self.seed)
-                    self.disc = EmbeddingGAN0(seed=self.seed)
-                    self.feature_extractor = FeatureExtractor1(seed=self.seed)
+                    self.gen = EmbeddingGAN0(seed=self.seed).to(self.device)
+                    self.disc = EmbeddingGAN0(seed=self.seed).to(self.device)
+                    self.feature_extractor = FeatureExtractor1(seed=self.seed).to(self.device)
                 elif self.dataset == "cifar10":
-                    self.gen = EmbeddingGAN0_Cifar(seed=self.seed)
-                    self.disc = EmbeddingGAN0_Cifar(seed=self.seed)
-                    self.feature_extractor = FeatureExtractor1_Cifar(seed=self.seed)
+                    self.gen = EmbeddingGAN0_Cifar(seed=self.seed).to(self.device)
+                    self.disc = EmbeddingGAN0_Cifar(seed=self.seed).to(self.device)
+                    self.feature_extractor = FeatureExtractor1_Cifar(seed=self.seed).to(self.device)
                 else:
                     raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {self.dataset} não reconhecido")
 
             elif config["level"] == 1:
                 if self.dataset == "mnist":
-                    self.gen = EmbeddingGAN1(seed=self.seed)
-                    self.disc = EmbeddingGAN1(seed=self.seed)
-                    self.feature_extractor = FeatureExtractor2(seed=self.seed)
+                    self.gen = EmbeddingGAN1(seed=self.seed).to(self.device)
+                    self.disc = EmbeddingGAN1(seed=self.seed).to(self.device)
+                    self.feature_extractor = FeatureExtractor2(seed=self.seed).to(self.device)
                 elif self.dataset == "cifar10":
-                    self.gen = EmbeddingGAN1_Cifar(seed=self.seed)
-                    self.disc = EmbeddingGAN1_Cifar(seed=self.seed)
-                    self.feature_extractor = FeatureExtractor2_Cifar(seed=self.seed)
+                    self.gen = EmbeddingGAN1_Cifar(seed=self.seed).to(self.device)
+                    self.disc = EmbeddingGAN1_Cifar(seed=self.seed).to(self.device)
+                    self.feature_extractor = FeatureExtractor2_Cifar(seed=self.seed).to(self.device)
                 else:
                     raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {self.dataset} não reconhecido")
 
             elif config["level"] == 2:
                 if self.dataset == "mnist":
-                    self.gen = EmbeddingGAN2(seed=self.seed)
-                    self.disc = EmbeddingGAN2(seed=self.seed)
-                    self.feature_extractor = FeatureExtractor3(seed=self.seed)
+                    self.gen = EmbeddingGAN2(seed=self.seed).to(self.device)
+                    self.disc = EmbeddingGAN2(seed=self.seed).to(self.device)
+                    self.feature_extractor = FeatureExtractor3(seed=self.seed).to(self.device)
                 elif self.dataset == "cifar10":
-                    self.gen = EmbeddingGAN2_Cifar(seed=self.seed)
-                    self.disc = EmbeddingGAN2_Cifar(seed=self.seed)
-                    self.feature_extractor = FeatureExtractor3_Cifar(seed=self.seed)
+                    self.gen = EmbeddingGAN2_Cifar(seed=self.seed).to(self.device)
+                    self.disc = EmbeddingGAN2_Cifar(seed=self.seed).to(self.device)
+                    self.feature_extractor = FeatureExtractor3_Cifar(seed=self.seed).to(self.device)
                 else:
                     raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {self.dataset} não reconhecido")
 
             elif config["level"] == 3:
                 if self.dataset == "mnist":
-                    self.gen = EmbeddingGAN3(seed=self.seed)
-                    self.disc = EmbeddingGAN3(seed=self.seed)
-                    self.feature_extractor = FeatureExtractor4(seed=self.seed)
+                    self.gen = EmbeddingGAN3(seed=self.seed).to(self.device)
+                    self.disc = EmbeddingGAN3(seed=self.seed).to(self.device)
+                    self.feature_extractor = FeatureExtractor4(seed=self.seed).to(self.device)
                 elif self.dataset == "cifar10":
-                    self.gen = EmbeddingGAN3_Cifar(seed=self.seed)
-                    self.disc = EmbeddingGAN3_Cifar(seed=self.seed)
-                    self.feature_extractor = FeatureExtractor4_Cifar(seed=self.seed)
+                    self.gen = EmbeddingGAN3_Cifar(seed=self.seed).to(self.device)
+                    self.disc = EmbeddingGAN3_Cifar(seed=self.seed).to(self.device)
+                    self.feature_extractor = FeatureExtractor4_Cifar(seed=self.seed).to(self.device)
                 else:
                     raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {self.dataset} não reconhecido")
             
@@ -261,7 +261,7 @@ class FlowerClient(NumPyClient):
             else:
                 trainloader = self.trainloader
 
-            self.classifier, self.feature_extractor = get_model(dataset=self.dataset, level=config["level"], seed=self.seed)
+            self.classifier, self.feature_extractor = get_model(dataset=self.dataset, level=config["level"], seed=self.seed, device=self.device)
             
             # Atualiza pesos do modelo classificador
             set_weights(self.classifier, parameters)
