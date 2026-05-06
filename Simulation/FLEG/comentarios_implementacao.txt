@@ -2,7 +2,6 @@ Para melhorar:
 - creio que num_samples pode ser definida dentro da if clause de self.epoch_gan == 25
 - reavaliar contabilizacao dos custos de rede se quero fazer total ou por cliente.
 - ver se deixar dataset inteiro no context é mais eficiente, ao inves de salvar os dados sinteticos recebidos no contexto do cliente, salvar conjunto aumentado para evitar a filtragem toda rodada.
-- alterar metodo de instanciacao de classe do client_app para evitar if e elses, como em strategy
 - add tempo de carregamento dados e modelos (acertar medidas de tempo)
 - inverter ordem de if no fit client_app.py para vir primeiro parte do classificador e depois generativo. No aggregate_fit e configure_fit do strategy.py tb
 - Nao compartilhar discs
@@ -50,9 +49,8 @@ Achei legal de colocar algo assim quando rodar:
 ╚══════════════════════════════════════════════════════╝
 """)
 
-AO RODAR UM EXPERIMENTO, AS LOSSES DA GEN E DISC ESTÃO BEM ABAIXO DAS OBTIDAS COM O FLEG.PY. O CHAT LOCALIZOU QUE NO FLWR ESTÁ SENDO OTIMIZADO
-A CAMADA DE LABEL EMBEDDING NA DISC E GEN, ENQUANTO QUE ESSA CAMADA NÃO É TREINADA EM FLEG.PY. ESTOU RODANDO SEM TREINAR A CAMADA NO FLWR PARA VER SE 
-AJUSTA. DE QUALQUER FORMA, AS ACURÁCIAS DO MODELO CLASSIFICADOR SÃO BOAS, MAS EQUIPARÁVEIS COM O BASELINE.
+Ao rodar um experimento, as losses da gen e disc estão bem abaixo das obtidas com o fleg.py. o chat localizou que no flwr está sendo otimizado
+a camada de label embedding na disc e gen, enquanto que essa camada não é treinada em fleg.py. Rodei sem treinar a camada no flwr para ver se 
+ajusta, mas não ajustou. De qualquer forma, as acurácias do modelo classificador são boas, mas equiparáveis com o baseline. Vou testar com cifar10
+para ver se tem ganhos.
 
-ENQUANTO ISSO ESTOU LENDO O CODIGO DO CLAUDE, MAS DECIDI USAR CODEX PARA AVALIAR OS CODIGOS DO CLAUDE E GEMINI.
-FUI PEDIR NO CODEX, MAS ATINGI O LIMITE, TENHO QUE ALTERAR A CONTA.
