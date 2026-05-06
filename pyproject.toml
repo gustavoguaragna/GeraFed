@@ -33,13 +33,13 @@ packages = ["."]
 publisher = "gustavoguaragna"
 
 [tool.flwr.app.components]
-serverapp = "Simulation.CNN.server_app:app"
-clientapp = "Simulation.CNN.client_app:app"
+serverapp = "Simulation.FLEG.server_app:app"
+clientapp = "Simulation.FLEG.client_app:app"
 
 [tool.flwr.app.config]
 agg                  = "full"        # 'disc', 'full', 'f2a', 'none'
 continue_epoch       = 0
-dataset              = "mnist"       # 'mnist', 'cifar10'
+dataset              = "cifar10"       # 'mnist', 'cifar10'
 epocas_alvo          = 1
 epocas_gen           = 2
 epocas_disc          = 2
@@ -55,7 +55,7 @@ levels               = 4
 model                = "both"       # 'alvo', 'gen', 'both'
 num_chunks           = 2
 num_clients          = 4
-num_epocas           = 50
+num_epocas           = 30
 partitioner          = "Class"      # 'Class', 'Dir01', 'Dir05', 'IID' (IID no else)
 patience             = 2
 seed                 = 42

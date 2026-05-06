@@ -174,12 +174,12 @@ class FLEG(Strategy):
         self.newlvl= True
         self.training_gan = False
         if self.dataset == "mnist":
-            self.global_net = Net().to(self.device)
-            self.best_model = Net().to(self.device)
+            self.global_net = Net(seed=self.seed).to(self.device)
+            self.best_model = Net(seed=self.seed).to(self.device)
             self.image = "image"
         elif self.dataset == "cifar10":
-            self.global_net = Net_Cifar().to(self.device)
-            self.best_model = Net_Cifar().to(self.device)
+            self.global_net = Net_Cifar(seed=self.seed).to(self.device)
+            self.best_model = Net_Cifar(seed=self.seed).to(self.device)
             self.image = "img"
         else:
             raise ValueError(f"Dataset {self.dataset} nao identificado. Deveria ser 'mnist' ou 'cifar10'")
@@ -381,11 +381,16 @@ class FLEG(Strategy):
 
         if self.training_gan:
             # Define os pesos do modelo
-            disc_ndarrays = {fit_res.metrics["cid"]: parameters_to_ndarrays(fit_res.parameters) for _, fit_res in results}
             gan_class = self.gen.__class__
-            self.discs = [gan_class().to(self.device) for _ in range(len(disc_ndarrays))]
-            for i, disc in enumerate(self.discs):
-                set_weights_disc(disc, disc_ndarrays[i])
+            sorted_results = sorted(
+                results,
+                key=lambda result: int(result[1].metrics.get("cid", 0)),
+            )
+            self.discs = []
+            for _, fit_res in sorted_results:
+                disc = gan_class(seed=self.seed).to(self.device)
+                set_weights_disc(disc, parameters_to_ndarrays(fit_res.parameters))
+                self.discs.append(disc)
 
             gen_time_start = time.time()
             g_loss, self.optimG_state_dict = train_G(
@@ -398,6 +403,7 @@ class FLEG(Strategy):
             batch_size=1,
             optim_state_dict=self.optimG_state_dict
             )
+            self.parameters_gen = ndarrays_to_parameters(get_weights_gen(self.gen))
             gen_time = time.time() - gen_time_start
 
             self.metrics_dict["g_loss_chunk"].append(g_loss)
@@ -670,4 +676,3 @@ class FLEG(Strategy):
                     print(f"Error saving metrics dict to JSON: {e}")
 
         return loss_aggregated, metrics_aggregated
-

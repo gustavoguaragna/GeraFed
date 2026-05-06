@@ -9,12 +9,10 @@ from Simulation.FLEG.task import(
     EmbeddingGAN0,
     EmbeddingGAN0_Cifar,
     get_weights,
+    get_weights_gen,
     load_data
 )
 from Simulation.FLEG.strategy import FLEG
-from typing import List, Tuple
-from flwr.common.typing import Metrics
-import torch
 
 # import random
 # import numpy as np
@@ -46,7 +44,6 @@ import torch
 def server_fn(context: Context):
     # Read from config
     num_chunks        = context.run_config["num_chunks"]
-    num_rounds        = context.run_config["num_epocas"] * num_chunks
     fraction_fit_alvo = context.run_config["fraction_fit_alvo"]
     fraction_fit_gen  = context.run_config["fraction_fit_gen"]
     dataset           = context.run_config["dataset"]
@@ -70,6 +67,10 @@ def server_fn(context: Context):
     patience          = context.run_config["patience"]
     syn_input         = context.run_config["syn_input"]
     levels            = context.run_config["levels"]
+    num_rounds        = (
+        patience * levels * 10
+        + gan_epochs * num_chunks * levels
+    )
     if seed == 42:
         trial = 1
     elif seed == 30:
@@ -102,7 +103,8 @@ def server_fn(context: Context):
             teste=teste,
             partitioner_type=partitioner,
             num_chunks=num_chunks,
-            alpha_dir=alpha_dir
+            alpha_dir=alpha_dir,
+            seed=seed
         )
 
     # if continue_epoch != 0:
@@ -112,7 +114,7 @@ def server_fn(context: Context):
     #     optimGstate_dict = checkpoint['optim_G_state_dict']
     
     ndarrays_alvo = get_weights(classifier)
-    ndarrays_gen  = get_weights(gen)
+    ndarrays_gen  = get_weights_gen(gen)
     parameters_alvo = ndarrays_to_parameters(ndarrays_alvo)
     parameters_gen = ndarrays_to_parameters(ndarrays_gen)
 

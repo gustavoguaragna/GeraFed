@@ -5,14 +5,10 @@ import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, Subset, Dataset, ConcatDataset, random_split
+from torch.utils.data import DataLoader, Subset, Dataset as TorchDataset, ConcatDataset, random_split
 from torchvision.transforms import Compose, Normalize, ToTensor
-from typing import Optional, List, Dict, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 from collections import defaultdict, Counter, OrderedDict
-from flwr_datasets import FederatedDataset
-from flwr_datasets.partitioner import IidPartitioner, DirichletPartitioner, Partitioner
-from typing import Optional, List, Union
-from datasets import Dataset
 import numpy as np
 import random
 import io
@@ -713,7 +709,7 @@ class GeneratedAssetDataset(torch.utils.data.Dataset):
             self.label_col_name: int(self.labels[idx])
         }
 
-class DictTensorDataset(Dataset):
+class DictTensorDataset(TorchDataset):
     def __init__(self, assets, labels, asset_col_name="image", label_col_name="label"):
         """
         Wrapper leve que simula o GeneratedAssetDataset.
@@ -740,97 +736,92 @@ class DictTensorDataset(Dataset):
             self.label_col_name: int(self.labels[idx])
         }
 
-class ClassPartitioner(Partitioner):
-    """Partitions a dataset by class, ensuring each class appears in exactly one partition.
+_ClassPartitionerImpl = None
 
-    Attributes:
-        num_partitions (int): Total number of partitions to create
-        seed (int, optional): Random seed for reproducibility
-        label_column (str): Name of the column containing class labels
-    """
 
-    def __init__(
-        self,
-        num_partitions: int,
-        seed: Optional[int] = None,
-        label_column: str = "label"
-    ) -> None:
-        super().__init__()
-        self._num_partitions = num_partitions
-        self._seed = seed
-        self._label_column = label_column
-        self._partition_indices: Optional[List[List[int]]] = None
+def _get_class_partitioner_impl():
+    global _ClassPartitionerImpl
+    if _ClassPartitionerImpl is not None:
+        return _ClassPartitionerImpl
 
-    def _create_partitions(self) -> None:
-        """Create class-based partitions and store indices."""
-        # Extract labels from dataset
-        labels = self.dataset[self._label_column]
+    from flwr_datasets.partitioner import Partitioner
 
-        # Group indices by class
-        class_indices = defaultdict(list)
-        for idx, label in enumerate(labels):
-            class_indices[label].append(idx)
+    class ClassPartitionerImpl(Partitioner):
+        """Partitions a dataset by class, ensuring each class appears in exactly one partition."""
 
-        classes = list(class_indices.keys())
-        num_classes = len(classes)
+        def __init__(
+            self,
+            num_partitions: int,
+            seed: Optional[int] = None,
+            label_column: str = "label"
+        ) -> None:
+            super().__init__()
+            self._num_partitions = num_partitions
+            self._seed = seed
+            self._label_column = label_column
+            self._partition_indices: Optional[List[List[int]]] = None
 
-        # Validate number of partitions
-        if self._num_partitions > num_classes:
-            raise ValueError(
-                f"Cannot create {self._num_partitions} partitions with only {num_classes} classes. "
-                f"Reduce partitions to ≤ {num_classes}."
-            )
+        def _create_partitions(self) -> None:
+            labels = self.dataset[self._label_column]
 
-        # Shuffle classes for random distribution
-        rng = random.Random(self._seed)
-        rng.shuffle(classes)
+            class_indices = defaultdict(list)
+            for idx, label in enumerate(labels):
+                class_indices[label].append(idx)
+                
+            classes = list(class_indices.keys())
+            num_classes = len(classes)
 
-        # Split classes into partitions
-        partition_classes = np.array_split(classes, self._num_partitions)
+            if self._num_partitions > num_classes:
+                raise ValueError(
+                    f"Cannot create {self._num_partitions} partitions with only {num_classes} classes. "
+                    f"Reduce partitions to <= {num_classes}."
+                )
 
-        # Create index lists for each partition
-        self._partition_indices = []
-        for class_group in partition_classes:
-            indices = []
-            for cls in class_group:
-                indices.extend(class_indices[cls])
-            self._partition_indices.append(indices)
+            rng = random.Random(self._seed)
+            rng.shuffle(classes)
 
-    @property
-    def dataset(self) -> Dataset:
-        return super().dataset
+            partition_classes = np.array_split(classes, self._num_partitions)
 
-    @dataset.setter
-    def dataset(self, value: Dataset) -> None:
-        # Use parent setter for basic validation
-        super(ClassPartitioner, ClassPartitioner).dataset.fset(self, value)
+            self._partition_indices = []
+            for class_group in partition_classes:
+                indices = []
+                for cls in class_group:
+                    indices.extend(class_indices[cls])
+                self._partition_indices.append(indices)
 
-        # Create partitions once dataset is set
-        self._create_partitions()
+        @property
+        def dataset(self):
+            return super().dataset
 
-    def load_partition(self, partition_id: int) -> Dataset:
-        """Load a partition containing exclusive classes.
+        @dataset.setter
+        def dataset(self, value) -> None:
+            super(ClassPartitionerImpl, ClassPartitionerImpl).dataset.fset(self, value)
+            self._create_partitions()
 
-        Args:
-            partition_id: The ID of the partition to load (0-based index)
+        def load_partition(self, partition_id: int):
+            if not self.is_dataset_assigned():
+                raise RuntimeError("Dataset must be assigned before loading partitions")
+            if partition_id < 0 or partition_id >= self.num_partitions:
+                raise ValueError(f"Invalid partition ID: {partition_id}")
 
-        Returns:
-            Dataset: Subset of the dataset containing only the specified partition's data
-        """
-        if not self.is_dataset_assigned():
-            raise RuntimeError("Dataset must be assigned before loading partitions")
-        if partition_id < 0 or partition_id >= self.num_partitions:
-            raise ValueError(f"Invalid partition ID: {partition_id}")
+            return self.dataset.select(self._partition_indices[partition_id])
 
-        return self.dataset.select(self._partition_indices[partition_id])
+        @property
+        def num_partitions(self) -> int:
+            return self._num_partitions
 
-    @property
-    def num_partitions(self) -> int:
-        return self._num_partitions
+        def __repr__(self) -> str:
+            return (f"ClassPartitioner(num_partitions={self._num_partitions}, "
+                    f"seed={self._seed}, label_column='{self._label_column}')")
 
-    def __repr__(self) -> str:
-        return (f"ClassPartitioner(num_partitions={self._num_partitions}, "
-                f"seed={self._seed}, label_column='{self._label_column}')")
+    ClassPartitionerImpl.__name__ = "ClassPartitioner"
+    _ClassPartitionerImpl = ClassPartitionerImpl
+    return _ClassPartitionerImpl
+
+
+class ClassPartitioner:
+    def __new__(cls, *args, **kwargs):
+        return _get_class_partitioner_impl()(*args, **kwargs)
 
 
 def _get_item_label(item, label_key='label'):
@@ -1103,13 +1094,17 @@ def load_data(partition_id: int,
               teste: bool = False,
               partitioner_type: str = "IID",
               alpha_dir: float = 0.1, 
-              num_chunks: int = 1) -> tuple[Union[DataLoader, List], DataLoader, DataLoader]:
+              num_chunks: int = 1,
+              seed: int = 42) -> tuple[Union[DataLoader, List], DataLoader, DataLoader]:
     
     """Carrega dataset com splits de treino e teste separados."""
    
     global fds
 
     if fds is None:
+        from flwr_datasets import FederatedDataset
+        from flwr_datasets.partitioner import IidPartitioner, DirichletPartitioner
+
         print(f"Carregamento dos Dados - {dataset}")
         if "Dir" in partitioner_type:
             print("Dados por Dirichlet")
@@ -1122,7 +1117,7 @@ def load_data(partition_id: int,
             )
         elif "Class" in partitioner_type:
             print("Dados por classe")
-            partitioner = ClassPartitioner(num_partitions=num_partitions, seed=42)
+            partitioner = ClassPartitioner(num_partitions=num_partitions, seed=seed)
         else:
             print("Dados IID")
             partitioner = IidPartitioner(num_partitions=num_partitions)
@@ -1177,7 +1172,7 @@ def load_data(partition_id: int,
     client_train, client_test = random_split(
         train_partition,
         [train_size, test_size],
-        generator=torch.Generator().manual_seed(42),
+        generator=torch.Generator().manual_seed(seed),
     )
 
     client_dataset = {
@@ -1191,8 +1186,8 @@ def load_data(partition_id: int,
 
         # 1) embaralha os índices com seed fixa
         indices_real = list(range(n_real))
-        random.seed(42)
-        random.shuffle(indices_real)
+        rng = random.Random(seed)
+        rng.shuffle(indices_real)
 
         # 2) calcula tamanho aproximado de cada chunk
         chunk_size_real = math.ceil(n_real / num_chunks)
@@ -1309,7 +1304,7 @@ def train_disc(gen, disc, trainloader, feature_extractor, epochs, device, optim,
 def train_G(net: nn.Module, discs: list, device: str, lr: float, epochs: int, batch_size: int, latent_dim: int, optim_state_dict = None):
     net.to(device)  # move model to GPU if available
 
-    optim_G = torch.optim.Adam(list(net.generator.parameters())+list(net.label_embedding.parameters()), lr=lr, betas=(0.5, 0.999))
+    optim_G = torch.optim.Adam(net.generator.parameters(), lr=lr, betas=(0.5, 0.999))
     if optim_state_dict:
         optim_G.load_state_dict(optim_state_dict)
 
@@ -1466,69 +1461,69 @@ def local_test(net: nn.Module,
 
     return results_metrics["overall_accuracy"]
 
-def get_model(dataset, level, seed, device):
-    if level == 0:
-        if dataset == "mnist":
-            classifier = Net(seed=seed).to(device)
-        elif dataset == "cifar10":
-            classifier = Net_Cifar(seed=seed).to(device)
-        else:
-            raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {dataset} não reconhecido") 
-        return classifier, None
+# def get_model(dataset, level, seed, device):
+#     if level == 0:
+#         if dataset == "mnist":
+#             classifier = Net(seed=seed).to(device)
+#         elif dataset == "cifar10":
+#             classifier = Net_Cifar(seed=seed).to(device)
+#         else:
+#             raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {dataset} não reconhecido") 
+#         return classifier, None
 
-    elif level == 1:
-        if dataset == "mnist":
-            feature_extractor = FeatureExtractor1(seed=seed).to(device)
-            classifier = ClassifierHead1(seed=seed).to(device)
-        elif dataset == "cifar10":
-            feature_extractor = FeatureExtractor1_Cifar(seed=seed).to(device)
-            classifier = ClassifierHead1_Cifar(seed=seed).to(device)
-        else:
-            raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {dataset} não reconhecido")
+#     elif level == 1:
+#         if dataset == "mnist":
+#             feature_extractor = FeatureExtractor1(seed=seed).to(device)
+#             classifier = ClassifierHead1(seed=seed).to(device)
+#         elif dataset == "cifar10":
+#             feature_extractor = FeatureExtractor1_Cifar(seed=seed).to(device)
+#             classifier = ClassifierHead1_Cifar(seed=seed).to(device)
+#         else:
+#             raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {dataset} não reconhecido")
 
-    elif level == 2:
-        if dataset == "mnist":
-            feature_extractor = FeatureExtractor2(seed=seed).to(device)
-            classifier = ClassifierHead2(seed=seed).to(device)
-        elif dataset == "cifar10":
-            feature_extractor = FeatureExtractor2_Cifar(seed=seed).to(device)
-            classifier = ClassifierHead2_Cifar(seed=seed).to(device)
-        else:
-            raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {dataset} não reconhecido")
+#     elif level == 2:
+#         if dataset == "mnist":
+#             feature_extractor = FeatureExtractor2(seed=seed).to(device)
+#             classifier = ClassifierHead2(seed=seed).to(device)
+#         elif dataset == "cifar10":
+#             feature_extractor = FeatureExtractor2_Cifar(seed=seed).to(device)
+#             classifier = ClassifierHead2_Cifar(seed=seed).to(device)
+#         else:
+#             raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {dataset} não reconhecido")
 
-    elif level == 3:
-        if dataset == "mnist":
-            feature_extractor = FeatureExtractor3(seed=seed).to(device)
-            classifier = ClassifierHead3(seed=seed).to(device)
-        elif dataset == "cifar10":
-            feature_extractor = FeatureExtractor3_Cifar(seed=seed).to(device)
-            classifier = ClassifierHead3_Cifar(seed=seed).to(device)
-        else:
-            raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {dataset} não reconhecido")
+#     elif level == 3:
+#         if dataset == "mnist":
+#             feature_extractor = FeatureExtractor3(seed=seed).to(device)
+#             classifier = ClassifierHead3(seed=seed).to(device)
+#         elif dataset == "cifar10":
+#             feature_extractor = FeatureExtractor3_Cifar(seed=seed).to(device)
+#             classifier = ClassifierHead3_Cifar(seed=seed).to(device)
+#         else:
+#             raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {dataset} não reconhecido")
 
-    elif level == 4:
-        if dataset == "mnist":
-            feature_extractor = FeatureExtractor4(seed=seed).to(device)
-            classifier = ClassifierHead4(seed=seed).to(device)
-        elif dataset == "cifar10":
-            feature_extractor = FeatureExtractor4_Cifar(seed=seed).to(device)
-            classifier = ClassifierHead4_Cifar(seed=seed).to(device)
-        else:
-            raise ValueError(f"dataset deveria ser mnist ou cifar10, {dataset} não reconhecido")
+#     elif level == 4:
+#         if dataset == "mnist":
+#             feature_extractor = FeatureExtractor4(seed=seed).to(device)
+#             classifier = ClassifierHead4(seed=seed).to(device)
+#         elif dataset == "cifar10":
+#             feature_extractor = FeatureExtractor4_Cifar(seed=seed).to(device)
+#             classifier = ClassifierHead4_Cifar(seed=seed).to(device)
+#         else:
+#             raise ValueError(f"dataset deveria ser mnist ou cifar10, {dataset} não reconhecido")
     
-    else:
-        raise ValueError(f"Treino vai até nível 4 (5° nível), não deveria receber config['level'] {config['level']}.")
+#     else:
+#         raise ValueError(f"Treino vai até nível 4 (5° nível), não deveria receber config['level'] {config['level']}.")
     
-    return classifier, feature_extractor
+#     return classifier, feature_extractor
 
 def get_weights(net):
     return [val.cpu().numpy() for _, val in net.state_dict().items()]
 
 def get_weights_gen(net):
-    return [val.cpu().numpy() for key, val in net.state_dict().items() if 'generator' in key or 'label' in key]
+    return [val.cpu().numpy() for key, val in net.state_dict().items() if key.startswith('generator.')]
 
 def get_weights_disc(net):
-    return [val.cpu().numpy() for key, val in net.state_dict().items() if 'discriminator' in key or 'label' in key]
+    return [val.cpu().numpy() for key, val in net.state_dict().items() if key.startswith('discriminator.')]
 
 def set_weights(net, parameters):
     device = next(net.parameters()).device
@@ -1537,19 +1532,17 @@ def set_weights(net, parameters):
     net.load_state_dict(state_dict, strict=False)
 
 def set_weights_disc(net, parameters):
-    """Injeta pesos apenas nas camadas do Discriminador e do Label Embedding"""
+    """Injeta pesos apenas nas camadas do Discriminador."""
     device = next(net.parameters()).device
-    # Filtra as chaves para pegar apenas o discriminador e as labels
-    valid_keys = [k for k in net.state_dict().keys() if 'discriminator' in k or 'label' in k]
+    valid_keys = [k for k in net.state_dict().keys() if k.startswith('discriminator.')]
     params_dict = zip(valid_keys, parameters)
     state_dict = OrderedDict({k: torch.tensor(v).to(device) for k, v in params_dict})
     net.load_state_dict(state_dict, strict=False)
 
 def set_weights_gen(net, parameters):
-    """Injeta pesos apenas nas camadas do Gerador e do Label Embedding"""
+    """Injeta pesos apenas nas camadas do Gerador."""
     device = next(net.parameters()).device
-    # Filtra as chaves para pegar apenas o gerador e as labels
-    valid_keys = [k for k in net.state_dict().keys() if 'generator' in k or 'label' in k]
+    valid_keys = [k for k in net.state_dict().keys() if k.startswith('generator.')]
     params_dict = zip(valid_keys, parameters)
     state_dict = OrderedDict({k: torch.tensor(v).to(device) for k, v in params_dict})
     net.load_state_dict(state_dict, strict=False)

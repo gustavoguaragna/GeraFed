@@ -17,14 +17,12 @@ from Simulation.FLEG.task import (
     FeatureExtractor1, FeatureExtractor2, FeatureExtractor3, FeatureExtractor4,
     FeatureExtractor1_Cifar, FeatureExtractor2_Cifar, FeatureExtractor3_Cifar, FeatureExtractor4_Cifar,
     get_label_counts,
-    get_model,
     get_weights,
     get_weights_disc,
     load_data, 
     local_test,
     set_weights,
     set_weights_gen,
-    test, 
     train_alvo, 
     train_disc,
     unpack_batch
@@ -34,6 +32,39 @@ import pickle
 import time
 import io
 import numpy as np
+
+GAN_COMPONENTS = {
+    "mnist": {
+        0: (EmbeddingGAN0, FeatureExtractor1),
+        1: (EmbeddingGAN1, FeatureExtractor2),
+        2: (EmbeddingGAN2, FeatureExtractor3),
+        3: (EmbeddingGAN3, FeatureExtractor4),
+    },
+    "cifar10": {
+        0: (EmbeddingGAN0_Cifar, FeatureExtractor1_Cifar),
+        1: (EmbeddingGAN1_Cifar, FeatureExtractor2_Cifar),
+        2: (EmbeddingGAN2_Cifar, FeatureExtractor3_Cifar),
+        3: (EmbeddingGAN3_Cifar, FeatureExtractor4_Cifar),
+    },
+}
+
+NET_COMPONENTS = {
+    "mnist": {
+        0: (Net, None),
+        1: (ClassifierHead1, FeatureExtractor1),
+        2: (ClassifierHead2, FeatureExtractor2),
+        3: (ClassifierHead3, FeatureExtractor3),
+        4: (ClassifierHead4, FeatureExtractor4),
+    },
+    "cifar10": {
+        0: (Net_Cifar, None),
+        1: (ClassifierHead1_Cifar, FeatureExtractor1_Cifar),
+        2: (ClassifierHead2_Cifar, FeatureExtractor2_Cifar),
+        3: (ClassifierHead3_Cifar, FeatureExtractor3_Cifar),
+        4: (ClassifierHead4_Cifar, FeatureExtractor4_Cifar),
+    },
+}
+
 
 # import random
 # import numpy as np
@@ -105,58 +136,15 @@ class FlowerClient(NumPyClient):
     def fit(self, parameters, config):
 
         if config["model"] == "gan":
-            if config["level"] == 0:
-                if self.dataset == "mnist":
-                    self.gen = EmbeddingGAN0(seed=self.seed).to(self.device)
-                    self.disc = EmbeddingGAN0(seed=self.seed).to(self.device)
-                    self.feature_extractor = FeatureExtractor1(seed=self.seed).to(self.device)
-                elif self.dataset == "cifar10":
-                    self.gen = EmbeddingGAN0_Cifar(seed=self.seed).to(self.device)
-                    self.disc = EmbeddingGAN0_Cifar(seed=self.seed).to(self.device)
-                    self.feature_extractor = FeatureExtractor1_Cifar(seed=self.seed).to(self.device)
-                else:
-                    raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {self.dataset} não reconhecido")
+            try:
+                gan_class, feature_extractor_class = GAN_COMPONENTS[self.dataset][config["level"]]
+            except KeyError as exc:
+                raise ValueError(f"Treino da GAN vai até nível 3 (4° nível), não deveria receber config['level'] {config['level']}.") from exc
+            self.gen = gan_class(seed=self.seed).to(self.device)
+            self.disc = gan_class(seed=self.seed).to(self.device)
+            self.feature_extractor = feature_extractor_class(seed=self.seed).to(self.device)
 
-            elif config["level"] == 1:
-                if self.dataset == "mnist":
-                    self.gen = EmbeddingGAN1(seed=self.seed).to(self.device)
-                    self.disc = EmbeddingGAN1(seed=self.seed).to(self.device)
-                    self.feature_extractor = FeatureExtractor2(seed=self.seed).to(self.device)
-                elif self.dataset == "cifar10":
-                    self.gen = EmbeddingGAN1_Cifar(seed=self.seed).to(self.device)
-                    self.disc = EmbeddingGAN1_Cifar(seed=self.seed).to(self.device)
-                    self.feature_extractor = FeatureExtractor2_Cifar(seed=self.seed).to(self.device)
-                else:
-                    raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {self.dataset} não reconhecido")
-
-            elif config["level"] == 2:
-                if self.dataset == "mnist":
-                    self.gen = EmbeddingGAN2(seed=self.seed).to(self.device)
-                    self.disc = EmbeddingGAN2(seed=self.seed).to(self.device)
-                    self.feature_extractor = FeatureExtractor3(seed=self.seed).to(self.device)
-                elif self.dataset == "cifar10":
-                    self.gen = EmbeddingGAN2_Cifar(seed=self.seed).to(self.device)
-                    self.disc = EmbeddingGAN2_Cifar(seed=self.seed).to(self.device)
-                    self.feature_extractor = FeatureExtractor3_Cifar(seed=self.seed).to(self.device)
-                else:
-                    raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {self.dataset} não reconhecido")
-
-            elif config["level"] == 3:
-                if self.dataset == "mnist":
-                    self.gen = EmbeddingGAN3(seed=self.seed).to(self.device)
-                    self.disc = EmbeddingGAN3(seed=self.seed).to(self.device)
-                    self.feature_extractor = FeatureExtractor4(seed=self.seed).to(self.device)
-                elif self.dataset == "cifar10":
-                    self.gen = EmbeddingGAN3_Cifar(seed=self.seed).to(self.device)
-                    self.disc = EmbeddingGAN3_Cifar(seed=self.seed).to(self.device)
-                    self.feature_extractor = FeatureExtractor4_Cifar(seed=self.seed).to(self.device)
-                else:
-                    raise ValueError(f"self.dataset deveria ser mnist ou cifar10, {self.dataset} não reconhecido")
-            
-            else:
-                raise ValueError(f"Treino da GAN vai até nível 3 (4° nível), não deveria receber config['level'] {config['level']}.")
-
-            self.optim_D = torch.optim.Adam(list(self.disc.discriminator.parameters())+list(self.disc.label_embedding.parameters()), lr=self.lr_disc, betas=(0.5, 0.999))
+            self.optim_D = torch.optim.Adam(self.disc.discriminator.parameters(), lr=self.lr_disc, betas=(0.5, 0.999))
 
             # Atualiza pesos do modelo generativo
             set_weights_gen(net=self.gen, parameters=parameters)
@@ -261,7 +249,17 @@ class FlowerClient(NumPyClient):
             else:
                 trainloader = self.trainloader
 
-            self.classifier, self.feature_extractor = get_model(dataset=self.dataset, level=config["level"], seed=self.seed, device=self.device)
+            try:
+                classifier_class, feature_extractor_class = NET_COMPONENTS[self.dataset][config["level"]]
+            except KeyError as exc:
+                raise ValueError(f"Treino vai até nível 4 (5° nível), não deveria receber config['level'] {config['level']}.") from exc
+            self.classifier = classifier_class(seed=self.seed).to(self.device)
+            self.feature_extractor = (
+                feature_extractor_class(seed=self.seed).to(self.device)
+                if feature_extractor_class is not None
+                else None
+            )
+
             
             # Atualiza pesos do modelo classificador
             set_weights(self.classifier, parameters)
@@ -453,7 +451,11 @@ class FlowerClient(NumPyClient):
             state_dict = torch.load(buf_net, map_location=self.device)
             self.net.load_state_dict(state_dict, strict=False)
 
-        self.classifier, _ = get_model(dataset=self.dataset, level=config["level"], seed=self.seed, device=self.device)
+        try:
+            classifier_class, _ = NET_COMPONENTS[self.dataset][config["level"]]
+        except KeyError as exc:
+            raise ValueError(f"Treino vai até nível 4 (5° nível), não deveria receber config['level'] {config['level']}.") from exc
+        self.classifier = classifier_class(seed=self.seed).to(self.device)
 
         set_weights(self.classifier, parameters)
         self.net.load_state_dict(self.classifier.state_dict(), strict=False)
@@ -538,7 +540,8 @@ def client_fn(context: Context):
             teste=teste,
             partitioner_type=partitioner,
             num_chunks=num_chunks,
-            alpha_dir=alpha_dir
+            alpha_dir=alpha_dir,
+            seed=seed
         )
 
 
