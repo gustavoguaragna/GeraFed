@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import time
 from flwr.server.strategy import Strategy
@@ -25,7 +27,7 @@ import torch
 from flwr.server.strategy.aggregate import aggregate, aggregate_inplace, weighted_loss_avg
 # import random
 
-from Simulation.CNN.task import Net, Net_CIFAR, set_weights
+from Simulation.CNN.task import create_model, get_image_column, normalize_dataset_name, set_weights
 # import torch
 
 
@@ -128,7 +130,7 @@ class GeraFed(Strategy):
         self.fit_metrics_aggregation_fn = fit_metrics_aggregation_fn
         self.evaluate_metrics_aggregation_fn = evaluate_metrics_aggregation_fn
         self.inplace = inplace
-        self.dataset = dataset
+        self.dataset = normalize_dataset_name(dataset)
         self.img_size = img_size
         self.latent_dim = latent_dim
         self.agg = agg
@@ -137,12 +139,7 @@ class GeraFed(Strategy):
         self.valloader = valloader
         self.model_save_interval = model_save_interval
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        if self.dataset == "mnist":
-            self.image = "image"
-        elif self.dataset == "cifar10":
-            self.image = "img"
-        else:
-            raise ValueError(f"Dataset {self.dataset} nao identificado. Deveria ser 'mnist' ou 'cifar10'")
+        self.image = get_image_column(self.dataset)
         self.metrics_dict = {
             "time_round": [],
             "net_loss_epoch": [],
@@ -361,12 +358,7 @@ class GeraFed(Strategy):
             self.metrics_dict["max_net_time"].append(max(net_times))
 
         if parameters_aggregated is not None:
-            if self.dataset == "mnist":
-                net = Net().to(self.device)
-            elif self.dataset == "cifar10":
-                net = Net_CIFAR().to(self.device)
-            else:
-                raise ValueError(f"Dataset {self.dataset} nao identificado. Deveria ser 'mnist' ou 'cifar10'")
+            net = create_model(self.dataset).to(self.device)
 
             set_weights(net, aggregated_ndarrays)
 

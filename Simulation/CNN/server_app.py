@@ -2,7 +2,7 @@
 
 from flwr.common import Context, ndarrays_to_parameters
 from flwr.server import ServerApp, ServerAppComponents, ServerConfig
-from Simulation.CNN.task import Net, Net_CIFAR, get_weights, load_data
+from Simulation.CNN.task import create_model, get_weights, load_data, normalize_dataset_name
 from Simulation.CNN.strategy import GeraFed
 from typing import List, Tuple
 from flwr.common.typing import Metrics
@@ -27,7 +27,7 @@ def server_fn(context: Context):
         num_rounds = context.run_config["num_rodadas"]
     fraction_fit = context.run_config["fraction_fit_alvo"]
     seed         = context.run_config["seed"]
-    dataset      = context.run_config["dataset"]
+    dataset      = normalize_dataset_name(context.run_config["dataset"])
     teste        = context.run_config["teste"]
     batch_size   = context.run_config["tam_batch"]
     num_clients  = context.run_config["num_clients"]
@@ -42,12 +42,7 @@ def server_fn(context: Context):
     os.makedirs(folder, exist_ok=True)
 
     # Initialize model parameters
-    if dataset == "mnist":
-        classifier = Net(seed=seed)
-    elif dataset == "cifar10":
-        classifier = Net_CIFAR(seed=seed)
-    else:
-        raise ValueError(f"Dataset {dataset} nao identificado. Deveria ser 'mnist' ou 'cifar10'")
+    classifier = create_model(dataset, seed=seed)
 
     ndarrays = get_weights(classifier)
     parameters = ndarrays_to_parameters(ndarrays)

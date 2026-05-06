@@ -1,5 +1,7 @@
 """GeraFed: um framework para balancear dados heterogêneos em aprendizado federado."""
 
+from __future__ import annotations
+
 from collections import OrderedDict, defaultdict
 import torch
 import torch.nn as nn
@@ -15,6 +17,57 @@ from typing import Optional, List, Union
 import random
 import numpy as np
 import datasets
+
+DATASET_ALIASES = {
+    "mnist": "mnist",
+    "ylecun/mnist": "mnist",
+    "cifar10": "cifar10",
+    "cifar-10": "cifar10",
+    "uoft-cs/cifar10": "cifar10",
+}
+
+DATASET_CONFIG = {
+    "mnist": {
+        "hf_name": "mnist",
+        "image_column": "image",
+        "mean": (0.5,),
+        "std": (0.5,),
+    },
+    "cifar10": {
+        "hf_name": "uoft-cs/cifar10",
+        "image_column": "img",
+        "mean": (0.5, 0.5, 0.5),
+        "std": (0.5, 0.5, 0.5),
+    },
+}
+
+
+def normalize_dataset_name(dataset: str) -> str:
+    dataset_key = str(dataset).lower()
+    try:
+        return DATASET_ALIASES[dataset_key]
+    except KeyError as exc:
+        supported = "', '".join(sorted(DATASET_CONFIG))
+        raise ValueError(
+            f"Dataset {dataset} nao identificado. Deveria ser '{supported}'"
+        ) from exc
+
+
+def get_dataset_config(dataset: str) -> dict:
+    return DATASET_CONFIG[normalize_dataset_name(dataset)]
+
+
+def get_image_column(dataset: str) -> str:
+    return get_dataset_config(dataset)["image_column"]
+
+
+def create_model(dataset: str, seed: Optional[int] = 42) -> nn.Module:
+    dataset = normalize_dataset_name(dataset)
+    if dataset == "mnist":
+        return Net(seed=seed)
+    if dataset == "cifar10":
+        return Net_CIFAR(seed=seed)
+    raise ValueError(f"Dataset {dataset} nao identificado. Deveria ser 'mnist' ou 'cifar10'")
 
 
 
@@ -153,7 +206,7 @@ class ClassPartitioner(Partitioner):
         return (f"ClassPartitioner(num_partitions={self._num_partitions}, "
                 f"seed={self._seed}, label_column='{self._label_column}')")
 
-fds = None  # Cache FederatedDataset
+fds_cache = {}  # Cache FederatedDataset by dataset/partitioner config
 
 def load_data(partition_id: int, 
               num_partitions: int,
@@ -166,9 +219,18 @@ def load_data(partition_id: int,
     
     """Carrega MNIST com splits de treino e teste separados. Se examples_per_class > 0, inclui dados gerados."""
    
-    global fds
+    global fds_cache
 
-    if fds is None:
+    dataset = normalize_dataset_name(dataset)
+    dataset_config = get_dataset_config(dataset)
+    cache_key = (
+        dataset,
+        num_partitions,
+        partitioner_type,
+        alpha_dir,
+    )
+
+    if cache_key not in fds_cache:
         print(f"Carregamento dos Dados - {dataset}")
         if "Dir" in partitioner_type:
             print("Dados por Dirichlet")
@@ -186,10 +248,12 @@ def load_data(partition_id: int,
             print("Dados IID")
             partitioner = IidPartitioner(num_partitions=num_partitions)
 
-        fds = FederatedDataset(
-            dataset=dataset,
+        fds_cache[cache_key] = FederatedDataset(
+            dataset=dataset_config["hf_name"],
             partitioners={"train": partitioner}
         )
+
+    fds = fds_cache[cache_key]
 
     # Carrega a partição de treino e teste separadamente
     test_partition = fds.load_split("test")
@@ -200,20 +264,11 @@ def load_data(partition_id: int,
         num_samples = int(len(train_partition)/10)
         train_partition = train_partition.select(range(num_samples))
     
-    if dataset == "mnist":
-        pytorch_transforms = Compose([
-            ToTensor(),
-            Normalize((0.5,), (0.5,))
-        ])
-        image = "image"
-    elif dataset == "cifar10":
-        pytorch_transforms = Compose([
-            ToTensor(),
-            Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-        ])
-        image = "img"
-    else:
-        raise ValueError(f"{dataset} not identified")
+    pytorch_transforms = Compose([
+        ToTensor(),
+        Normalize(dataset_config["mean"], dataset_config["std"])
+    ])
+    image = dataset_config["image_column"]
     
     def apply_transforms(batch):
         batch[image] = [pytorch_transforms(img) for img in batch[image]]
@@ -275,12 +330,7 @@ def train(net, trainloader, epochs, device, dataset, lr):
     criterion = torch.nn.CrossEntropyLoss().to(device)
     optimizer = torch.optim.SGD(net.parameters(), lr=lr)
     net.train()
-    if dataset == "mnist":
-        image = "image"
-    elif dataset == "cifar10":
-        image = "img"
-    else:
-        raise ValueError(f"Dataset {dataset} nao identificado. Deveria ser 'mnist' ou 'cifar10'")
+    image = get_image_column(dataset)
     
     running_loss = 0.0
     for _ in range(epochs):
@@ -300,12 +350,7 @@ def train(net, trainloader, epochs, device, dataset, lr):
 def test(net, testloader, device, dataset):
     """Validate the model on the test set."""
     net.to(device)
-    if dataset == "mnist":
-        image = "image"
-    elif dataset == "cifar10":
-        image = "img"
-    else:
-        raise ValueError(f"Dataset {dataset} nao identificado. Deveria ser 'mnist' ou 'cifar10'")
+    image = get_image_column(dataset)
     criterion = torch.nn.CrossEntropyLoss()
     correct, loss = 0, 0.0
     with torch.no_grad():
@@ -336,12 +381,7 @@ def local_test(net: nn.Module,
     net.eval()
     net.to(device)
 
-    if dataset == "mnist":
-        image = "image"
-    elif dataset == "cifar10":
-        image = "img"
-    else:
-        raise ValueError(f"dataset nao identificado")
+    image = get_image_column(dataset)
 
     with torch.no_grad():
         for batch in testloader:

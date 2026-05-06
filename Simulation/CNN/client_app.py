@@ -7,11 +7,11 @@ from torch.utils.data import DataLoader, ConcatDataset
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import Context
 from Simulation.CNN.task import (
-    Net, 
-    Net_CIFAR,
+    create_model,
     get_weights, 
     load_data, 
     local_test,
+    normalize_dataset_name,
     set_weights, 
     train
 )
@@ -116,7 +116,7 @@ def client_fn(context: Context):
         alpha_dir       = None
     batch_size     = context.run_config["tam_batch"]
     local_epochs   = context.run_config["epocas_alvo"]
-    dataset        = context.run_config["dataset"]
+    dataset        = normalize_dataset_name(context.run_config["dataset"])
     seed           = context.run_config["seed"]
     teste          = context.run_config["teste"]
     num_chunks     = context.run_config["num_chunks"]
@@ -127,12 +127,7 @@ def client_fn(context: Context):
     folder         = f"{context.run_config['Exp_name_folder']}CNN/{dataset}/{partitioner}/{strategy}/{num_clients}_clients"
     os.makedirs(folder, exist_ok=True)
 
-    if dataset == "mnist":
-        net = Net(seed=seed)
-    elif dataset == "cifar10":
-        net = Net_CIFAR(seed=seed)
-    else:
-        raise ValueError(f"Dataset {dataset} nao identificado. Deveria ser 'mnist' ou 'cifar10'")
+    net = create_model(dataset, seed=seed)
 
     trainloader, _, testloader_local = load_data(
         partition_id=partition_id,
