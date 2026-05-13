@@ -32,6 +32,7 @@ import pickle
 import time
 import io
 import numpy as np
+import os
 
 GAN_COMPONENTS = {
     "mnist": {
@@ -132,6 +133,29 @@ class FlowerClient(NumPyClient):
             self.net = Net_Cifar(seed=self.seed).to(self.device)
             self.asset_name = "img"  
 
+    def _disc_checkpoint_path(self, level: int) -> str:
+        return os.path.join(
+            self.folder,
+            "client_state",
+            f"client_{self.cid}",
+            f"disc_level{level}.pth",
+        )
+
+    def _load_disc_checkpoint(self, path: str) -> bool:
+        if not os.path.exists(path):
+            return False
+
+        state_dict = torch.load(path, map_location="cpu")
+        if any(key.startswith("discriminator.") for key in state_dict):
+            self.disc.load_state_dict(state_dict, strict=False)
+        else:
+            self.disc.discriminator.load_state_dict(state_dict)
+        return True
+
+    def _drop_legacy_disc_context(self) -> None:
+        for key in ("disc_state_dict", "disc_optim_state_dict"):
+            self.client_state.parameters_records.pop(key, None)
+
 
     def fit(self, parameters, config):
 
@@ -149,21 +173,22 @@ class FlowerClient(NumPyClient):
             # Atualiza pesos do modelo generativo
             set_weights_gen(net=self.gen, parameters=parameters)
 
-            # --- Restore discriminator model parameters ---
-            if "disc_state_dict" in self.client_state.parameters_records and config["round"] != 0:
+            disc_ckpt_path = self._disc_checkpoint_path(config["level"])
+            loaded_disc_from_disk = config["round"] != 0 and self._load_disc_checkpoint(disc_ckpt_path)
+
+            # Migra estados antigos do Context, mas nao continua reenviando esses bytes pelo Ray.
+            if (
+                not loaded_disc_from_disk
+                and "disc_state_dict" in self.client_state.parameters_records
+                and config["round"] != 0
+            ):
                 rec_model = self.client_state.parameters_records["disc_state_dict"]
                 arr_model = rec_model["state_bytes"].numpy()
                 buf_model = io.BytesIO(arr_model.tobytes())
-                state_dict = torch.load(buf_model, map_location=self.device)
-                self.disc.load_state_dict(state_dict)
+                state_dict = torch.load(buf_model, map_location="cpu")
+                self.disc.load_state_dict(state_dict, strict=False)
 
-            # --- Restore optimizer state ---
-            if "disc_optim_state_dict" in self.client_state.parameters_records and config["round"] != 0:
-                rec_optim = self.client_state.parameters_records["disc_optim_state_dict"]
-                arr_optim = rec_optim["state_bytes"].numpy()
-                buf_optim = io.BytesIO(arr_optim.tobytes())
-                optim_state_dict = torch.load(buf_optim, map_location=self.device)
-                self.optim_D.load_state_dict(optim_state_dict)
+            self._drop_legacy_disc_context()
 
             # --- Restore feature extractor parameters ---
             if "net_state_dict" in self.client_state.parameters_records:
@@ -204,28 +229,15 @@ class FlowerClient(NumPyClient):
             # # Add to a context
             # self.client_state.parameters_records["disc_parameters"] = p_record
             
-            # --- Save discriminator model parameters ---
-            buf_model = io.BytesIO()
-            torch.save(self.disc.state_dict(), buf_model)
-
-            # Convert bytes → numpy array (uint8)
-            arr_model = np.frombuffer(buf_model.getvalue(), dtype=np.uint8)
-
-            # Store in ParametersRecord
-            rec_model = ParametersRecord()
-            rec_model["state_bytes"] = array_from_numpy(arr_model)
-            self.client_state.parameters_records["disc_state_dict"] = rec_model
+            os.makedirs(os.path.dirname(disc_ckpt_path), exist_ok=True)
+            torch.save(
+                {
+                    key: value.detach().cpu()
+                    for key, value in self.disc.discriminator.state_dict().items()
+                },
+                disc_ckpt_path,
+            )
             print(f"SALVOU DISC NO CLIENTE {self.cid} NA RODADA {config['round']} DO NÍVEL {config['level']}")
-
-            # --- Save optimizer state (Adam, etc.) ---
-            buf_optim = io.BytesIO()
-            torch.save(self.optim_D.state_dict(), buf_optim)
-
-            arr_optim = np.frombuffer(buf_optim.getvalue(), dtype=np.uint8)
-            rec_optim = ParametersRecord()
-            rec_optim["state_bytes"] = array_from_numpy(arr_optim)
-            self.client_state.parameters_records["disc_optim_state_dict"] = rec_optim
-
 
             disc_params = get_weights_disc(self.disc)
 

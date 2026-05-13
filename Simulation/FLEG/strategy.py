@@ -43,6 +43,7 @@ import pickle
 import time
 import json
 import math
+import gc
 
 class FLEG(Strategy):
 
@@ -386,16 +387,20 @@ class FLEG(Strategy):
                 results,
                 key=lambda result: int(result[1].metrics.get("cid", 0)),
             )
-            self.discs = []
+            discs = []
+            discs_sizes = 0.0
             for _, fit_res in sorted_results:
+                disc_params = parameters_to_ndarrays(fit_res.parameters)
+                discs_sizes += get_model_size_mb(disc_params)
                 disc = gan_class(seed=self.seed).to(self.device)
-                set_weights_disc(disc, parameters_to_ndarrays(fit_res.parameters))
-                self.discs.append(disc)
+                set_weights_disc(disc, disc_params)
+                discs.append(disc)
+                del disc_params
 
             gen_time_start = time.time()
             g_loss, self.optimG_state_dict = train_G(
             net=self.gen,
-            discs=self.discs,
+            discs=discs,
             epochs=self.gen_iter,
             lr=self.lr_gen,
             device=self.device,
@@ -421,11 +426,12 @@ class FLEG(Strategy):
             disc_times = [fit_res.metrics["tempo_treino_disc"] for _, fit_res in results]
 
             max_disc_time = max(disc_times)
-           
+
             self.metrics_dict["max_disc_time"].append(max_disc_time)
 
-            discs_sizes = sum([get_model_size_mb(parameters_to_ndarrays(fit_res.parameters)) for _, fit_res in results])
             self.metrics_dict["traffic_cost_discriminator"].append(discs_sizes)
+            del discs
+            gc.collect()
 
             D = sum([fit_res.num_examples for _, fit_res in results])
             num_partitions = len(results)

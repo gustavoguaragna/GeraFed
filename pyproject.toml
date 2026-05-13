@@ -41,8 +41,8 @@ agg                  = "full"        # 'disc', 'full', 'f2a', 'none'
 continue_epoch       = 0
 dataset              = "cifar10"       # 'mnist', 'cifar10'
 epocas_alvo          = 1
-epocas_gen           = 2
-epocas_disc          = 2
+epocas_gen           = 20
+epocas_disc          = 25
 Exp_name_folder      = "Experimentos/Flwr_run/"
 fid                  = false
 fraction_fit_alvo    = 1.0
@@ -53,18 +53,18 @@ learn_rate_disc      = 0.0002
 learn_rate_gen       = 0.0002
 levels               = 4
 model                = "both"       # 'alvo', 'gen', 'both'
-num_chunks           = 2
+num_chunks           = 10
 num_clients          = 4
 num_epocas           = 30
 partitioner          = "Class"      # 'Class', 'Dir01', 'Dir05', 'IID' (IID no else)
-patience             = 2
+patience             = 10
 seed                 = 42
 strategy             = "fedavg"     # 'fedavg', 'fedprox', 'scaffold'
 syn_input            = "dynamic"    # 'dynamic', 'fixed'
 tam_batch            = 32
 tam_img              = 28
 tam_ruido            = 128
-teste                = true
+teste                = false
 
 xgb_params.objective = "binary:logistic"
 xgb_params.eta = 0.1 # Learning rate
@@ -80,6 +80,6 @@ default = "local-simulation"
 
 [tool.flwr.federations.local-simulation]
 options.num-supernodes = 4
-options.backend.client-resources.num-cpus = 4
-options.backend.client-resources.num-gpus = 0
+options.backend.client-resources.num-cpus = 2
+options.backend.client-resources.num-gpus = 0.25
 

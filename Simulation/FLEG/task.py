@@ -1254,6 +1254,9 @@ def train_disc(gen, disc, trainloader, feature_extractor, epochs, device, optim,
     gen.to(device)  # move model to GPU if available
     disc.to(device)  # move model to GPU if available
     feature_extractor.to(device)  # move model to GPU if available
+    feature_extractor.eval()
+    for param in feature_extractor.parameters():
+        param.requires_grad_(False)
 
     d_loss_b = 0
     total_samples = 0
@@ -1265,7 +1268,8 @@ def train_disc(gen, disc, trainloader, feature_extractor, epochs, device, optim,
                 print("Batch size is 1, skipping batch")
                 continue
 
-            images = feature_extractor(images)
+            with torch.no_grad():
+                images = feature_extractor(images).detach()
             
             real_ident = torch.full((batch_size, 1), 1., device=device)
             fake_ident = torch.full((batch_size, 1), 0., device=device)
@@ -1303,6 +1307,11 @@ def train_disc(gen, disc, trainloader, feature_extractor, epochs, device, optim,
                 
 def train_G(net: nn.Module, discs: list, device: str, lr: float, epochs: int, batch_size: int, latent_dim: int, optim_state_dict = None):
     net.to(device)  # move model to GPU if available
+    for disc in discs:
+        disc.to(device)
+        disc.eval()
+        for param in disc.parameters():
+            param.requires_grad_(False)
 
     optim_G = torch.optim.Adam(net.generator.parameters(), lr=lr, betas=(0.5, 0.999))
     if optim_state_dict:
@@ -1320,8 +1329,9 @@ def train_G(net: nn.Module, discs: list, device: str, lr: float, epochs: int, ba
         x_fake = net(z_noise, x_fake_labels)
 
         # Calcula a média das saídas dos discriminadores
-        y_fake_gs = [disc(x_fake.detach(), x_fake_labels) for disc in discs]
-        y_fake_g_means = [torch.mean(y).item() for y in y_fake_gs]
+        with torch.no_grad():
+            y_fake_gs = [disc(x_fake, x_fake_labels) for disc in discs]
+            y_fake_g_means = [torch.mean(y).item() for y in y_fake_gs]
 
         # Escolhe o discriminador com a maior média
         Dmax = discs[y_fake_g_means.index(max(y_fake_g_means))]
