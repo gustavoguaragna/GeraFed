@@ -1,5 +1,8 @@
 Para melhorar:
+- add fedprox
+- ver como adicionar otim adam sem precisar salvar em disco/contexto (implementação flwr)
 - creio que num_samples pode ser definida dentro da if clause de self.epoch_gan == 25
+- permitir chunks dinamicos, como em FLEG.py
 - reavaliar contabilizacao dos custos de rede se quero fazer total ou por cliente.
 - ver se deixar dataset inteiro no context é mais eficiente, ao inves de salvar os dados sinteticos recebidos no contexto do cliente, salvar conjunto aumentado para evitar a filtragem toda rodada.
 - add tempo de carregamento dados e modelos (acertar medidas de tempo)

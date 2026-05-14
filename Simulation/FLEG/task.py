@@ -1,5 +1,7 @@
 """FLEG: um framework para balancear dados heterogêneos em aprendizado federado, com precupações com a privacidade."""
 
+from __future__ import annotations
+
 import math
 import time
 import torch
