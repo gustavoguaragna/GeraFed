@@ -28,26 +28,25 @@ def _alpha_from_partitioner(partitioner: str, run_config):
         return 0.1
     if partitioner in {"Dir05", "Dirichlet05"}:
         return 0.5
-    return _get(run_config, "alpha", None)
+    return None
 
 
 def server_fn(context: Context):
     run_config = context.run_config
 
     dataset = normalize_dataset_name(_get(run_config, "dataset", "mnist"))
-    partitioner = _get(run_config, "partitioner", "ClassPartitioner")
+    partitioner = _get(run_config, "partitioner", "Class")
     strategy_name = _get(run_config, "strategy", "fedavg")
     seed = _get(run_config, "seed", 42)
-    num_clients = _get(run_config, "num_clients", 4)
-    batch_size = _get(run_config, "tam_batch", _get(run_config, "batch_size", 32))
-    teste = _get(run_config, "teste", _get(run_config, "test_mode", False))
-    cvae_epochs = _get(run_config, "cvae_epochs", _get(run_config, "epocas_gen", 25))
+    num_clients = context.node_config["num-partitions"]
+    batch_size = _get(run_config, "tam_batch", 32)
+    teste = _get(run_config, "teste", False)
+    cvae_epochs = _get(run_config, "epocas_gen", 25)
     patience = _get(run_config, "patience", 10)
     levels = _get(run_config, "levels", 4)
-    syn_input = _get(run_config, "num_syn", _get(run_config, "syn_input", "dynamic"))
+    syn_input = _get(run_config, "syn_input", "dynamic")
     trial = _get(run_config, "trial", seed)
     alpha_dir = _alpha_from_partitioner(partitioner, run_config)
-    partitioner_for_data = "Dir01" if partitioner == "Dirichlet" else partitioner
 
     folder = (
         f"{_get(run_config, 'Exp_name_folder', 'Experimentos/Flwr_run/')}CVAE/"
@@ -97,15 +96,15 @@ def server_fn(context: Context):
         baseline=_get(run_config, "baseline", False),
         cvae_epochs=cvae_epochs,
         cvae_beta=_get(run_config, "cvae_beta", 1.0),
-        cvae_lr=_get(run_config, "cvae_lr", 0.001),
-        cvae_local_epochs=_get(run_config, "cvae_local_epochs", 1),
-        normalization=_get(run_config, "normalization", "minmax"),
-        resblock=_get(run_config, "resblock", False),
-        anealing=_get(run_config, "anealing", False),
-        latent_dim_mode=_get(run_config, "latent_dim_mode", "fixed"),
+        cvae_lr=_get(run_config, "learn_rate_gen", 0.001),
+        cvae_local_epochs=cvae_local_epochs,
+        normalization=_get(run_config, "cvae_normalization", "minmax"),
+        resblock=_get(run_config, "cvae_resblock", False),
+        anealing=_get(run_config, "cvae_anealing", False),
+        latent_dim_mode=syn_input
         latent_dim=_get(run_config, "tam_ruido", 100),
         num_syn=syn_input,
-        mixup_type=_get(run_config, "mixup_type", "none"),
+        mixup_type=_get(run_config, "cvae_mixup_type", "none"),
         valloader=valloader,
         num_clients=num_clients,
     )

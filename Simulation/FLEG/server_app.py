@@ -53,7 +53,7 @@ def server_fn(context: Context):
     gen_iter          = context.run_config["epocas_gen"]
     gan_epochs        = context.run_config["epocas_disc"]
     teste             = context.run_config["teste"]
-    num_partitions    = context.run_config["num_clients"]
+    num_partitions    = context.node_config["num-partitions"]
     partitioner       = context.run_config["partitioner"]
     if partitioner == "Dir01":
         alpha_dir       = 0.1

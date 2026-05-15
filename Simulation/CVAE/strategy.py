@@ -136,11 +136,15 @@ class FLEG_CVAE(Strategy):
         self.phase = "classifier"
         self.lvl = 0
         self.net_epochs = 0
+        self._evaluate_after_fit = False
         self.best_accuracy = 0.0
         self.epochs_no_improve = 0
         self.finished = False
         self.generated_by_cid: dict[str, bytes] = {}
         self._last_total_examples = num_clients
+        self._level_transmission_mb = 0.0
+        self._level_classifier_traffic_mb = 0.0
+        self._level_cvae_traffic_mb = 0.0
 
         self.global_net = create_full_model(self.dataset, seed=self.seed).to(self.device)
         self.best_model = create_full_model(self.dataset, seed=self.seed).to(self.device)
@@ -202,6 +206,39 @@ class FLEG_CVAE(Strategy):
         if self.decoder is not None:
             checkpoint["decoder_state_dict"] = self.decoder.state_dict()
         torch.save(checkpoint, f"{self.folder}/{filename}")
+
+    @staticmethod
+    def _bytes_size_mb(payload) -> float:
+        if payload is None:
+            return 0.0
+        if isinstance(payload, (bytes, bytearray)):
+            return len(payload) / 10**6
+        return 0.0
+
+    def _parameters_size_mb(self, parameters: Optional[Parameters]) -> float:
+        if parameters is None:
+            return 0.0
+        return get_model_size_mb(parameters_to_ndarrays(parameters))
+
+    def _config_payload_size_mb(self, config: dict) -> float:
+        return sum(self._bytes_size_mb(value) for value in config.values())
+
+    def _add_level_traffic(self, amount_mb: float, bucket: str) -> None:
+        self._level_transmission_mb += amount_mb
+        if bucket == "classifier":
+            self._level_classifier_traffic_mb += amount_mb
+        elif bucket == "cvae":
+            self._level_cvae_traffic_mb += amount_mb
+
+    def _record_level_transmission(self) -> None:
+        self.metrics_dict["traffic_cost_classifier"].append(
+            self._level_classifier_traffic_mb
+        )
+        self.metrics_dict["traffic_cost_cvae"].append(self._level_cvae_traffic_mb)
+        self.metrics_dict["MB_transmission"].append(self._level_transmission_mb)
+        self._level_transmission_mb = 0.0
+        self._level_classifier_traffic_mb = 0.0
+        self._level_cvae_traffic_mb = 0.0
 
     def _setup_classifier_for_current_level(self) -> None:
         level = self._classifier_level()
@@ -323,6 +360,7 @@ class FLEG_CVAE(Strategy):
             return []
 
         self.init_round_time = time.time()
+        self._evaluate_after_fit = self.phase == "classifier"
         sample_size, min_num_clients = self.num_fit_clients(client_manager.num_available())
         clients = client_manager.sample(
             num_clients=sample_size, min_num_clients=min_num_clients
@@ -330,8 +368,12 @@ class FLEG_CVAE(Strategy):
 
         if self.phase == "classifier":
             classifier_level = self._classifier_level()
+            classifier_parameters_mb = self._parameters_size_mb(self.parameters_classifier)
+            global_net_state = state_dict_to_bytes(self.global_net.state_dict())
+            global_net_state_mb = self._bytes_size_mb(global_net_state)
             fit_instructions = []
             for client in clients:
+                generated_payload = self.generated_by_cid.get(str(client.cid), b"")
                 config = {
                     "model": "classifier",
                     "round": self.net_epochs,
@@ -340,9 +382,15 @@ class FLEG_CVAE(Strategy):
                     "strategy": self.strategy_name,
                     "mu": self.mu,
                     "mixup_type": self.mixup_type,
-                    "global_net_state": state_dict_to_bytes(self.global_net.state_dict()),
-                    "generated": self.generated_by_cid.get(str(client.cid), b""),
+                    "global_net_state": global_net_state,
+                    "generated": generated_payload,
                 }
+                self._add_level_traffic(
+                    classifier_parameters_mb
+                    + global_net_state_mb
+                    + self._bytes_size_mb(generated_payload),
+                    bucket="classifier",
+                )
                 fit_instructions.append(
                     (client, FitIns(parameters=self.parameters_classifier, config=config))
                 )
@@ -351,16 +399,34 @@ class FLEG_CVAE(Strategy):
         if self.phase == "cvae":
             if self.decoder is None:
                 self._setup_cvae_for_current_level()
+            config = self._cvae_config(model="cvae")
+            self._add_level_traffic(
+                len(clients)
+                * (
+                    self._parameters_size_mb(self.parameters_cvae)
+                    + self._config_payload_size_mb(config)
+                ),
+                bucket="cvae",
+            )
             fit_ins = FitIns(
                 parameters=self.parameters_cvae,
-                config=self._cvae_config(model="cvae"),
+                config=config,
             )
             return [(client, fit_ins) for client in clients]
 
         if self.phase == "cvae_generate":
+            config = self._cvae_config(model="cvae_generate")
+            self._add_level_traffic(
+                len(clients)
+                * (
+                    self._parameters_size_mb(self.parameters_cvae)
+                    + self._config_payload_size_mb(config)
+                ),
+                bucket="cvae",
+            )
             fit_ins = FitIns(
                 parameters=self.parameters_cvae,
-                config=self._cvae_config(model="cvae_generate"),
+                config=config,
             )
             return [(client, fit_ins) for client in clients]
 
@@ -369,13 +435,19 @@ class FLEG_CVAE(Strategy):
     def configure_evaluate(
         self, server_round: int, parameters: Parameters, client_manager: ClientManager
     ) -> list[tuple[ClientProxy, EvaluateIns]]:
-        if self.finished or self.phase != "classifier" or self.fraction_evaluate_alvo == 0.0:
+        if (
+            self.finished
+            or self.phase != "classifier"
+            or not self._evaluate_after_fit
+            or self.fraction_evaluate_alvo == 0.0
+        ):
             return []
 
+        global_net_state = state_dict_to_bytes(self.global_net.state_dict())
         config = {
             "round": self.net_epochs,
             "classifier_level": self._classifier_level(),
-            "global_net_state": state_dict_to_bytes(self.global_net.state_dict()),
+            "global_net_state": global_net_state,
         }
         evaluate_ins = EvaluateIns(self.parameters_classifier, config)
         sample_size, min_num_clients = self.num_evaluation_clients(
@@ -383,6 +455,14 @@ class FLEG_CVAE(Strategy):
         )
         clients = client_manager.sample(
             num_clients=sample_size, min_num_clients=min_num_clients
+        )
+        self._add_level_traffic(
+            len(clients)
+            * (
+                self._parameters_size_mb(self.parameters_classifier)
+                + self._config_payload_size_mb(config)
+            ),
+            bucket="classifier",
         )
         return [(client, evaluate_ins) for client in clients]
 
@@ -427,11 +507,13 @@ class FLEG_CVAE(Strategy):
             self.metrics_dict["time_epoch_classifier"].append(
                 time.time() - self.init_round_time
             )
-            self.metrics_dict["traffic_cost_classifier"].append(
-                sum(
-                    get_model_size_mb(parameters_to_ndarrays(fit_res.parameters))
-                    for _, fit_res in results
-                )
+            classifier_upload_mb = sum(
+                get_model_size_mb(parameters_to_ndarrays(fit_res.parameters))
+                for _, fit_res in results
+            )
+            self._add_level_traffic(
+                classifier_upload_mb,
+                bucket="classifier",
             )
 
             accuracy = self._global_eval()
@@ -441,10 +523,10 @@ class FLEG_CVAE(Strategy):
                 self.best_model.load_state_dict(self.global_net.state_dict())
             else:
                 self.epochs_no_improve += 1
-                print(
-                    f"Sem melhorias por {self.epochs_no_improve} épocas. "
-                    f"Melhor acurácia: {self.best_accuracy:.4f}"
-                )
+            print(
+                f"Sem melhorias por {self.epochs_no_improve} épocas. "
+                f"Melhor acurácia: {self.best_accuracy:.4f} x Acurácia atual: {accuracy:.4f}."
+            )
             self.net_epochs += 1
             return self.parameters_classifier, {"net_loss": avg_loss}
 
@@ -461,8 +543,13 @@ class FLEG_CVAE(Strategy):
                 max(fit_res.metrics["cvae_time"] for _, fit_res in results)
             )
             self.metrics_dict["time_epoch_cvae"].append(time.time() - self.init_round_time)
-            self.metrics_dict["traffic_cost_cvae"].append(
-                get_model_size_mb(aggregated_ndarrays) * 2
+            cvae_upload_mb = sum(
+                get_model_size_mb(parameters_to_ndarrays(fit_res.parameters))
+                for _, fit_res in results
+            )
+            self._add_level_traffic(
+                cvae_upload_mb,
+                bucket="cvae",
             )
             self.cvae_round += 1
             if self.cvae_round >= self.cvae_epochs:
@@ -472,17 +559,28 @@ class FLEG_CVAE(Strategy):
         if self.phase == "cvae_generate":
             generation_times = []
             self.generated_by_cid = {}
+            cvae_upload_mb = 0.0
+            generated_upload_mb = 0.0
             for client, fit_res in results:
                 cid = str(fit_res.metrics.get("cid"))
                 payload = fit_res.metrics.get("generated", b"")
+                cvae_upload_mb += get_model_size_mb(
+                    parameters_to_ndarrays(fit_res.parameters)
+                )
+                generated_upload_mb += self._bytes_size_mb(payload)
                 self.generated_by_cid[cid] = payload
                 self.generated_by_cid[str(client.cid)] = payload
                 if payload:
                     generation_times.append(pickle.loads(payload).get("time", 0.0))
+            self._add_level_traffic(
+                cvae_upload_mb + generated_upload_mb,
+                bucket="cvae",
+            )
             self.metrics_dict["img_syn_time"].append(
                 sum(generation_times) / len(generation_times) if generation_times else 0.0
             )
             self.metrics_dict["time_level"].append(time.time() - self.init_level_time)
+            self._record_level_transmission()
             self._save_checkpoint(f"checkpoint_level{self.lvl + 1}.pth")
             self._save_metrics()
 
@@ -530,6 +628,7 @@ class FLEG_CVAE(Strategy):
             if self.baseline or self._is_final_level():
                 self.finished = True
                 self.metrics_dict["time_level"].append(time.time() - self.init_level_time)
+                self._record_level_transmission()
                 self._save_checkpoint("checkpoint_end.pth")
                 self._save_metrics()
                 print("Treinamento CVAE finalizado.")
