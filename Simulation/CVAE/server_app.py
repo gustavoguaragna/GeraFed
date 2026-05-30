@@ -45,8 +45,15 @@ def server_fn(context: Context):
     patience = _get(run_config, "patience", 10)
     levels = _get(run_config, "levels", 4)
     syn_input = _get(run_config, "syn_input", "dynamic")
-    trial = _get(run_config, "trial", seed)
     alpha_dir = _alpha_from_partitioner(partitioner, run_config)
+    if seed == 42:
+        trial = 1
+    elif seed == 30:
+        trial = 2
+    elif seed == 20:
+        trial = 3
+    else:
+        trial = seed
 
     folder = (
         f"{_get(run_config, 'Exp_name_folder', 'Experimentos/Flwr_run/')}CVAE/"
@@ -64,18 +71,13 @@ def server_fn(context: Context):
         batch_size=batch_size,
         dataset=dataset,
         teste=teste,
-        partitioner_type=partitioner_for_data,
-        num_chunks=_get(run_config, "num_chunks", 1),
+        partitioner_type=partitioner,
         alpha_dir=alpha_dir,
         seed=seed,
     )
 
     # Flower needs a finite upper bound. The strategy stops itself when patience/levels finish.
-    num_rounds = _get(
-        run_config,
-        "num_rodadas",
-        patience * max(1, levels) * 10 + cvae_epochs * max(1, levels) + levels + 5,
-    )
+    num_rounds = patience * max(1, levels) * 10 + cvae_epochs * max(1, levels) + levels + 5
 
     strategy = FLEG_CVAE(
         fraction_fit_alvo=_get(run_config, "fraction_fit_alvo", 1.0),
@@ -101,7 +103,7 @@ def server_fn(context: Context):
         normalization=_get(run_config, "cvae_normalization", "minmax"),
         resblock=_get(run_config, "cvae_resblock", False),
         anealing=_get(run_config, "cvae_anealing", False),
-        latent_dim_mode=syn_input
+        latent_dim_mode=syn_input,
         latent_dim=_get(run_config, "tam_ruido", 100),
         num_syn=syn_input,
         mixup_type=_get(run_config, "cvae_mixup_type", "none"),

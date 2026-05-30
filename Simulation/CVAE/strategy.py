@@ -285,7 +285,7 @@ class FLEG_CVAE(Strategy):
         warmup_epochs = self.cvae_epochs // 3
         beta = self.cvae_beta
         if self.anealing:
-            beta = min(1.0, self.cvae_round / warmup_epochs if warmup_epochs > 0 else 1.0)
+            beta = min(1.0, self.cvae_round / warmup_epochs if warmup_epochs > 0 else 0.0)
 
         total_examples = self._last_total_examples or self.num_clients
         if self.num_syn == "dynamic":
@@ -377,7 +377,6 @@ class FLEG_CVAE(Strategy):
                 config = {
                     "model": "classifier",
                     "round": self.net_epochs,
-                    "logical_level": self.lvl,
                     "classifier_level": classifier_level,
                     "strategy": self.strategy_name,
                     "mu": self.mu,
@@ -631,7 +630,7 @@ class FLEG_CVAE(Strategy):
                 self._record_level_transmission()
                 self._save_checkpoint("checkpoint_end.pth")
                 self._save_metrics()
-                print("Treinamento CVAE finalizado.")
+                print("Treinamento finalizado.")
             else:
                 self.phase = "cvae"
                 self.decoder = None

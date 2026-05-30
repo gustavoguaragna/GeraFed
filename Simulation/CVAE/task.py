@@ -114,9 +114,11 @@ def load_data(
     teste: bool = False,
     partitioner_type: str = "IID",
     alpha_dir: Optional[float] = None,
-    num_chunks: int = 1,
     seed: int = 42,
-):
+)-> tuple[DataLoader, DataLoader, DataLoader]:
+    
+    """Carrega dataset com splits de treino e teste separados para o cliente específico."""
+
     dataset = normalize_dataset_name(dataset)
     dataset_config = DATASET_CONFIG[dataset]
     cache_key = (dataset, num_partitions, partitioner_type, alpha_dir, seed)
@@ -168,26 +170,10 @@ def load_data(
         generator=torch.Generator().manual_seed(seed),
     )
 
-    if num_chunks > 1:
-        indices = list(range(len(client_train)))
-        rng = random.Random(seed)
-        rng.shuffle(indices)
-        chunk_size = math.ceil(len(indices) / num_chunks)
-        chunks = []
-        for chunk_idx in range(num_chunks):
-            start = chunk_idx * chunk_size
-            end = min((chunk_idx + 1) * chunk_size, len(indices))
-            chunk_indices = indices[start:end]
-            if chunk_indices:
-                chunks.append(Subset(client_train, chunk_indices))
-        trainloader = [
-            DataLoader(chunk, batch_size=batch_size, shuffle=True) for chunk in chunks
-        ]
-    else:
-        trainloader = DataLoader(client_train, batch_size=batch_size, shuffle=True)
-
+    trainloader = DataLoader(client_train, batch_size=batch_size, shuffle=True)
     testloader = DataLoader(test_partition, batch_size=64, shuffle=False)
     testloader_local = DataLoader(client_test, batch_size=64, shuffle=False)
+
     return trainloader, testloader, testloader_local
 
 

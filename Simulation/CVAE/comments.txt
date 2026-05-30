@@ -1,0 +1,48 @@
+STATUS ATUAL:
+
+estou avaliando os arquivos criados pelo codex, modificando coisas mais simples e colocando comentários nesse arquivo. já li o
+server_app e agora estou no strategy. parei no configure fit. ler o configure_fit do fleg para ver se falta algo. estou lendo os
+arquivos atuais, fleg e fleg_cvae.py juntos para ir analisando. não vi o processo de geração do cliente ainda (ver no client_app)
+
+
+PARA MANDAR PARA O CODEX:
+Avaliando os arquivos criados para o FLEG_CVAE em flwr, vou pontuar algumas coisas que gostaria que verificasse:
+1. self.decoder é definido como None em 3 momentos, no init, no aggregate_fit ao trocar para fase do classificador e no
+aggregate_evaluate ao trocar para a fase da cvae. Na minha opinião, não é necessário a definição no aggregate_evaluate, já que o 
+decoder já seria None, estou certo disso? Se sim, retirar essa linha do aggregate_evaluate.
+2. As variáveis latent_dim_mode e num_syn da classe FLEG_CVAE representam a mesma coisa? Se sim, padronizar par usar apenas uma delas.
+3. A atualizaçõ do self.global net em strategy.py é feioto com self.global_net.load_state_dict(self.best_model.state_dict()) em dois 
+momentos: no aggregate_fit durante a fase de geração de embeddings e no aggregate_evaluate ao término da fase do classificador. Na 
+minha visão, somente é necessário a atualização no aggregate_evaluate, já que self.global_net não é modificado fora do treinamento do 
+classificador. Se concordar comigo, remova onde é desnecessário e caso contrário me explique.
+
+Ajustar para salvar o best_model do classificador no cliente (disco) para poupar custo de comunicacao.
+Ajustar tambem para deixar o embedding sintetico gerado com cvae no cliente, para poupar custos computacionais. O tempo de geração
+vai ter que ser transferido para o cliente também.
+Parece que esá com a ideia errada de nível, só tem uma rodada de cvae com numero de epocas locais. Vi isso ao calcular o
+level_time, começa no aggregate_fit do cvae e termina lá tambem. (primeira rodada comeca no init).
+Avaliar cvae_local_epochs, parece só uma redundancia para cvae_epochs, de modo que cvae_epochs seria na verdade
+cvae_epochs x cvae_local_epochs.
+Troque o otimizador do classificador para SGD e não deixe que o estado do otimizador do cvae, ou o encoder se percam a cada rodada
+Decidir onde ficará o baseline, no mesmo projeto ou separado em CNN.
+Está sem alignment loss
+Adicionar logica de checkpoint
+Add prints para acompanhamento do processo.
+Retirar lógica de chunks, vi que tem no load_data.
+Ver se seed funciona bem, oq causa fonte de variação?
+Desvincular task do FLEG.
+Add opcao de fedprox (para classificador e cvae). Ver se melhor adicionar manualmente ou se dá para adaptar de algum jeito a
+implementação do flwr.
+Porque varias epocas locais para cvae e somente uma para classifier? Testar com multiplas tambem
+Deixar codigo mais organizado para facilitar leitura (identação, nomes de variáveis, comentários, importações desnecessárias)
+Levar para um projeto proprio, pyproject isolado
+
+
+PARA EU VERIFICAR/ALTERAR:
+
+Estava dando erro em 'beta = min(1.0, self.cvae_round / warmup_epochs)' na função _cvae_config do strategy.py na linha 288 quando
+warmup_epochs era 0. Ajustei para retornar 0.0 nesse caso, mas é bom verificar se isso faz sentido.
+O codigo entende o processo como nivel 0 classificador -> nivel1 cvae -> nivel 1 classificador. Ver se queremos manter assim ou 
+nivel 0 primeiro para os dois. Isso não muda nada, só como o FLEG é apresentado. 
+
+
