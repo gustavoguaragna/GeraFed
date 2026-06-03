@@ -209,15 +209,6 @@ def create_feature_extractor(
         return None
     return feature_extractor_class(seed=seed)
 
-
-def get_target_classifier_level(level: int, lesslvl: bool = False) -> int:
-    return 0 if level == 0 else level + (1 if lesslvl else 0)
-
-
-def get_target_cvae_level(level: int, lesslvl: bool = False) -> int:
-    return level + (2 if lesslvl else 1)
-
-
 def state_dict_to_bytes(state_dict: dict[str, torch.Tensor]) -> bytes:
     buffer = io.BytesIO()
     torch.save({key: value.detach().cpu() for key, value in state_dict.items()}, buffer)

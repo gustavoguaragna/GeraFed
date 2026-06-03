@@ -1,20 +1,33 @@
 STATUS ATUAL:
 
 estou avaliando os arquivos criados pelo codex, modificando coisas mais simples e colocando comentários nesse arquivo. já li o
-server_app e agora estou no strategy. parei no configure fit. ler o configure_fit do fleg para ver se falta algo. estou lendo os
-arquivos atuais, fleg e fleg_cvae.py juntos para ir analisando. não vi o processo de geração do cliente ainda (ver no client_app)
-
+server_app e agora estou no strategy. parei no configure fit. avançar para configure_evaluate. estou lendo os
+arquivos atuais, fleg e fleg_cvae.py juntos para ir analisando.
 
 PARA MANDAR PARA O CODEX:
 Avaliando os arquivos criados para o FLEG_CVAE em flwr, vou pontuar algumas coisas que gostaria que verificasse:
-1. self.decoder é definido como None em 3 momentos, no init, no aggregate_fit ao trocar para fase do classificador e no
+1. Pelo que entendi do código, após completarem as épocas destinadas para o treinamento da cvae, tem uma rodada destinada a geração
+de embeddings, na qual cada cliente gera embeddings, manda para o servidor que depois devolve os embeddings para os clientes. Na
+minha opinião, isso é desperdício de comunicação. Acho que seria mais eficiente se, após a última época da CVAE, o servidor utilize o
+decoder final para gerar embeddings e então compartilhar com os clientes. Nesse caso, não precisaria da rodada extra para geração.
+O compartilhamento dos embeddings pode ser feito na primeira época do próximo nível do classificador.
+2. self.decoder é definido como None em 3 momentos, no init, no aggregate_fit ao trocar para fase do classificador e no
 aggregate_evaluate ao trocar para a fase da cvae. Na minha opinião, não é necessário a definição no aggregate_evaluate, já que o 
 decoder já seria None, estou certo disso? Se sim, retirar essa linha do aggregate_evaluate.
-2. As variáveis latent_dim_mode e num_syn da classe FLEG_CVAE representam a mesma coisa? Se sim, padronizar par usar apenas uma delas.
-3. A atualizaçõ do self.global net em strategy.py é feioto com self.global_net.load_state_dict(self.best_model.state_dict()) em dois 
+3. A atualizaçõ do self.global_net em strategy.py é feito com self.global_net.load_state_dict(self.best_model.state_dict()) em dois 
 momentos: no aggregate_fit durante a fase de geração de embeddings e no aggregate_evaluate ao término da fase do classificador. Na 
 minha visão, somente é necessário a atualização no aggregate_evaluate, já que self.global_net não é modificado fora do treinamento do 
 classificador. Se concordar comigo, remova onde é desnecessário e caso contrário me explique.
+4. Várias funções são importadas do arquivo em FLEG/task.py para CVAE/task.py. Defina as funções diretamente em CVAE/task.py.
+5. Nos arquivos de Simulation/FLEG tinha a possibilidade de dividirmos o dataset em diferentes chunks. Para Simulation/CVAE isso não 
+vai mais acontecer. Em CVAE/task.py removi o argumento num_chunks. Removi a função _full_trainloader em CVAE/client_app.py e sempre
+ela era utilizada, mantive o trainloader único. Revise se tem algum problema funcional nisso.
+6. Removi as funções get_target_classifier_level e get_target_cvae_level, colocando o calculo direto, onde eram chamadas. Fiz isso, 
+pois eram chamadas poucas vezes e a função era muito simples. Tem algum problema funcional nisso?
+7. Optei por contabilizar o tráfego na rede apenas considerando um cliente. Para isso, removi len(clients) da multiplicação com os 
+tamanhos calculados. Confira, se está tudo ok a respeito disso.
+8. Removi "round" do config do configure_fit, pois só era usado no evaluate nos clientes. Nenhum problema nisso, certo?
+
 
 Ajustar para salvar o best_model do classificador no cliente (disco) para poupar custo de comunicacao.
 Ajustar tambem para deixar o embedding sintetico gerado com cvae no cliente, para poupar custos computacionais. O tempo de geração
@@ -28,9 +41,7 @@ Decidir onde ficará o baseline, no mesmo projeto ou separado em CNN.
 Está sem alignment loss
 Adicionar logica de checkpoint
 Add prints para acompanhamento do processo.
-Retirar lógica de chunks, vi que tem no load_data.
 Ver se seed funciona bem, oq causa fonte de variação?
-Desvincular task do FLEG.
 Add opcao de fedprox (para classificador e cvae). Ver se melhor adicionar manualmente ou se dá para adaptar de algum jeito a
 implementação do flwr.
 Porque varias epocas locais para cvae e somente uma para classifier? Testar com multiplas tambem
@@ -40,9 +51,14 @@ Levar para um projeto proprio, pyproject isolado
 
 PARA EU VERIFICAR/ALTERAR:
 
-Estava dando erro em 'beta = min(1.0, self.cvae_round / warmup_epochs)' na função _cvae_config do strategy.py na linha 288 quando
+- Estava dando erro em 'beta = min(1.0, self.cvae_round / warmup_epochs)' na função _cvae_config do strategy.py na linha 288 quando
 warmup_epochs era 0. Ajustei para retornar 0.0 nesse caso, mas é bom verificar se isso faz sentido.
-O codigo entende o processo como nivel 0 classificador -> nivel1 cvae -> nivel 1 classificador. Ver se queremos manter assim ou 
+- O codigo entende o processo como nivel 0 classificador -> nivel1 cvae -> nivel 1 classificador. Ver se queremos manter assim ou 
 nivel 0 primeiro para os dois. Isso não muda nada, só como o FLEG é apresentado. 
-
+- Reentender as variações de melhoria para o CVAE e avaliar se realmente é significativo. Tem explicações no chat e gráficos nos 
+slides de reuniao semanal. Os resultados completos estão armazenados no pillars. Se algo for ser mantido, seria bom ver refs
+sobre as técnicas.
+- Ver no playground o calculo do tamanho do config com a funcao _config_payload_size_mb.
+- Ver em refs sobre numero de epocas locais da cvae.
+- Avaliar se é menos custoso compartilhar grande dataset de embeddings ou decoder para geracao local.
 

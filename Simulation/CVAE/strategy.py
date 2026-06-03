@@ -35,8 +35,6 @@ from Simulation.CVAE.task import (
     create_full_model,
     get_image_key,
     get_model_size_mb,
-    get_target_classifier_level,
-    get_target_cvae_level,
     get_weights,
     infer_feature_dim,
     normalize_dataset_name,
@@ -184,7 +182,7 @@ class FLEG_CVAE(Strategy):
         return "FLEG_CVAE()"
 
     def _classifier_level(self) -> int:
-        return get_target_classifier_level(self.lvl, self.lesslvl)
+        return 0 if self.lvl == 0 else self.lvl + (1 if self.lesslvl else 0)
 
     def _is_final_level(self) -> bool:
         return self.lvl + (1 if self.lesslvl else 0) >= self.levels
@@ -253,7 +251,7 @@ class FLEG_CVAE(Strategy):
         return batch[self.image_key][0]
 
     def _setup_cvae_for_current_level(self) -> None:
-        self.cvae_level = get_target_cvae_level(self.lvl, self.lesslvl)
+        self.cvae_level = self.lvl + (2 if self.lesslvl else 1)
         feature_extractor = create_feature_extractor(
             self.dataset, level=self.cvae_level, seed=self.seed
         ).to(self.device)
@@ -376,7 +374,6 @@ class FLEG_CVAE(Strategy):
                 generated_payload = self.generated_by_cid.get(str(client.cid), b"")
                 config = {
                     "model": "classifier",
-                    "round": self.net_epochs,
                     "classifier_level": classifier_level,
                     "strategy": self.strategy_name,
                     "mu": self.mu,
@@ -400,8 +397,7 @@ class FLEG_CVAE(Strategy):
                 self._setup_cvae_for_current_level()
             config = self._cvae_config(model="cvae")
             self._add_level_traffic(
-                len(clients)
-                * (
+                (
                     self._parameters_size_mb(self.parameters_cvae)
                     + self._config_payload_size_mb(config)
                 ),
@@ -416,8 +412,7 @@ class FLEG_CVAE(Strategy):
         if self.phase == "cvae_generate":
             config = self._cvae_config(model="cvae_generate")
             self._add_level_traffic(
-                len(clients)
-                * (
+                 (
                     self._parameters_size_mb(self.parameters_cvae)
                     + self._config_payload_size_mb(config)
                 ),
@@ -456,8 +451,7 @@ class FLEG_CVAE(Strategy):
             num_clients=sample_size, min_num_clients=min_num_clients
         )
         self._add_level_traffic(
-            len(clients)
-            * (
+            (
                 self._parameters_size_mb(self.parameters_classifier)
                 + self._config_payload_size_mb(config)
             ),

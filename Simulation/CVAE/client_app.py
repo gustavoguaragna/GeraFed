@@ -70,15 +70,6 @@ class FlowerClient(NumPyClient):
         self.image_key = get_image_key(self.dataset)
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    def _full_trainloader(self) -> DataLoader:
-        if isinstance(self.trainloader, list):
-            return DataLoader(
-                ConcatDataset([dl.dataset for dl in self.trainloader]),
-                batch_size=self.batch_size,
-                shuffle=True,
-            )
-        return self.trainloader
-
     def _feature_extractor(self, level: int, global_state_bytes: bytes):
         feature_extractor = create_feature_extractor(
             self.dataset, level=level, seed=self.seed
@@ -242,7 +233,7 @@ class FlowerClient(NumPyClient):
 
     def _fit_classifier(self, parameters, config):
         level = int(config["classifier_level"])
-        trainloader = self._full_trainloader()
+        trainloader = self.trainloader
         classifier = create_classifier(self.dataset, level=level, seed=self.seed).to(self.device)
         set_weights(classifier, parameters)
 
@@ -266,7 +257,7 @@ class FlowerClient(NumPyClient):
         train_time = time.time() - train_start
         return (
             get_weights(classifier),
-            len(self._full_trainloader().dataset),
+            len(self.trainloader.dataset),
             {
                 "cid": self.cid,
                 "train_loss": train_loss,
@@ -276,7 +267,7 @@ class FlowerClient(NumPyClient):
 
     def _fit_cvae(self, parameters, config, generate_only=False):
         level = int(config["cvae_level"])
-        trainloader = self._full_trainloader()
+        trainloader = self.trainloader
         feature_extractor = self._feature_extractor(level, config["global_net_state"])
         embedding_loader, norm_stats = self._normalized_embedding_loader(
             feature_extractor=feature_extractor,
@@ -465,7 +456,6 @@ def client_fn(context: Context):
         dataset=dataset,
         teste=run_config.get("teste", run_config.get("test_mode", False)),
         partitioner_type=partitioner_for_data,
-        num_chunks=run_config.get("num_chunks", 1),
         alpha_dir=alpha,
         seed=seed,
     )
