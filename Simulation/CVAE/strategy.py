@@ -134,7 +134,6 @@ class FLEG_CVAE(Strategy):
         self.phase = "classifier"
         self.lvl = 0
         self.net_epochs = 0
-        self._evaluate_after_fit = False
         self.best_accuracy = 0.0
         self.epochs_no_improve = 0
         self.finished = False
@@ -158,15 +157,15 @@ class FLEG_CVAE(Strategy):
         self.feature_shape = None
 
         self.metrics_dict = {
-            "cvae_loss": [],
-            "net_loss": [],
-            "net_acc": [],
+            "avg_cvae_loss": [],
+            "avg_net_loss": [],
+            "global_net_acc": [],
             "local_acc_epoch": [],
             "time_epoch_classifier": [],
             "time_epoch_cvae": [],
             "time_level": [],
-            "net_time": [],
-            "cvae_time": [],
+            "max_net_time": [],
+            "max_cvae_time": [],
             "net_global_eval_time": [],
             "img_syn_time": [],
             "MB_transmission": [],
@@ -326,7 +325,7 @@ class FLEG_CVAE(Strategy):
                 correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
         accuracy = correct / len(self.valloader.dataset)
         self.metrics_dict["net_global_eval_time"].append(time.time() - start)
-        self.metrics_dict["net_acc"].append(accuracy)
+        self.metrics_dict["global_net_acc"].append(accuracy)
         return accuracy
 
     def num_fit_clients(self, num_available_clients: int) -> tuple[int, int]:
@@ -358,7 +357,6 @@ class FLEG_CVAE(Strategy):
             return []
 
         self.init_round_time = time.time()
-        self._evaluate_after_fit = self.phase == "classifier"
         sample_size, min_num_clients = self.num_fit_clients(client_manager.num_available())
         clients = client_manager.sample(
             num_clients=sample_size, min_num_clients=min_num_clients
@@ -382,9 +380,9 @@ class FLEG_CVAE(Strategy):
                     "generated": generated_payload,
                 }
                 self._add_level_traffic(
-                    classifier_parameters_mb
-                    + global_net_state_mb
-                    + self._bytes_size_mb(generated_payload),
+                    classifier_parameters_mb/len(clients)
+                    + global_net_state_mb/len(clients)
+                    + self._bytes_size_mb(generated_payload)/len(clients),
                     bucket="classifier",
                 )
                 fit_instructions.append(
@@ -432,7 +430,6 @@ class FLEG_CVAE(Strategy):
         if (
             self.finished
             or self.phase != "classifier"
-            or not self._evaluate_after_fit
             or self.fraction_evaluate_alvo == 0.0
         ):
             return []
@@ -493,8 +490,8 @@ class FLEG_CVAE(Strategy):
             avg_loss = weighted_loss_avg(
                 [(fit_res.num_examples, fit_res.metrics["train_loss"]) for _, fit_res in results]
             )
-            self.metrics_dict["net_loss"].append(avg_loss)
-            self.metrics_dict["net_time"].append(
+            self.metrics_dict["avg_net_loss"].append(avg_loss)
+            self.metrics_dict["max_net_time"].append(
                 max(fit_res.metrics["tempo_treino_alvo"] for _, fit_res in results)
             )
             self.metrics_dict["time_epoch_classifier"].append(
@@ -505,7 +502,7 @@ class FLEG_CVAE(Strategy):
                 for _, fit_res in results
             )
             self._add_level_traffic(
-                classifier_upload_mb,
+                classifier_upload_mb/len(results),
                 bucket="classifier",
             )
 
@@ -521,7 +518,7 @@ class FLEG_CVAE(Strategy):
                 f"Melhor acurácia: {self.best_accuracy:.4f} x Acurácia atual: {accuracy:.4f}."
             )
             self.net_epochs += 1
-            return self.parameters_classifier, {"net_loss": avg_loss}
+            return self.parameters_classifier, {"avg_net_loss": avg_loss}
 
         if self.phase == "cvae":
             aggregated_ndarrays = aggregate_inplace(results)
@@ -531,8 +528,8 @@ class FLEG_CVAE(Strategy):
             avg_cvae_loss = weighted_loss_avg(
                 [(fit_res.num_examples, fit_res.metrics["cvae_loss"]) for _, fit_res in results]
             )
-            self.metrics_dict["cvae_loss"].append(avg_cvae_loss)
-            self.metrics_dict["cvae_time"].append(
+            self.metrics_dict["avg_cvae_loss"].append(avg_cvae_loss)
+            self.metrics_dict["max_cvae_time"].append(
                 max(fit_res.metrics["cvae_time"] for _, fit_res in results)
             )
             self.metrics_dict["time_epoch_cvae"].append(time.time() - self.init_round_time)
@@ -541,13 +538,13 @@ class FLEG_CVAE(Strategy):
                 for _, fit_res in results
             )
             self._add_level_traffic(
-                cvae_upload_mb,
+                cvae_upload_mb/len(results),
                 bucket="cvae",
             )
             self.cvae_round += 1
             if self.cvae_round >= self.cvae_epochs:
                 self.phase = "cvae_generate"
-            return self.parameters_cvae, {"cvae_loss": avg_cvae_loss}
+            return self.parameters_cvae, {"avg_cvae_loss": avg_cvae_loss}
 
         if self.phase == "cvae_generate":
             generation_times = []
@@ -566,7 +563,7 @@ class FLEG_CVAE(Strategy):
                 if payload:
                     generation_times.append(pickle.loads(payload).get("time", 0.0))
             self._add_level_traffic(
-                cvae_upload_mb + generated_upload_mb,
+                cvae_upload_mb/len(results) + generated_upload_mb/len(results),
                 bucket="cvae",
             )
             self.metrics_dict["img_syn_time"].append(

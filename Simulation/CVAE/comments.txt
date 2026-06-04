@@ -1,7 +1,7 @@
 STATUS ATUAL:
 
 estou avaliando os arquivos criados pelo codex, modificando coisas mais simples e colocando comentários nesse arquivo. já li o
-server_app e agora estou no strategy. parei no configure fit. avançar para configure_evaluate. estou lendo os
+server_app e agora estou no strategy. finalizei o aggregate fit. avançar para aggregate_evaluate. estou lendo os
 arquivos atuais, fleg e fleg_cvae.py juntos para ir analisando.
 
 PARA MANDAR PARA O CODEX:
@@ -25,8 +25,11 @@ ela era utilizada, mantive o trainloader único. Revise se tem algum problema fu
 6. Removi as funções get_target_classifier_level e get_target_cvae_level, colocando o calculo direto, onde eram chamadas. Fiz isso, 
 pois eram chamadas poucas vezes e a função era muito simples. Tem algum problema funcional nisso?
 7. Optei por contabilizar o tráfego na rede apenas considerando um cliente. Para isso, removi len(clients) da multiplicação com os 
-tamanhos calculados. Confira, se está tudo ok a respeito disso.
+tamanhos calculados e quando o cálculo era por cliente, dividi pelo numero de clientes. Confira, se está tudo ok a respeito disso.
 8. Removi "round" do config do configure_fit, pois só era usado no evaluate nos clientes. Nenhum problema nisso, certo?
+9. A variável self._evaluate_after_fit parece ser redundante em CVAE/strategy.py, assim vou removê-la, se vir algum problema nisso,
+avise.
+
 
 
 Ajustar para salvar o best_model do classificador no cliente (disco) para poupar custo de comunicacao.
@@ -61,4 +64,14 @@ sobre as técnicas.
 - Ver no playground o calculo do tamanho do config com a funcao _config_payload_size_mb.
 - Ver em refs sobre numero de epocas locais da cvae.
 - Avaliar se é menos custoso compartilhar grande dataset de embeddings ou decoder para geracao local.
-
+- if level == 0:
+    set_weights(self.global_net, aggregated_ndarrays)
+  else:
+    set_weights(self.classifier, aggregated_ndarrays)
+    self.global_net.load_state_dict(self.classifier.state_dict(), strict=False)
+Acho que da para remover o if deixando somente o que ta no else, ja que o self.classifier está preparado para o caso level 0, 
+conferir com Claude/Codex
+- self.cvae_round += 1
+  if self.cvae_round >= self.cvae_epochs:
+    self.phase = "cvae_generate"
+ Aqui falha se epocas locais da gen for maior que um, deveria usar essa variavel no if tambem.
