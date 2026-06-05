@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 import pickle
 import time
 from typing import Union
@@ -12,7 +11,7 @@ import torch
 import torch.nn.functional as F
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import Context
-from torch.utils.data import ConcatDataset, DataLoader, TensorDataset
+from torch.utils.data import DataLoader, TensorDataset
 
 from Simulation.CVAE.task import (
     CVAE,
@@ -24,9 +23,7 @@ from Simulation.CVAE.task import (
     create_full_model,
     get_image_key,
     get_label_counts,
-    get_target_classifier_level,
     get_weights,
-    infer_feature_dim,
     load_data,
     local_test,
     normalize_dataset_name,
@@ -121,7 +118,7 @@ class FlowerClient(NumPyClient):
 
     def _train_classifier(self, classifier, trainloader, level, strategy, mu, mixup_type):
         criterion = torch.nn.CrossEntropyLoss().to(self.device)
-        optimizer = torch.optim.Adam(classifier.parameters(), lr=self.lr_alvo)
+        optimizer = torch.optim.SGD(classifier.parameters(), lr=self.lr_alvo)
         global_ref = create_classifier(self.dataset, level=level, seed=self.seed).to(self.device)
         global_ref.load_state_dict(classifier.state_dict())
         for param in global_ref.parameters():
