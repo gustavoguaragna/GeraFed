@@ -1,8 +1,7 @@
 STATUS ATUAL:
 
 estou avaliando os arquivos criados pelo codex, modificando coisas mais simples e colocando comentários nesse arquivo. já li o
-server_app e agora estou no client_app. Estou lendo os metodos do FLowerClient, parei no _train_classifier, indo para 
-_build_augmented_loader. estou lendo os arquivos atuais, fleg e fleg_cvae.py juntos para ir analisando.
+server_app, strategy e client_app, só falta o task. estou lendo os arquivos atuais, fleg e fleg_cvae.py juntos para ir analisando.
 
 PARA MANDAR PARA O CODEX:
 Avaliando os arquivos criados para o FLEG_CVAE em flwr, vou pontuar algumas coisas que gostaria que verificasse:
@@ -43,6 +42,7 @@ Troque o otimizador do classificador para SGD e não deixe que o estado do otimi
 Decidir onde ficará o baseline, no mesmo projeto ou separado em CNN.
 Está sem alignment loss
 Adicionar logica de checkpoint
+Ajustar continue_epoch
 Add prints para acompanhamento do processo.
 Ver se seed funciona bem, oq causa fonte de variação?
 Add opcao de fedprox (para classificador e cvae). Ver se melhor adicionar manualmente ou se dá para adaptar de algum jeito a

@@ -438,11 +438,11 @@ def client_fn(context: Context):
     syn_input = run_config.get("num_syn", run_config.get("syn_input", "dynamic"))
     trial = run_config.get("trial", seed)
     alpha = run_config.get("alpha", _alpha_from_partitioner(partitioner))
-    partitioner_for_data = "Dir01" if partitioner == "Dirichlet" else partitioner
+    partitioner_for_data = f"Dir{int(alpha * 10):02d}" if partitioner == "Dirichlet" else partitioner
 
     folder = (
         f"{run_config['Exp_name_folder']}CVAE/"
-        f"{dataset}_{partitioner}_{run_config['strategy']}_"
+        f"{dataset}_{partitioner_for_data}_{run_config['strategy']}_"
         f"cvaeepochs{cvae_epochs}_{syn_input}_fleg_trial{trial}"
     )
 
