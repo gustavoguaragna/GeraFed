@@ -1,7 +1,6 @@
 STATUS ATUAL:
 
-estou avaliando os arquivos criados pelo codex, modificando coisas mais simples e colocando comentários nesse arquivo. já li o
-server_app, strategy e client_app, só falta o task. estou lendo os arquivos atuais, fleg e fleg_cvae.py juntos para ir analisando.
+Revisar instrucoes para enviar ao codex. Pode-se revisar o fluxo do fleg_cave.py para ver se falta algo tb.
 
 PARA MANDAR PARA O CODEX:
 Avaliando os arquivos criados para o FLEG_CVAE em flwr, vou pontuar algumas coisas que gostaria que verificasse:
