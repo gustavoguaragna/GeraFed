@@ -78,7 +78,6 @@ class FLEG_CVAE(Strategy):
         cvae_epochs: int = 25,
         cvae_beta: float = 1.0,
         cvae_lr: float = 0.001,
-        cvae_local_epochs: int = 1,
         normalization: str = "minmax",
         resblock: bool = False,
         anealing: bool = False,
@@ -119,7 +118,6 @@ class FLEG_CVAE(Strategy):
         self.cvae_epochs = cvae_epochs
         self.cvae_beta = cvae_beta
         self.cvae_lr = cvae_lr
-        self.cvae_local_epochs = cvae_local_epochs
         self.normalization = normalization
         self.resblock = resblock
         self.anealing = anealing

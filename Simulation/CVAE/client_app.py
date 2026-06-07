@@ -39,7 +39,7 @@ class FlowerClient(NumPyClient):
         cid: int,
         dataset: str,
         batch_size: int,
-        trainloader: Union[DataLoader, list],
+        trainloader: DataLoader,
         testloader_local: DataLoader,
         context: Context,
         folder: str,
@@ -434,11 +434,19 @@ def client_fn(context: Context):
     partitioner = run_config["partitioner"]
     batch_size = run_config["tam_batch"]
     seed = run_config["seed"]
-    cvae_epochs = run_config.get("epocas_gen")
+    cvae_local_epochs = run_config.get("epocas_locais_gen")
     syn_input = run_config.get("num_syn", run_config.get("syn_input", "dynamic"))
-    trial = run_config.get("trial", seed)
     alpha = run_config.get("alpha", _alpha_from_partitioner(partitioner))
     partitioner_for_data = f"Dir{int(alpha * 10):02d}" if partitioner == "Dirichlet" else partitioner
+
+    if seed == 42:
+        trial = 1
+    elif seed == 30:
+        trial = 2
+    elif seed == 20:
+        trial = 3
+    else:
+        trial = seed
 
     folder = (
         f"{run_config['Exp_name_folder']}CVAE/"
@@ -469,7 +477,7 @@ def client_fn(context: Context):
         lr_alvo=run_config.get("learn_rate_alvo", 0.01),
         cvae_lr=run_config.get("cvae_lr", 0.001),
         local_epochs_alvo=run_config.get("epocas_alvo", 1),
-        cvae_local_epochs=cvae_epochs,
+        cvae_local_epochs=cvae_local_epochs,
         continue_epoch=run_config.get("continue_epoch", 0),
     ).to_client()
 

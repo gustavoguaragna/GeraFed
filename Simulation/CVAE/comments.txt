@@ -3,12 +3,13 @@ STATUS ATUAL:
 Revisar instrucoes para enviar ao codex. Pode-se revisar o fluxo do fleg_cave.py para ver se falta algo tb.
 
 PARA MANDAR PARA O CODEX:
-Avaliando os arquivos criados para o FLEG_CVAE em flwr, vou pontuar algumas coisas que gostaria que verificasse:
+Avaliei os arquivos criados para o FLEG_CVAE em flwr e vou pontuar algumas coisas que gostaria que você verificasse:
 1. Pelo que entendi do código, após completarem as épocas destinadas para o treinamento da cvae, tem uma rodada destinada a geração
 de embeddings, na qual cada cliente gera embeddings, manda para o servidor que depois devolve os embeddings para os clientes. Na
-minha opinião, isso é desperdício de comunicação. Acho que seria mais eficiente se, após a última época da CVAE, o servidor utilize o
-decoder final para gerar embeddings e então compartilhar com os clientes. Nesse caso, não precisaria da rodada extra para geração.
-O compartilhamento dos embeddings pode ser feito na primeira época do próximo nível do classificador.
+minha opinião, isso é desperdício de comunicação. Acho que seria mais eficiente se, após a última época da CVAE, o servidor
+utilizasse o decoder final para gerar embeddings e então compartilhasse com os clientes. Nesse caso, não precisaria da rodada extra 
+para geração. O compartilhamento dos embeddings pode ser feito na primeira época do próximo nível do classificador. Se concordar 
+comigo, faça isso, caso contrário, justifique ou proponha nova solução.
 2. self.decoder é definido como None em 3 momentos, no init, no aggregate_fit ao trocar para fase do classificador e no
 aggregate_evaluate ao trocar para a fase da cvae. Na minha opinião, não é necessário a definição no aggregate_evaluate, já que o 
 decoder já seria None, estou certo disso? Se sim, retirar essa linha do aggregate_evaluate.
@@ -19,18 +20,19 @@ classificador. Se concordar comigo, remova onde é desnecessário e caso contrá
 4. Várias funções são importadas do arquivo em FLEG/task.py para CVAE/task.py. Defina as funções diretamente em CVAE/task.py.
 5. Nos arquivos de Simulation/FLEG tinha a possibilidade de dividirmos o dataset em diferentes chunks. Para Simulation/CVAE isso não 
 vai mais acontecer. Em CVAE/task.py removi o argumento num_chunks. Removi a função _full_trainloader em CVAE/client_app.py e sempre
-ela era utilizada, mantive o trainloader único. Revise se tem algum problema funcional nisso.
+que ela era utilizada, mantive o trainloader único. Revise se tem algum problema funcional nisso.
 6. Removi as funções get_target_classifier_level e get_target_cvae_level, colocando o calculo direto, onde eram chamadas. Fiz isso, 
 pois eram chamadas poucas vezes e a função era muito simples. Tem algum problema funcional nisso?
 7. Optei por contabilizar o tráfego na rede apenas considerando um cliente. Para isso, removi len(clients) da multiplicação com os 
 tamanhos calculados e quando o cálculo era por cliente, dividi pelo numero de clientes. Confira, se está tudo ok a respeito disso.
 8. Removi "round" do config do configure_fit, pois só era usado no evaluate nos clientes. Nenhum problema nisso, certo?
-9. A variável self._evaluate_after_fit parece ser redundante em CVAE/strategy.py, assim vou removê-la, se vir algum problema nisso,
+9. A variável self._evaluate_after_fit parece ser redundante em CVAE/strategy.py, assim a removi, se vir algum problema nisso,
 avise.
 
 
 
-Ajustar para salvar o best_model do classificador no cliente (disco) para poupar custo de comunicacao.
+Ajustar para salvar o best_model do classificador no cliente (disco) para poupar custo de comunicacao. Evitaria de compartilhar o 
+global_net_state a toda rodada.
 Ajustar tambem para deixar o embedding sintetico gerado com cvae no cliente, para poupar custos computacionais. O tempo de geração
 vai ter que ser transferido para o cliente também.
 Parece que esá com a ideia errada de nível, só tem uma rodada de cvae com numero de epocas locais. Vi isso ao calcular o
@@ -41,7 +43,6 @@ Troque o otimizador do classificador para SGD e não deixe que o estado do otimi
 Decidir onde ficará o baseline, no mesmo projeto ou separado em CNN.
 Está sem alignment loss
 Adicionar logica de checkpoint
-Ajustar continue_epoch
 Add prints para acompanhamento do processo.
 Ver se seed funciona bem, oq causa fonte de variação?
 Add opcao de fedprox (para classificador e cvae). Ver se melhor adicionar manualmente ou se dá para adaptar de algum jeito a

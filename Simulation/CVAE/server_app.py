@@ -99,7 +99,6 @@ def server_fn(context: Context):
         cvae_epochs=cvae_epochs,
         cvae_beta=_get(run_config, "cvae_beta", 1.0),
         cvae_lr=_get(run_config, "learn_rate_gen", 0.001),
-        cvae_local_epochs=cvae_local_epochs,
         normalization=_get(run_config, "cvae_normalization", "minmax"),
         resblock=_get(run_config, "cvae_resblock", False),
         anealing=_get(run_config, "cvae_anealing", False),
