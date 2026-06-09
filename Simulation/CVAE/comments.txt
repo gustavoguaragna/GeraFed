@@ -1,15 +1,17 @@
 STATUS ATUAL:
-
-Já mandei o que está abaixo para o codex e ele ja alterou. Estou revendo as alterações. Já vi o task e falta o strategy e o 
-client_app.
+Avaliando sessao "para eu verificar/alterar"
 
 PARA MANDAR PARA O CODEX:
+Tenho alguns pontos sobre os arquivos do Simulation/CVAE:
+1. Toda rodada é enviado o global_net_state para os clientes. Os parâmetros são usados para a feature extractor nos clientes durante 
+as fases de treinamento e para a parte congelada no modelo completo na avaliação. Pensei que seria melhor para o custo de 
+comunicação, se a parte da feature_extractor fosse salva no contexto do cliente sempre que o modelo global seja o best model.
+Os arquivos em Simulation/FLEG fazem algo similar, mas salvando o modelo completo. Aqui pensei em salvar somente a parte extratora 
+para economia de espaço.
 
 
 
 PARA EU VERIFICAR/ALTERAR:
-Ajustar para salvar o best_model do classificador no cliente (disco) para poupar custo de comunicacao. Evitaria de compartilhar o 
-global_net_state a toda rodada.
 Ajustar tambem para deixar o embedding sintetico gerado com cvae no cliente, para poupar custos computacionais. O tempo de geração
 vai ter que ser transferido para o cliente também.
 Parece que esá com a ideia errada de nível, só tem uma rodada de cvae com numero de epocas locais. Vi isso ao calcular o
