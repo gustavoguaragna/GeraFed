@@ -392,7 +392,7 @@ class FLEG(Strategy):
             for _, fit_res in sorted_results:
                 disc_params = parameters_to_ndarrays(fit_res.parameters)
                 discs_sizes += get_model_size_mb(disc_params)
-                disc = gan_class(seed=self.seed).to(self.device)
+                disc = gan_class(seed=self.seed, latent_dim=self.latent_dim).to(self.device)
                 set_weights_disc(disc, disc_params)
                 discs.append(disc)
                 del disc_params
@@ -664,7 +664,7 @@ class FLEG(Strategy):
             if self.lvl < self.levels:
                 self.epochs_no_improve = 0
                 self.training_gan = True
-                self.gen = self.gan[self.dataset][self.lvl](seed=self.seed).to(self.device)
+                self.gen = self.gan[self.dataset][self.lvl](seed=self.seed, latent_dim=self.latent_dim).to(self.device)
                 self.parameters_gen = ndarrays_to_parameters(get_weights_gen(self.gen))
                 self.optimG_state_dict = None
                 self.global_net.load_state_dict(self.best_model.state_dict())

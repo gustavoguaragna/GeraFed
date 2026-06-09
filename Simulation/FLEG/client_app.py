@@ -164,8 +164,8 @@ class FlowerClient(NumPyClient):
                 gan_class, feature_extractor_class = GAN_COMPONENTS[self.dataset][config["level"]]
             except KeyError as exc:
                 raise ValueError(f"Treino da GAN vai até nível 3 (4° nível), não deveria receber config['level'] {config['level']}.") from exc
-            self.gen = gan_class(seed=self.seed).to(self.device)
-            self.disc = gan_class(seed=self.seed).to(self.device)
+            self.gen = gan_class(seed=self.seed, latent_dim=self.latent_dim).to(self.device)
+            self.disc = gan_class(seed=self.seed, latent_dim=self.latent_dim).to(self.device)
             self.feature_extractor = feature_extractor_class(seed=self.seed).to(self.device)
 
             self.optim_D = torch.optim.Adam(self.disc.discriminator.parameters(), lr=self.lr_disc, betas=(0.5, 0.999))

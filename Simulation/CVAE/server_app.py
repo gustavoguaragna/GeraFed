@@ -38,7 +38,7 @@ def server_fn(context: Context):
     partitioner = _get(run_config, "partitioner", "Class")
     strategy_name = _get(run_config, "strategy", "fedavg")
     seed = _get(run_config, "seed", 42)
-    num_clients = context.node_config["num-partitions"]
+    num_clients = _get(run_config, "num_clients", 10)
     batch_size = _get(run_config, "tam_batch", 32)
     teste = _get(run_config, "teste", False)
     cvae_epochs = _get(run_config, "epocas_gen", 25)
@@ -117,4 +117,3 @@ def server_fn(context: Context):
 
 
 app = ServerApp(server_fn=server_fn)
-
