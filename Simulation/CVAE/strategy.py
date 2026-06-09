@@ -136,6 +136,7 @@ class FLEG_CVAE(Strategy):
         self.epochs_no_improve = 0
         self.finished = False
         self.generated_by_cid: dict[str, bytes] = {}
+        self.generated_payload: bytes = b""
         self._last_total_examples = num_clients
         self._level_transmission_mb = 0.0
         self._level_classifier_traffic_mb = 0.0
@@ -276,12 +277,7 @@ class FLEG_CVAE(Strategy):
         self.parameters_cvae = ndarrays_to_parameters(get_weights(self.decoder.decoder))
         self.cvae_round = 0
 
-    def _cvae_config(self, model: str) -> dict[str, Scalar]:
-        warmup_epochs = self.cvae_epochs // 3
-        beta = self.cvae_beta
-        if self.anealing:
-            beta = min(1.0, self.cvae_round / warmup_epochs if warmup_epochs > 0 else 0.0)
-
+    def _num_generated_samples(self) -> int:
         total_examples = self._last_total_examples or self.num_clients
         if self.num_syn == "dynamic":
             num_samples = int(
@@ -295,6 +291,14 @@ class FLEG_CVAE(Strategy):
         else:
             raise ValueError(f"num_syn deve ser 'dynamic' ou 'fixed', recebeu {self.num_syn}")
 
+        return num_samples
+
+    def _cvae_config(self, model: str) -> dict[str, Scalar]:
+        warmup_epochs = self.cvae_epochs // 3
+        beta = self.cvae_beta
+        if self.anealing:
+            beta = min(1.0, self.cvae_round / warmup_epochs if warmup_epochs > 0 else 0.0)
+
         return {
             "model": model,
             "cvae_level": self.cvae_level,
@@ -306,8 +310,82 @@ class FLEG_CVAE(Strategy):
             "normalization": self.normalization,
             "beta": beta,
             "resblock": self.resblock,
-            "num_samples": num_samples,
+            "num_samples": self._num_generated_samples(),
         }
+
+    def _server_embedding_norm_stats(self) -> dict[str, torch.Tensor]:
+        feature_extractor = create_feature_extractor(
+            self.dataset, level=self.cvae_level, seed=self.seed
+        ).to(self.device)
+        feature_extractor.load_state_dict(self.global_net.state_dict(), strict=False)
+        feature_extractor.eval()
+
+        all_embeddings = []
+        with torch.no_grad():
+            for batch in self.valloader:
+                images = batch[self.image_key].to(self.device)
+                embeddings = feature_extractor(images)
+                embeddings = embeddings.view(embeddings.size(0), -1)
+                all_embeddings.append(embeddings)
+
+        if not all_embeddings:
+            raise RuntimeError("Nao foi possivel calcular estatisticas do servidor.")
+
+        embeddings = torch.cat(all_embeddings, dim=0)
+        if self.normalization == "minmax":
+            min_ = embeddings.min(dim=0).values
+            max_ = embeddings.max(dim=0).values
+            scale = torch.clamp(max_ - min_, min=1e-8)
+            return {"min": min_, "scale": scale}
+        if self.normalization == "z":
+            mean = embeddings.mean(dim=0)
+            std = torch.clamp(embeddings.std(dim=0), min=1e-8)
+            return {"mean": mean, "std": std}
+        raise ValueError(
+            f"normalization deve ser 'minmax' ou 'z', recebeu {self.normalization}"
+        )
+
+    def _sample_generated_labels(self, num_samples: int) -> torch.Tensor:
+        labels = torch.arange(10, device=self.device).repeat(num_samples // 10)
+        remainder = num_samples % 10
+        if remainder:
+            labels = torch.cat(
+                [
+                    labels,
+                    torch.randint(0, 10, (remainder,), device=self.device),
+                ],
+                dim=0,
+            )
+        if labels.numel() == 0:
+            labels = torch.randint(0, 10, (num_samples,), device=self.device)
+        return labels[torch.randperm(labels.numel(), device=self.device)]
+
+    def _generate_embeddings_on_server(self) -> bytes:
+        if self.decoder is None:
+            return b""
+
+        start = time.time()
+        num_samples = self._num_generated_samples()
+        norm_stats = self._server_embedding_norm_stats()
+        labels = self._sample_generated_labels(num_samples)
+        latents = torch.randn((num_samples, self.latent_dim), device=self.device)
+
+        self.decoder.eval()
+        with torch.no_grad():
+            one_hot = torch.nn.functional.one_hot(labels, num_classes=10).float()
+            generated = self.decoder.decode(latents, one_hot)
+            if self.normalization == "minmax":
+                generated = generated * norm_stats["scale"] + norm_stats["min"]
+            else:
+                generated = generated * norm_stats["std"] + norm_stats["mean"]
+
+            generated = generated.view(-1, *self.feature_shape)
+            payload = {
+                "assets": generated.detach().cpu().numpy(),
+                "labels": labels.detach().cpu().numpy(),
+                "time": time.time() - start,
+            }
+        return pickle.dumps(payload)
 
     def _global_eval(self) -> float:
         criterion = torch.nn.CrossEntropyLoss()
@@ -367,7 +445,9 @@ class FLEG_CVAE(Strategy):
             global_net_state_mb = self._bytes_size_mb(global_net_state)
             fit_instructions = []
             for client in clients:
-                generated_payload = self.generated_by_cid.get(str(client.cid), b"")
+                generated_payload = self.generated_by_cid.get(
+                    str(client.cid), self.generated_payload
+                )
                 config = {
                     "model": "classifier",
                     "classifier_level": classifier_level,
@@ -394,21 +474,6 @@ class FLEG_CVAE(Strategy):
             config = self._cvae_config(model="cvae")
             self._add_level_traffic(
                 (
-                    self._parameters_size_mb(self.parameters_cvae)
-                    + self._config_payload_size_mb(config)
-                ),
-                bucket="cvae",
-            )
-            fit_ins = FitIns(
-                parameters=self.parameters_cvae,
-                config=config,
-            )
-            return [(client, fit_ins) for client in clients]
-
-        if self.phase == "cvae_generate":
-            config = self._cvae_config(model="cvae_generate")
-            self._add_level_traffic(
-                 (
                     self._parameters_size_mb(self.parameters_cvae)
                     + self._config_payload_size_mb(config)
                 ),
@@ -541,47 +606,27 @@ class FLEG_CVAE(Strategy):
             )
             self.cvae_round += 1
             if self.cvae_round >= self.cvae_epochs:
-                self.phase = "cvae_generate"
+                self.generated_by_cid = {}
+                self.generated_payload = self._generate_embeddings_on_server()
+                generation_time = 0.0
+                if self.generated_payload:
+                    generation_time = pickle.loads(self.generated_payload).get("time", 0.0)
+                self.metrics_dict["img_syn_time"].append(generation_time)
+                self.metrics_dict["time_level"].append(time.time() - self.init_level_time)
+                self._record_level_transmission()
+                self._save_checkpoint(f"checkpoint_level{self.lvl + 1}.pth")
+                self._save_metrics()
+
+                self.lvl += 1
+                self.epochs_no_improve = 0
+                self.phase = "classifier"
+                self.decoder = None
+                self.parameters_cvae = None
+                self.init_level_time = time.time()
+                self._setup_classifier_for_current_level()
+                print(f"Avançando para o nível {self.lvl}.")
+                return self.parameters_classifier, {"avg_cvae_loss": avg_cvae_loss}
             return self.parameters_cvae, {"avg_cvae_loss": avg_cvae_loss}
-
-        if self.phase == "cvae_generate":
-            generation_times = []
-            self.generated_by_cid = {}
-            cvae_upload_mb = 0.0
-            generated_upload_mb = 0.0
-            for client, fit_res in results:
-                cid = str(fit_res.metrics.get("cid"))
-                payload = fit_res.metrics.get("generated", b"")
-                cvae_upload_mb += get_model_size_mb(
-                    parameters_to_ndarrays(fit_res.parameters)
-                )
-                generated_upload_mb += self._bytes_size_mb(payload)
-                self.generated_by_cid[cid] = payload
-                self.generated_by_cid[str(client.cid)] = payload
-                if payload:
-                    generation_times.append(pickle.loads(payload).get("time", 0.0))
-            self._add_level_traffic(
-                cvae_upload_mb/len(results) + generated_upload_mb/len(results),
-                bucket="cvae",
-            )
-            self.metrics_dict["img_syn_time"].append(
-                sum(generation_times) / len(generation_times) if generation_times else 0.0
-            )
-            self.metrics_dict["time_level"].append(time.time() - self.init_level_time)
-            self._record_level_transmission()
-            self._save_checkpoint(f"checkpoint_level{self.lvl + 1}.pth")
-            self._save_metrics()
-
-            self.global_net.load_state_dict(self.best_model.state_dict())
-            self.lvl += 1
-            self.epochs_no_improve = 0
-            self.phase = "classifier"
-            self.decoder = None
-            self.parameters_cvae = None
-            self.init_level_time = time.time()
-            self._setup_classifier_for_current_level()
-            print(f"Avançando para o nível {self.lvl}.")
-            return self.parameters_classifier, {}
 
         return None, {}
 
@@ -622,9 +667,9 @@ class FLEG_CVAE(Strategy):
                 print("Treinamento finalizado.")
             else:
                 self.phase = "cvae"
-                self.decoder = None
                 self.parameters_cvae = None
                 self.generated_by_cid = {}
+                self.generated_payload = b""
                 print("Alternando para treinamento do CVAE.")
 
         metrics = {"loss": loss_aggregated, "accuracy": accuracy_aggregated}

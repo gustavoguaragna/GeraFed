@@ -262,11 +262,11 @@ class FlowerClient(NumPyClient):
             },
         )
 
-    def _fit_cvae(self, parameters, config, generate_only=False):
+    def _fit_cvae(self, parameters, config):
         level = int(config["cvae_level"])
         trainloader = self.trainloader
         feature_extractor = self._feature_extractor(level, config["global_net_state"])
-        embedding_loader, norm_stats = self._normalized_embedding_loader(
+        embedding_loader, _ = self._normalized_embedding_loader(
             feature_extractor=feature_extractor,
             trainloader=trainloader,
             normalization=config["normalization"],
@@ -288,28 +288,26 @@ class FlowerClient(NumPyClient):
         ).to(self.device)
         set_weights(cvae.decoder, parameters)
 
-        cvae_time = 0.0
+        optimizer = torch.optim.Adam(cvae.parameters(), lr=self.cvae_lr)
+        cvae.train()
+        start = time.time()
         avg_loss = 0.0
-        if not generate_only:
-            optimizer = torch.optim.Adam(cvae.parameters(), lr=self.cvae_lr)
-            cvae.train()
-            start = time.time()
-            for _ in range(self.cvae_local_epochs):
-                local_loss = 0.0
-                batches = 0
-                for embeddings, labels in embedding_loader:
-                    embeddings = embeddings.to(self.device)
-                    labels = labels.to(self.device)
-                    labels_one_hot = F.one_hot(labels, num_classes=self.num_classes).float()
-                    optimizer.zero_grad()
-                    recon_x, z_mu, z_logvar = cvae(embeddings, labels_one_hot)
-                    loss = cvae.loss_function(recon_x, embeddings, z_mu, z_logvar)
-                    loss.backward()
-                    optimizer.step()
-                    local_loss += loss.item()
-                    batches += 1
-                avg_loss = local_loss / max(batches, 1)
-            cvae_time = time.time() - start
+        for _ in range(self.cvae_local_epochs):
+            local_loss = 0.0
+            batches = 0
+            for embeddings, labels in embedding_loader:
+                embeddings = embeddings.to(self.device)
+                labels = labels.to(self.device)
+                labels_one_hot = F.one_hot(labels, num_classes=self.num_classes).float()
+                optimizer.zero_grad()
+                recon_x, z_mu, z_logvar = cvae(embeddings, labels_one_hot)
+                loss = cvae.loss_function(recon_x, embeddings, z_mu, z_logvar)
+                loss.backward()
+                optimizer.step()
+                local_loss += loss.item()
+                batches += 1
+            avg_loss = local_loss / max(batches, 1)
+        cvae_time = time.time() - start
 
         metrics = {
             "cid": self.cid,
@@ -317,73 +315,13 @@ class FlowerClient(NumPyClient):
             "cvae_time": float(cvae_time),
         }
 
-        if generate_only:
-            metrics["generated"] = self._generate_embeddings(
-                cvae=cvae,
-                norm_stats=norm_stats,
-                feature_shape=pickle.loads(config["feature_shape"]),
-                normalization=config["normalization"],
-                latent_dim=latent_dim,
-                num_samples=int(config["num_samples"]),
-            )
-
         return get_weights(cvae.decoder), len(trainloader.dataset), metrics
-
-    def _generate_embeddings(
-        self,
-        cvae,
-        norm_stats,
-        feature_shape,
-        normalization,
-        latent_dim,
-        num_samples,
-    ) -> bytes:
-        start = time.time()
-        random_labels = torch.randint(0, self.num_classes, (num_samples,), device=self.device)
-        samples_per_class = torch.bincount(random_labels, minlength=self.num_classes)
-
-        all_labels = []
-        all_latents = []
-        cvae.eval()
-        with torch.no_grad():
-            for label in range(self.num_classes):
-                n_samples = samples_per_class[label].item()
-                if n_samples <= 0:
-                    continue
-                all_labels.append(
-                    torch.full((n_samples,), label, dtype=torch.long, device=self.device)
-                )
-                all_latents.append(torch.randn((n_samples, latent_dim), device=self.device))
-
-            if not all_labels:
-                payload = {"assets": np.array([]), "labels": np.array([]), "time": time.time() - start}
-                return pickle.dumps(payload)
-
-            labels = torch.cat(all_labels, dim=0)
-            latents = torch.cat(all_latents, dim=0)
-            one_hot = F.one_hot(labels, num_classes=self.num_classes).float()
-            generated = cvae.decode(latents, one_hot)
-
-            if normalization == "minmax":
-                generated = generated * norm_stats["scale"] + norm_stats["min"]
-            else:
-                generated = generated * norm_stats["std"] + norm_stats["mean"]
-
-            generated = generated.view(-1, *feature_shape)
-            payload = {
-                "assets": generated.detach().cpu().numpy(),
-                "labels": labels.detach().cpu().numpy(),
-                "time": time.time() - start,
-            }
-            return pickle.dumps(payload)
 
     def fit(self, parameters, config):
         if config["model"] == "classifier":
             return self._fit_classifier(parameters, config)
         if config["model"] == "cvae":
-            return self._fit_cvae(parameters, config, generate_only=False)
-        if config["model"] == "cvae_generate":
-            return self._fit_cvae(parameters, config, generate_only=True)
+            return self._fit_cvae(parameters, config)
         raise ValueError(f"Modelo desconhecido em config['model']: {config['model']}")
 
     def evaluate(self, parameters, config):
@@ -434,7 +372,8 @@ def client_fn(context: Context):
     partitioner = run_config["partitioner"]
     batch_size = run_config["tam_batch"]
     seed = run_config["seed"]
-    cvae_local_epochs = run_config.get("epocas_locais_gen")
+    cvae_epochs = run_config.get("epocas_gen", 25)
+    cvae_local_epochs = run_config.get("epocas_locais_gen", 1)
     syn_input = run_config.get("num_syn", run_config.get("syn_input", "dynamic"))
     alpha = run_config.get("alpha", _alpha_from_partitioner(partitioner))
     partitioner_for_data = f"Dir{int(alpha * 10):02d}" if partitioner == "Dirichlet" else partitioner
@@ -475,7 +414,7 @@ def client_fn(context: Context):
         folder=folder,
         seed=seed,
         lr_alvo=run_config.get("learn_rate_alvo", 0.01),
-        cvae_lr=run_config.get("cvae_lr", 0.001),
+        cvae_lr=run_config.get("learn_rate_gen", run_config.get("cvae_lr", 0.001)),
         local_epochs_alvo=run_config.get("epocas_alvo", 1),
         cvae_local_epochs=cvae_local_epochs,
         continue_epoch=run_config.get("continue_epoch", 0),
