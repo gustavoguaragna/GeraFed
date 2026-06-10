@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import pickle
 import time
-from typing import Union
 
 import numpy as np
 import torch
 import torch.nn.functional as F
 from flwr.client import ClientApp, NumPyClient
-from flwr.common import Context
+from flwr.common import Context, ParametersRecord, array_from_numpy
 from torch.utils.data import DataLoader, TensorDataset
 
 from Simulation.CVAE.task import (
@@ -67,13 +66,76 @@ class FlowerClient(NumPyClient):
         self.image_key = get_image_key(self.dataset)
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    def _feature_extractor(self, level: int, global_state_bytes: bytes):
+    def _record_bytes(self, key: str) -> bytes | None:
+        if key not in self.client_state.parameters_records:
+            return None
+        record = self.client_state.parameters_records[key]
+        return record["state_bytes"].numpy().tobytes()
+
+    def _record_level(self, key: str) -> int | None:
+        if key not in self.client_state.parameters_records:
+            return None
+        record = self.client_state.parameters_records[key]
+        if "level" not in record:
+            return None
+        return int(record["level"].numpy()[0])
+
+    def _save_bytes_record(self, key: str, payload: bytes, level: int) -> None:
+        record = ParametersRecord()
+        record["state_bytes"] = array_from_numpy(
+            np.frombuffer(payload, dtype=np.uint8)
+        )
+        record["level"] = array_from_numpy(np.array([level], dtype=np.int64))
+        self.client_state.parameters_records[key] = record
+
+    def _save_feature_extractor_state(self, level: int, payload: bytes) -> None:
+        if payload:
+            self._save_bytes_record("feature_extractor_state", payload, level)
+
+    def _cached_feature_extractor_state(self, level: int) -> bytes | None:
+        if self._record_level("feature_extractor_state") != level:
+            return None
+        return self._record_bytes("feature_extractor_state")
+
+    def _feature_extractor(self, level: int, config):
         feature_extractor = create_feature_extractor(
             self.dataset, level=level, seed=self.seed
         ).to(self.device)
-        global_state = state_dict_from_bytes(global_state_bytes, self.device)
-        feature_extractor.load_state_dict(global_state, strict=False)
+        self._save_feature_extractor_state(
+            level, config.get("feature_extractor_state", b"")
+        )
+        feature_state_bytes = self._cached_feature_extractor_state(level)
+        if feature_state_bytes is None:
+            raise RuntimeError(
+                f"Cliente {self.cid} nao possui feature extractor em cache "
+                f"para o nivel {level}."
+            )
+        feature_state = state_dict_from_bytes(feature_state_bytes, self.device)
+        feature_extractor.load_state_dict(feature_state, strict=False)
         return feature_extractor
+
+    def _save_generated_embeddings(self, level: int, payload: bytes) -> None:
+        if not payload:
+            return
+        received = pickle.loads(payload)
+        record = ParametersRecord()
+        record["assets"] = array_from_numpy(received["assets"])
+        record["labels"] = array_from_numpy(received["labels"])
+        record["level"] = array_from_numpy(np.array([level], dtype=np.int64))
+        self.client_state.parameters_records["generated_embeddings"] = record
+
+    def _cached_generated_embeddings(self, level: int):
+        if self._record_level("generated_embeddings") != level:
+            return None
+        record = self.client_state.parameters_records["generated_embeddings"]
+        return {
+            "assets": record["assets"].numpy(),
+            "labels": record["labels"].numpy(),
+        }
+
+    def _generated_embeddings(self, level: int, payload: bytes):
+        self._save_generated_embeddings(level, payload)
+        return self._cached_generated_embeddings(level)
 
     def _extract_embeddings(self, feature_extractor, trainloader):
         all_embeddings = []
@@ -178,7 +240,7 @@ class FlowerClient(NumPyClient):
 
         return running_loss / max(batches_seen, 1)
 
-    def _build_augmented_loader(self, trainloader, feature_extractor, generated_payload):
+    def _build_augmented_loader(self, trainloader, feature_extractor, generated_data):
         embeddings, labels = self._extract_embeddings(feature_extractor, trainloader)
         embedding_dataset = EmbeddingPairDataset(
             embeddings=embeddings,
@@ -187,15 +249,14 @@ class FlowerClient(NumPyClient):
             label_col_name="label",
         )
 
-        if not generated_payload:
+        if not generated_data:
             return DataLoader(embedding_dataset, batch_size=self.batch_size, shuffle=True)
 
-        received = pickle.loads(generated_payload)
-        if len(received["assets"]) == 0:
+        if len(generated_data["assets"]) == 0:
             return DataLoader(embedding_dataset, batch_size=self.batch_size, shuffle=True)
 
-        gen_assets = torch.from_numpy(received["assets"]).float().to(self.device)
-        gen_labels = torch.from_numpy(received["labels"]).long().to(self.device)
+        gen_assets = torch.from_numpy(generated_data["assets"]).float().to(self.device)
+        gen_labels = torch.from_numpy(generated_data["labels"]).long().to(self.device)
         gen_dataset = DictTensorDataset(
             assets=gen_assets,
             labels=gen_labels,
@@ -235,11 +296,14 @@ class FlowerClient(NumPyClient):
         set_weights(classifier, parameters)
 
         if level > 0:
-            feature_extractor = self._feature_extractor(level, config["global_net_state"])
+            feature_extractor = self._feature_extractor(level, config)
+            generated_data = self._generated_embeddings(
+                level, config.get("generated", b"")
+            )
             trainloader = self._build_augmented_loader(
                 trainloader=trainloader,
                 feature_extractor=feature_extractor,
-                generated_payload=config.get("generated", b""),
+                generated_data=generated_data,
             )
 
         train_start = time.time()
@@ -265,7 +329,7 @@ class FlowerClient(NumPyClient):
     def _fit_cvae(self, parameters, config):
         level = int(config["cvae_level"])
         trainloader = self.trainloader
-        feature_extractor = self._feature_extractor(level, config["global_net_state"])
+        feature_extractor = self._feature_extractor(level, config)
         embedding_loader, _ = self._normalized_embedding_loader(
             feature_extractor=feature_extractor,
             trainloader=trainloader,
@@ -331,7 +395,17 @@ class FlowerClient(NumPyClient):
             set_weights(net, parameters)
         else:
             net = create_full_model(self.dataset, seed=self.seed).to(self.device)
-            net.load_state_dict(state_dict_from_bytes(config["global_net_state"], self.device))
+            self._save_feature_extractor_state(
+                level, config.get("feature_extractor_state", b"")
+            )
+            feature_state_bytes = self._cached_feature_extractor_state(level)
+            if feature_state_bytes is None:
+                raise RuntimeError(
+                    f"Cliente {self.cid} nao possui feature extractor em cache "
+                    f"para avaliar o nivel {level}."
+                )
+            feature_state = state_dict_from_bytes(feature_state_bytes, self.device)
+            net.load_state_dict(feature_state, strict=False)
             classifier = create_classifier(self.dataset, level=level, seed=self.seed).to(self.device)
             set_weights(classifier, parameters)
             net.load_state_dict(classifier.state_dict(), strict=False)

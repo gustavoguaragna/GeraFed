@@ -137,6 +137,10 @@ class FLEG_CVAE(Strategy):
         self.finished = False
         self.generated_by_cid: dict[str, bytes] = {}
         self.generated_payload: bytes = b""
+        self.generated_sent_to_cids: set[str] = set()
+        self.feature_extractor_payload: bytes = b""
+        self.feature_extractor_sent_to_cids: set[str] = set()
+        self._skip_next_client_evaluation = False
         self._last_total_examples = num_clients
         self._level_transmission_mb = 0.0
         self._level_classifier_traffic_mb = 0.0
@@ -260,6 +264,10 @@ class FLEG_CVAE(Strategy):
             sample_input=self._first_validation_image(),
             device=self.device,
         )
+        self.feature_extractor_payload = state_dict_to_bytes(
+            feature_extractor.state_dict()
+        )
+        self.feature_extractor_sent_to_cids = set()
         self.hidden_dim = max(1, self.input_dim // 2)
         self.latent_dim = (
             max(1, self.input_dim // 4)
@@ -302,7 +310,6 @@ class FLEG_CVAE(Strategy):
         return {
             "model": model,
             "cvae_level": self.cvae_level,
-            "global_net_state": state_dict_to_bytes(self.global_net.state_dict()),
             "input_dim": self.input_dim,
             "hidden_dim": self.hidden_dim,
             "latent_dim": self.latent_dim,
@@ -387,6 +394,26 @@ class FLEG_CVAE(Strategy):
             }
         return pickle.dumps(payload)
 
+    def _feature_payload_for_client(self, cid: str, level: int) -> bytes:
+        if level <= 0 or cid in self.feature_extractor_sent_to_cids:
+            return b""
+        if not self.feature_extractor_payload:
+            feature_extractor = create_feature_extractor(
+                self.dataset, level=level, seed=self.seed
+            ).to(self.device)
+            feature_extractor.load_state_dict(self.global_net.state_dict(), strict=False)
+            self.feature_extractor_payload = state_dict_to_bytes(
+                feature_extractor.state_dict()
+            )
+        self.feature_extractor_sent_to_cids.add(cid)
+        return self.feature_extractor_payload
+
+    def _generated_payload_for_client(self, cid: str, level: int) -> bytes:
+        if level <= 0 or cid in self.generated_sent_to_cids:
+            return b""
+        self.generated_sent_to_cids.add(cid)
+        return self.generated_by_cid.get(cid, self.generated_payload)
+
     def _global_eval(self) -> float:
         criterion = torch.nn.CrossEntropyLoss()
         correct, loss = 0, 0.0
@@ -441,12 +468,14 @@ class FLEG_CVAE(Strategy):
         if self.phase == "classifier":
             classifier_level = self._classifier_level()
             classifier_parameters_mb = self._parameters_size_mb(self.parameters_classifier)
-            global_net_state = state_dict_to_bytes(self.global_net.state_dict())
-            global_net_state_mb = self._bytes_size_mb(global_net_state)
             fit_instructions = []
             for client in clients:
-                generated_payload = self.generated_by_cid.get(
-                    str(client.cid), self.generated_payload
+                cid = str(client.cid)
+                feature_payload = self._feature_payload_for_client(
+                    cid, classifier_level
+                )
+                generated_payload = self._generated_payload_for_client(
+                    cid, classifier_level
                 )
                 config = {
                     "model": "classifier",
@@ -454,12 +483,12 @@ class FLEG_CVAE(Strategy):
                     "strategy": self.strategy_name,
                     "mu": self.mu,
                     "mixup_type": self.mixup_type,
-                    "global_net_state": global_net_state,
+                    "feature_extractor_state": feature_payload,
                     "generated": generated_payload,
                 }
                 self._add_level_traffic(
                     classifier_parameters_mb/len(clients)
-                    + global_net_state_mb/len(clients)
+                    + self._bytes_size_mb(feature_payload)/len(clients)
                     + self._bytes_size_mb(generated_payload)/len(clients),
                     bucket="classifier",
                 )
@@ -471,55 +500,72 @@ class FLEG_CVAE(Strategy):
         if self.phase == "cvae":
             if self.decoder is None:
                 self._setup_cvae_for_current_level()
-            config = self._cvae_config(model="cvae")
-            self._add_level_traffic(
-                (
-                    self._parameters_size_mb(self.parameters_cvae)
-                    + self._config_payload_size_mb(config)
-                ),
-                bucket="cvae",
-            )
-            fit_ins = FitIns(
-                parameters=self.parameters_cvae,
-                config=config,
-            )
-            return [(client, fit_ins) for client in clients]
+            base_config = self._cvae_config(model="cvae")
+            parameters_cvae_mb = self._parameters_size_mb(self.parameters_cvae)
+            fit_instructions = []
+            for client in clients:
+                config = dict(base_config)
+                feature_payload = self._feature_payload_for_client(
+                    str(client.cid), self.cvae_level
+                )
+                config["feature_extractor_state"] = feature_payload
+                self._add_level_traffic(
+                    (
+                        parameters_cvae_mb/len(clients)
+                        + self._config_payload_size_mb(config)/len(clients)
+                    ),
+                    bucket="cvae",
+                )
+                fit_instructions.append(
+                    (client, FitIns(parameters=self.parameters_cvae, config=config))
+                )
+            return fit_instructions
 
         raise ValueError(f"Fase desconhecida: {self.phase}")
 
     def configure_evaluate(
         self, server_round: int, parameters: Parameters, client_manager: ClientManager
     ) -> list[tuple[ClientProxy, EvaluateIns]]:
+        if self._skip_next_client_evaluation:
+            self._skip_next_client_evaluation = False
+            return []
         if (
             self.finished
             or self.phase != "classifier"
             or self.fraction_evaluate_alvo == 0.0
         ):
-            if self.cvae_round >= self.cvae_epochs:
-                self.phase = "classifier"
             return []
 
-        global_net_state = state_dict_to_bytes(self.global_net.state_dict())
-        config = {
+        classifier_level = self._classifier_level()
+        base_config = {
             "round": self.net_epochs,
-            "classifier_level": self._classifier_level(),
-            "global_net_state": global_net_state,
+            "classifier_level": classifier_level,
         }
-        evaluate_ins = EvaluateIns(self.parameters_classifier, config)
         sample_size, min_num_clients = self.num_evaluation_clients(
             client_manager.num_available()
         )
         clients = client_manager.sample(
             num_clients=sample_size, min_num_clients=min_num_clients
         )
-        self._add_level_traffic(
-            (
-                self._parameters_size_mb(self.parameters_classifier)
-                + self._config_payload_size_mb(config)
-            ),
-            bucket="classifier",
-        )
-        return [(client, evaluate_ins) for client in clients]
+        evaluate_instructions = []
+        parameters_classifier_mb = self._parameters_size_mb(self.parameters_classifier)
+        for client in clients:
+            config = dict(base_config)
+            feature_payload = self._feature_payload_for_client(
+                str(client.cid), classifier_level
+            )
+            config["feature_extractor_state"] = feature_payload
+            self._add_level_traffic(
+                (
+                    parameters_classifier_mb/len(clients)
+                    + self._config_payload_size_mb(config)/len(clients)
+                ),
+                bucket="classifier",
+            )
+            evaluate_instructions.append(
+                (client, EvaluateIns(self.parameters_classifier, config))
+            )
+        return evaluate_instructions
 
     def aggregate_fit(
         self,
@@ -610,6 +656,7 @@ class FLEG_CVAE(Strategy):
             if self.cvae_round >= self.cvae_epochs:
                 self.generated_by_cid = {}
                 self.generated_payload = self._generate_embeddings_on_server()
+                self.generated_sent_to_cids = set()
                 generation_time = 0.0
                 if self.generated_payload:
                     generation_time = pickle.loads(self.generated_payload).get("time", 0.0)
@@ -621,6 +668,8 @@ class FLEG_CVAE(Strategy):
 
                 self.lvl += 1
                 self.epochs_no_improve = 0
+                self.phase = "classifier"
+                self._skip_next_client_evaluation = True
                 self.decoder = None
                 self.parameters_cvae = None
                 self.init_level_time = time.time()
@@ -671,6 +720,9 @@ class FLEG_CVAE(Strategy):
                 self.parameters_cvae = None
                 self.generated_by_cid = {}
                 self.generated_payload = b""
+                self.generated_sent_to_cids = set()
+                self.feature_extractor_payload = b""
+                self.feature_extractor_sent_to_cids = set()
                 print("Alternando para treinamento do CVAE.")
 
         metrics = {"loss": loss_aggregated, "accuracy": accuracy_aggregated}
