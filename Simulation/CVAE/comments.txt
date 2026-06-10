@@ -8,14 +8,17 @@ as fases de treinamento e para a parte congelada no modelo completo na avaliaç�
 comunicação, se a parte da feature_extractor fosse salva no contexto do cliente sempre que o modelo global seja o best model.
 Os arquivos em Simulation/FLEG fazem algo similar, mas salvando o modelo completo. Aqui pensei em salvar somente a parte extratora 
 para economia de espaço.
+2. Além disso, os embeddings gerados na última rodada do treinamento da cvae são compartilhados com os clientes a toda rodada do
+treinamento da classificadora. Acho que isso também pode ser evitado, sendo compartilhado somente na primeira rodada e os clientes
+salvam eles no contexto. A cada rodada, eles teriam somente que retirar do contexto e juntar com seus dados locais. No nível 0 nada
+precisa ser feito e a cada nível seguinte os embeddings sintéticos são substituídos por novos.
+3. Fiz uma pequena alteração no CVAE/strategy.py: ao invés de definir self.phase = "classifier" no aggregate_fit após a condição
+if self.cvae_round >= self.cvae_epochs, mudei para o configure_evaluate com a mesma condição. Isso evita que seja feita uma rodada
+extra de avaliação nos clientes e o comportamento restante se mantém. Tudo certo com isso?
 
 
 
 PARA EU VERIFICAR/ALTERAR:
-Ajustar tambem para deixar o embedding sintetico gerado com cvae no cliente, para poupar custos computacionais. O tempo de geração
-vai ter que ser transferido para o cliente também.
-Parece que esá com a ideia errada de nível, só tem uma rodada de cvae com numero de epocas locais. Vi isso ao calcular o
-level_time, começa no aggregate_fit do cvae e termina lá tambem. (primeira rodada comeca no init).
 Avaliar cvae_local_epochs, parece só uma redundancia para cvae_epochs, de modo que cvae_epochs seria na verdade
 cvae_epochs x cvae_local_epochs.
 Troque o otimizador do classificador para SGD e não deixe que o estado do otimizador do cvae, ou o encoder se percam a cada rodada

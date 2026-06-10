@@ -162,7 +162,7 @@ class FLEG_CVAE(Strategy):
             "local_acc_epoch": [],
             "time_epoch_classifier": [],
             "time_epoch_cvae": [],
-            "time_level": [],
+            "level_time": [],
             "max_net_time": [],
             "max_cvae_time": [],
             "net_global_eval_time": [],
@@ -495,6 +495,8 @@ class FLEG_CVAE(Strategy):
             or self.phase != "classifier"
             or self.fraction_evaluate_alvo == 0.0
         ):
+            if self.cvae_round >= self.cvae_epochs:
+                self.phase = "classifier"
             return []
 
         global_net_state = state_dict_to_bytes(self.global_net.state_dict())
@@ -612,14 +614,13 @@ class FLEG_CVAE(Strategy):
                 if self.generated_payload:
                     generation_time = pickle.loads(self.generated_payload).get("time", 0.0)
                 self.metrics_dict["img_syn_time"].append(generation_time)
-                self.metrics_dict["time_level"].append(time.time() - self.init_level_time)
+                self.metrics_dict["level_time"].append(time.time() - self.init_level_time)
                 self._record_level_transmission()
                 self._save_checkpoint(f"checkpoint_level{self.lvl + 1}.pth")
                 self._save_metrics()
 
                 self.lvl += 1
                 self.epochs_no_improve = 0
-                self.phase = "classifier"
                 self.decoder = None
                 self.parameters_cvae = None
                 self.init_level_time = time.time()
@@ -660,7 +661,7 @@ class FLEG_CVAE(Strategy):
             self.metrics_dict["epoch_transition"].append(self.net_epochs)
             if self.baseline or self._is_final_level():
                 self.finished = True
-                self.metrics_dict["time_level"].append(time.time() - self.init_level_time)
+                self.metrics_dict["level_time"].append(time.time() - self.init_level_time)
                 self._record_level_transmission()
                 self._save_checkpoint("checkpoint_end.pth")
                 self._save_metrics()
