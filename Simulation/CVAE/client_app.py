@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import pickle
 import time
 
@@ -136,6 +137,52 @@ class FlowerClient(NumPyClient):
     def _generated_embeddings(self, level: int, payload: bytes):
         self._save_generated_embeddings(level, payload)
         return self._cached_generated_embeddings(level)
+
+    def _cvae_state_matches(self, state: dict, config: dict) -> bool:
+        expected = {
+            "level": int(config["cvae_level"]),
+            "input_dim": int(config["input_dim"]),
+            "latent_dim": int(config["latent_dim"]),
+            "hidden_dim": int(config["hidden_dim"]),
+            "normalization": config["normalization"],
+            "resblock": bool(config["resblock"]),
+        }
+        return all(state.get(key) == value for key, value in expected.items())
+
+    def _load_cvae_training_state(self, cvae, optimizer, config: dict) -> None:
+        payload = self._record_bytes("cvae_training_state")
+        if payload is None:
+            return
+
+        state = torch.load(io.BytesIO(payload), map_location=self.device)
+        if not self._cvae_state_matches(state, config):
+            return
+
+        cvae.encoder.load_state_dict(state["encoder_state_dict"])
+        cvae.fc_mu.load_state_dict(state["fc_mu_state_dict"])
+        cvae.fc_logvar.load_state_dict(state["fc_logvar_state_dict"])
+        optimizer.load_state_dict(state["optimizer_state_dict"])
+
+    def _save_cvae_training_state(self, cvae, optimizer, config: dict) -> None:
+        state = {
+            "level": int(config["cvae_level"]),
+            "input_dim": int(config["input_dim"]),
+            "latent_dim": int(config["latent_dim"]),
+            "hidden_dim": int(config["hidden_dim"]),
+            "normalization": config["normalization"],
+            "resblock": bool(config["resblock"]),
+            "encoder_state_dict": cvae.encoder.state_dict(),
+            "fc_mu_state_dict": cvae.fc_mu.state_dict(),
+            "fc_logvar_state_dict": cvae.fc_logvar.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+        }
+        buffer = io.BytesIO()
+        torch.save(state, buffer)
+        self._save_bytes_record(
+            "cvae_training_state",
+            buffer.getvalue(),
+            int(config["cvae_level"]),
+        )
 
     def _extract_embeddings(self, feature_extractor, trainloader):
         all_embeddings = []
@@ -353,10 +400,12 @@ class FlowerClient(NumPyClient):
         set_weights(cvae.decoder, parameters)
 
         optimizer = torch.optim.Adam(cvae.parameters(), lr=self.cvae_lr)
+        self._load_cvae_training_state(cvae, optimizer, config)
         cvae.train()
         start = time.time()
         avg_loss = 0.0
-        for _ in range(self.cvae_local_epochs):
+        local_epochs = int(config.get("local_epochs", self.cvae_local_epochs))
+        for _ in range(local_epochs):
             local_loss = 0.0
             batches = 0
             for embeddings, labels in embedding_loader:
@@ -372,11 +421,12 @@ class FlowerClient(NumPyClient):
                 batches += 1
             avg_loss = local_loss / max(batches, 1)
         cvae_time = time.time() - start
+        self._save_cvae_training_state(cvae, optimizer, config)
 
         metrics = {
             "cid": self.cid,
             "cvae_loss": float(avg_loss),
-            "cvae_time": float(cvae_time),
+            "cvae_time": float(cvae_time)
         }
 
         return get_weights(cvae.decoder), len(trainloader.dataset), metrics

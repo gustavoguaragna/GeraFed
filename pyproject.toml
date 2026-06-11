@@ -65,6 +65,7 @@ num_clients          = 4                        # int
 num_epocas           = 30                       # int
 partitioner          = "Class"                  # 'Class', 'Dir01', 'Dir05', 'IID' (IID no else)
 patience             = 2                        # int
+resume_from_checkpoint = false                  # boolean
 seed                 = 42                       # int
 strategy             = "fedavg"                 # 'fedavg', 'fedprox', 'scaffold'
 syn_input            = "dynamic"                # 'dynamic', 'fixed'
@@ -89,4 +90,3 @@ default = "local-simulation"
 options.num-supernodes = 4
 options.backend.client-resources.num-cpus = 4
 options.backend.client-resources.num-gpus = 0
-

@@ -42,6 +42,7 @@ def server_fn(context: Context):
     batch_size = _get(run_config, "tam_batch", 32)
     teste = _get(run_config, "teste", False)
     cvae_epochs = _get(run_config, "epocas_gen", 25)
+    cvae_local_epochs = _get(run_config, "epocas_locais_gen",1)
     patience = _get(run_config, "patience", 10)
     levels = _get(run_config, "levels", 4)
     syn_input = _get(run_config, "syn_input", "dynamic")
@@ -97,6 +98,7 @@ def server_fn(context: Context):
         lesslvl=_get(run_config, "lesslvl", False),
         baseline=_get(run_config, "baseline", False),
         cvae_epochs=cvae_epochs,
+        cvae_local_epochs=cvae_local_epochs,
         cvae_beta=_get(run_config, "cvae_beta", 1.0),
         cvae_lr=_get(run_config, "learn_rate_gen", 0.001),
         normalization=_get(run_config, "cvae_normalization", "minmax"),
@@ -108,6 +110,7 @@ def server_fn(context: Context):
         mixup_type=_get(run_config, "cvae_mixup_type", "none"),
         valloader=valloader,
         num_clients=num_clients,
+        resume_from_checkpoint=_get(run_config, "resume_from_checkpoint", False),
     )
 
     return ServerAppComponents(

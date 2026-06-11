@@ -1,58 +1,27 @@
 STATUS ATUAL:
-Avaliando sessao "para eu verificar/alterar"
+Proximo ponto na sessa "PARA EU VERIFICAR/ALTERAR"
 
 PARA MANDAR PARA O CODEX:
-Tenho alguns pontos sobre os arquivos do Simulation/CVAE:
-1. Toda rodada é enviado o global_net_state para os clientes. Os parâmetros são usados para a feature extractor nos clientes durante 
-as fases de treinamento e para a parte congelada no modelo completo na avaliação. Pensei que seria melhor para o custo de 
-comunicação, se a parte da feature_extractor fosse salva no contexto do cliente sempre que o modelo global seja o best model.
-Os arquivos em Simulation/FLEG fazem algo similar, mas salvando o modelo completo. Aqui pensei em salvar somente a parte extratora 
-para economia de espaço.
-2. Além disso, os embeddings gerados na última rodada do treinamento da cvae são compartilhados com os clientes a toda rodada do
-treinamento da classificadora. Acho que isso também pode ser evitado, sendo compartilhado somente na primeira rodada e os clientes
-salvam eles no contexto. A cada rodada, eles teriam somente que retirar do contexto e juntar com seus dados locais. No nível 0 nada
-precisa ser feito e a cada nível seguinte os embeddings sintéticos são substituídos por novos.
-3. Fiz uma pequena alteração no CVAE/strategy.py: ao invés de definir self.phase = "classifier" no aggregate_fit após a condição
-if self.cvae_round >= self.cvae_epochs, mudei para o configure_evaluate com a mesma condição. Isso evita que seja feita uma rodada
-extra de avaliação nos clientes e o comportamento restante se mantém. Tudo certo com isso?
-
 
 
 PARA EU VERIFICAR/ALTERAR:
-Avaliar cvae_local_epochs, parece só uma redundancia para cvae_epochs, de modo que cvae_epochs seria na verdade
-cvae_epochs x cvae_local_epochs.
-Troque o otimizador do classificador para SGD e não deixe que o estado do otimizador do cvae, ou o encoder se percam a cada rodada
-Decidir onde ficará o baseline, no mesmo projeto ou separado em CNN.
-Está sem alignment loss
-Adicionar logica de checkpoint
-Add prints para acompanhamento do processo.
-Ver se seed funciona bem, oq causa fonte de variação?
-Add opcao de fedprox (para classificador e cvae). Ver se melhor adicionar manualmente ou se dá para adaptar de algum jeito a
-implementação do flwr.
-Porque varias epocas locais para cvae e somente uma para classifier? Testar com multiplas tambem
-Deixar codigo mais organizado para facilitar leitura (identação, nomes de variáveis, comentários, importações desnecessárias)
-Levar para um projeto proprio, pyproject isolado
-- Estava dando erro em 'beta = min(1.0, self.cvae_round / warmup_epochs)' na função _cvae_config do strategy.py na linha 288 quando
-warmup_epochs era 0. Ajustei para retornar 0.0 nesse caso, mas é bom verificar se isso faz sentido.
-- O codigo entende o processo como nivel 0 classificador -> nivel1 cvae -> nivel 1 classificador. Ver se queremos manter assim ou 
-nivel 0 primeiro para os dois. Isso não muda nada, só como o FLEG é apresentado. 
+
+- Revisar direitinho tudo que é retomado no loadcheckpoint do strategy pra ver se precisa de tudo mesmo ou se falta algo.
+- Ver no playground o calculo do tamanho do config com a funcao _config_payload_size_mb.
+- Avaliar se é menos custoso compartilhar grande dataset de embeddings ou decoder para geracao local.
 - Reentender as variações de melhoria para o CVAE e avaliar se realmente é significativo. Tem explicações no chat e gráficos nos 
 slides de reuniao semanal. Os resultados completos estão armazenados no pillars. Se algo for ser mantido, seria bom ver refs
 sobre as técnicas.
-- Ver no playground o calculo do tamanho do config com a funcao _config_payload_size_mb.
-- Ver em refs sobre numero de epocas locais da cvae.
-- Avaliar se é menos custoso compartilhar grande dataset de embeddings ou decoder para geracao local.
-- if level == 0:
-    set_weights(self.global_net, aggregated_ndarrays)
-  else:
-    set_weights(self.classifier, aggregated_ndarrays)
-    self.global_net.load_state_dict(self.classifier.state_dict(), strict=False)
-Acho que da para remover o if deixando somente o que ta no else, ja que o self.classifier está preparado para o caso level 0, 
-conferir com Claude/Codex
-- self.cvae_round += 1
-  if self.cvae_round >= self.cvae_epochs:
-    self.phase = "cvae_generate"
- Aqui falha se epocas locais da gen for maior que um, deveria usar essa variavel no if tambem.
+- Estava dando erro em 'beta = min(1.0, self.cvae_round / warmup_epochs)' na função _cvae_config do strategy.py quando
+warmup_epochs era 0. Ajustei para retornar 0.0 nesse caso, mas é bom verificar se isso faz sentido.
+- Decidir onde ficará o baseline, no mesmo projeto ou separado em CNN.
+- Está sem alignment loss
 - A cada nivel eu retorno ao best_model. Isso dever ser evitado e continuar com modelo atual?
+- Add prints para acompanhamento do processo.
+- Ver se seed funciona bem, oq causa fonte de variação?
+- Analisar como ficaria para implementar Adam e FedProx com implementação do flwr.
+- Deixar codigo mais organizado para facilitar leitura (identação, nomes de variáveis, comentários, importações desnecessárias)
+- Levar para um projeto proprio, pyproject isolado
+- Ver em refs sobre numero de epocas locais da cvae.
 - Após a geração, é preciso desnormalizar os embeddings com as estatísticas usadas no treinamento. Porém, o decoder gerador é
 agregado, então estou usando métricas do valloader. Testar usar métricas agregadas também.
