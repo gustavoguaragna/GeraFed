@@ -140,7 +140,6 @@ class FLEG_CVAE(Strategy):
         self.best_accuracy = 0.0
         self.epochs_no_improve = 0
         self.finished = False
-        self.generated_by_cid: dict[str, bytes] = {}
         self.generated_payload: bytes = b""
         self.generated_sent_to_cids: set[str] = set()
         self.feature_extractor_payload: bytes = b""
@@ -157,7 +156,6 @@ class FLEG_CVAE(Strategy):
 
         self.decoder = None
         self.parameters_cvae = None
-        self.cvae_round = 0
         self.cvae_trained_epochs = 0
         self.cvae_level = None
         self.input_dim = None
@@ -209,7 +207,6 @@ class FLEG_CVAE(Strategy):
     def _checkpoint_files(self) -> list[Path]:
         folder = Path(self.folder)
         candidates = list(folder.glob("checkpoint_level*.pth"))
-        candidates.extend(folder.glob("checkpoint_end.pth"))
         candidates.extend(folder.glob("checkpoint.pth"))
         return [path for path in candidates if path.is_file()]
 
@@ -223,31 +220,16 @@ class FLEG_CVAE(Strategy):
         self,
         filename: str,
         *,
-        level: Optional[int] = None,
-        phase: Optional[str] = None,
-        finished: Optional[bool] = None,
+        level: Optional[int] = None
     ) -> None:
         checkpoint = {
             "classifier_state_dict": self.global_net.state_dict(),
-            "best_model_state_dict": self.best_model.state_dict(),
             "level": self.lvl if level is None else level,
-            "phase": self.phase if phase is None else phase,
-            "finished": self.finished if finished is None else finished,
             "net_epochs": self.net_epochs,
             "best_accuracy": self.best_accuracy,
-            "epochs_no_improve": self.epochs_no_improve,
             "metrics_dict": self.metrics_dict,
             "generated_payload": self.generated_payload,
-            "cvae_round": self.cvae_round,
-            "cvae_trained_epochs": self.cvae_trained_epochs,
-            "cvae_level": self.cvae_level,
-            "input_dim": self.input_dim,
-            "hidden_dim": self.hidden_dim,
-            "latent_dim": self.latent_dim,
-            "feature_shape": self.feature_shape,
         }
-        if self.decoder is not None:
-            checkpoint["decoder_state_dict"] = self.decoder.state_dict()
         torch.save(checkpoint, f"{self.folder}/{filename}")
 
     def _load_latest_checkpoint(self) -> None:
@@ -258,50 +240,17 @@ class FLEG_CVAE(Strategy):
 
         checkpoint = torch.load(checkpoint_path, map_location=self.device)
         self.global_net.load_state_dict(checkpoint["classifier_state_dict"])
-        self.best_model.load_state_dict(
-            checkpoint.get("best_model_state_dict", checkpoint["classifier_state_dict"])
-        )
+        self.best_model.load_state_dict(checkpoint["classifier_state_dict"])
         self.lvl = int(checkpoint.get("level", self.lvl))
-        self.phase = checkpoint.get("phase", "classifier")
-        self.finished = bool(checkpoint.get("finished", False))
         self.net_epochs = int(checkpoint.get("net_epochs", self.net_epochs))
         self.best_accuracy = float(checkpoint.get("best_accuracy", self.best_accuracy))
-        self.epochs_no_improve = int(
-            checkpoint.get("epochs_no_improve", self.epochs_no_improve)
-        )
         self.metrics_dict = checkpoint.get("metrics_dict", self.metrics_dict)
         self.generated_payload = checkpoint.get("generated_payload", b"")
-        self.generated_by_cid = {}
-        self.generated_sent_to_cids = set()
-        self.feature_extractor_payload = b""
-        self.feature_extractor_sent_to_cids = set()
-        self.cvae_round = int(checkpoint.get("cvae_round", 0))
-        self.cvae_trained_epochs = int(checkpoint.get("cvae_trained_epochs", 0))
-        self.cvae_level = checkpoint.get("cvae_level")
-        self.input_dim = checkpoint.get("input_dim")
-        self.hidden_dim = checkpoint.get("hidden_dim")
-        self.latent_dim = checkpoint.get("latent_dim")
-        self.feature_shape = checkpoint.get("feature_shape")
-        self.decoder = None
-        self.parameters_cvae = None
 
         self._setup_classifier_for_current_level()
-        if self.phase == "cvae" and "decoder_state_dict" in checkpoint:
-            self.decoder = Decoder(
-                input_dim=self.input_dim,
-                latent_dim=self.latent_dim,
-                hidden_dim=self.hidden_dim,
-                condition_dim=10,
-                resblock=self.resblock,
-                minmax=self.normalization == "minmax",
-            ).to(self.device)
-            self.decoder.load_state_dict(checkpoint["decoder_state_dict"])
-            self.parameters_cvae = ndarrays_to_parameters(
-                get_weights(self.decoder.decoder)
-            )
 
         self.init_level_time = time.time()
-        print(f"Retomando CVAE a partir de {checkpoint_path}.")
+        print(f"Retomando treinamento a partir de {checkpoint_path}.")
 
     @staticmethod
     def _bytes_size_mb(payload) -> float:
@@ -379,7 +328,6 @@ class FLEG_CVAE(Strategy):
             minmax=self.normalization == "minmax",
         ).to(self.device)
         self.parameters_cvae = ndarrays_to_parameters(get_weights(self.decoder.decoder))
-        self.cvae_round = 0
         self.cvae_trained_epochs = 0
 
     def _num_generated_samples(self) -> int:
@@ -515,7 +463,7 @@ class FLEG_CVAE(Strategy):
         if level <= 0 or cid in self.generated_sent_to_cids:
             return b""
         self.generated_sent_to_cids.add(cid)
-        return self.generated_by_cid.get(cid, self.generated_payload)
+        return self.generated_payload
 
     def _global_eval(self) -> float:
         criterion = torch.nn.CrossEntropyLoss()
@@ -751,11 +699,9 @@ class FLEG_CVAE(Strategy):
                 cvae_upload_mb/len(results),
                 bucket="cvae",
             )
-            self.cvae_round += 1
 
             self.cvae_trained_epochs += self.local_epochs
             if self.cvae_trained_epochs >= self.cvae_epochs_target:
-                self.generated_by_cid = {}
                 self.generated_payload = self._generate_embeddings_on_server()
                 self.generated_sent_to_cids = set()
                 generation_time = 0.0
@@ -767,8 +713,6 @@ class FLEG_CVAE(Strategy):
                 self._save_checkpoint(
                     f"checkpoint_level{self.lvl + 1}.pth",
                     level=self.lvl + 1,
-                    phase="classifier",
-                    finished=False,
                 )
                 self._save_metrics()
 
@@ -825,7 +769,6 @@ class FLEG_CVAE(Strategy):
             else:
                 self.phase = "cvae"
                 self.parameters_cvae = None
-                self.generated_by_cid = {}
                 self.generated_payload = b""
                 self.generated_sent_to_cids = set()
                 self.feature_extractor_payload = b""
