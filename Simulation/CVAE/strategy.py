@@ -140,8 +140,8 @@ class FLEG_CVAE(Strategy):
         self.best_accuracy = 0.0
         self.epochs_no_improve = 0
         self.finished = False
-        self.generated_payload: bytes = b""
-        self.generated_sent_to_cids: set[str] = set()
+        self.decoder_payload: bytes = b""
+        self.decoder_sent_to_cids: set[str] = set()
         self.feature_extractor_payload: bytes = b""
         self.feature_extractor_sent_to_cids: set[str] = set()
         self._skip_next_client_evaluation = False
@@ -228,7 +228,12 @@ class FLEG_CVAE(Strategy):
             "net_epochs": self.net_epochs,
             "best_accuracy": self.best_accuracy,
             "metrics_dict": self.metrics_dict,
-            "generated_payload": self.generated_payload,
+            "decoder_payload": self.decoder_payload,
+            "cvae_level": self.cvae_level,
+            "input_dim": self.input_dim,
+            "hidden_dim": self.hidden_dim,
+            "latent_dim": self.latent_dim,
+            "feature_shape": self.feature_shape,
         }
         torch.save(checkpoint, f"{self.folder}/{filename}")
 
@@ -245,7 +250,13 @@ class FLEG_CVAE(Strategy):
         self.net_epochs = int(checkpoint.get("net_epochs", self.net_epochs))
         self.best_accuracy = float(checkpoint.get("best_accuracy", self.best_accuracy))
         self.metrics_dict = checkpoint.get("metrics_dict", self.metrics_dict)
-        self.generated_payload = checkpoint.get("generated_payload", b"")
+        self.decoder_payload = checkpoint.get("decoder_payload", b"")
+        self.decoder_sent_to_cids = set()
+        self.cvae_level = checkpoint.get("cvae_level")
+        self.input_dim = checkpoint.get("input_dim")
+        self.hidden_dim = checkpoint.get("hidden_dim")
+        self.latent_dim = checkpoint.get("latent_dim")
+        self.feature_shape = checkpoint.get("feature_shape")
 
         self._setup_classifier_for_current_level()
 
@@ -371,80 +382,6 @@ class FLEG_CVAE(Strategy):
             "local_epochs": self.local_epochs,
         }
 
-    def _server_embedding_norm_stats(self) -> dict[str, torch.Tensor]:
-        feature_extractor = create_feature_extractor(
-            self.dataset, level=self.cvae_level, seed=self.seed
-        ).to(self.device)
-        feature_extractor.load_state_dict(self.global_net.state_dict(), strict=False)
-        feature_extractor.eval()
-
-        all_embeddings = []
-        with torch.no_grad():
-            for batch in self.valloader:
-                images = batch[self.image_key].to(self.device)
-                embeddings = feature_extractor(images)
-                embeddings = embeddings.view(embeddings.size(0), -1)
-                all_embeddings.append(embeddings)
-
-        if not all_embeddings:
-            raise RuntimeError("Nao foi possivel calcular estatisticas do servidor.")
-
-        embeddings = torch.cat(all_embeddings, dim=0)
-        if self.normalization == "minmax":
-            min_ = embeddings.min(dim=0).values
-            max_ = embeddings.max(dim=0).values
-            scale = torch.clamp(max_ - min_, min=1e-8)
-            return {"min": min_, "scale": scale}
-        if self.normalization == "z":
-            mean = embeddings.mean(dim=0)
-            std = torch.clamp(embeddings.std(dim=0), min=1e-8)
-            return {"mean": mean, "std": std}
-        raise ValueError(
-            f"normalization deve ser 'minmax' ou 'z', recebeu {self.normalization}"
-        )
-
-    def _sample_generated_labels(self, num_samples: int) -> torch.Tensor:
-        labels = torch.arange(10, device=self.device).repeat(num_samples // 10)
-        remainder = num_samples % 10
-        if remainder:
-            labels = torch.cat(
-                [
-                    labels,
-                    torch.randint(0, 10, (remainder,), device=self.device),
-                ],
-                dim=0,
-            )
-        if labels.numel() == 0:
-            labels = torch.randint(0, 10, (num_samples,), device=self.device)
-        return labels[torch.randperm(labels.numel(), device=self.device)]
-
-    def _generate_embeddings_on_server(self) -> bytes:
-        if self.decoder is None:
-            return b""
-
-        start = time.time()
-        num_samples = self._num_generated_samples()
-        norm_stats = self._server_embedding_norm_stats()
-        labels = self._sample_generated_labels(num_samples)
-        latents = torch.randn((num_samples, self.latent_dim), device=self.device)
-
-        self.decoder.eval()
-        with torch.no_grad():
-            one_hot = torch.nn.functional.one_hot(labels, num_classes=10).float()
-            generated = self.decoder.decode(latents, one_hot)
-            if self.normalization == "minmax":
-                generated = generated * norm_stats["scale"] + norm_stats["min"]
-            else:
-                generated = generated * norm_stats["std"] + norm_stats["mean"]
-
-            generated = generated.view(-1, *self.feature_shape)
-            payload = {
-                "assets": generated.detach().cpu().numpy(),
-                "labels": labels.detach().cpu().numpy(),
-                "time": time.time() - start,
-            }
-        return pickle.dumps(payload)
-
     def _feature_payload_for_client(self, cid: str, level: int) -> bytes:
         if level <= 0 or cid in self.feature_extractor_sent_to_cids:
             return b""
@@ -459,11 +396,11 @@ class FLEG_CVAE(Strategy):
         self.feature_extractor_sent_to_cids.add(cid)
         return self.feature_extractor_payload
 
-    def _generated_payload_for_client(self, cid: str, level: int) -> bytes:
-        if level <= 0 or cid in self.generated_sent_to_cids:
+    def _decoder_payload_for_client(self, cid: str, level: int) -> bytes:
+        if level <= 0 or cid in self.decoder_sent_to_cids:
             return b""
-        self.generated_sent_to_cids.add(cid)
-        return self.generated_payload
+        self.decoder_sent_to_cids.add(cid)
+        return self.decoder_payload
 
     def _global_eval(self) -> float:
         criterion = torch.nn.CrossEntropyLoss()
@@ -525,7 +462,7 @@ class FLEG_CVAE(Strategy):
                 feature_payload = self._feature_payload_for_client(
                     cid, classifier_level
                 )
-                generated_payload = self._generated_payload_for_client(
+                decoder_payload = self._decoder_payload_for_client(
                     cid, classifier_level
                 )
                 config = {
@@ -535,12 +472,18 @@ class FLEG_CVAE(Strategy):
                     "mu": self.mu,
                     "mixup_type": self.mixup_type,
                     "feature_extractor_state": feature_payload,
-                    "generated": generated_payload,
+                    "decoder_state": decoder_payload,
+                    "input_dim": self.input_dim or 0,
+                    "hidden_dim": self.hidden_dim or 0,
+                    "latent_dim": self.latent_dim or 0,
+                    "feature_shape": pickle.dumps(self.feature_shape),
+                    "normalization": self.normalization,
+                    "resblock": self.resblock,
                 }
                 self._add_level_traffic(
                     classifier_parameters_mb/len(clients)
                     + self._bytes_size_mb(feature_payload)/len(clients)
-                    + self._bytes_size_mb(generated_payload)/len(clients),
+                    + self._bytes_size_mb(decoder_payload)/len(clients),
                     bucket="classifier",
                 )
                 fit_instructions.append(
@@ -652,6 +595,12 @@ class FLEG_CVAE(Strategy):
             self.metrics_dict["max_net_time"].append(
                 max(fit_res.metrics["tempo_treino_alvo"] for _, fit_res in results)
             )
+            max_generation_time = max(
+                float(fit_res.metrics.get("img_syn_time", 0.0))
+                for _, fit_res in results
+            )
+            if max_generation_time > 0.0:
+                self.metrics_dict["img_syn_time"].append(max_generation_time)
             self.metrics_dict["time_epoch_classifier"].append(
                 time.time() - self.init_round_time
             )
@@ -702,12 +651,8 @@ class FLEG_CVAE(Strategy):
 
             self.cvae_trained_epochs += self.local_epochs
             if self.cvae_trained_epochs >= self.cvae_epochs_target:
-                self.generated_payload = self._generate_embeddings_on_server()
-                self.generated_sent_to_cids = set()
-                generation_time = 0.0
-                if self.generated_payload:
-                    generation_time = pickle.loads(self.generated_payload).get("time", 0.0)
-                self.metrics_dict["img_syn_time"].append(generation_time)
+                self.decoder_payload = state_dict_to_bytes(self.decoder.state_dict())
+                self.decoder_sent_to_cids = set()
                 self.metrics_dict["level_time"].append(time.time() - self.init_level_time)
                 self._record_level_transmission()
                 self._save_checkpoint(
@@ -769,8 +714,8 @@ class FLEG_CVAE(Strategy):
             else:
                 self.phase = "cvae"
                 self.parameters_cvae = None
-                self.generated_payload = b""
-                self.generated_sent_to_cids = set()
+                self.decoder_payload = b""
+                self.decoder_sent_to_cids = set()
                 self.feature_extractor_payload = b""
                 self.feature_extractor_sent_to_cids = set()
                 print("Alternando para treinamento do CVAE.")

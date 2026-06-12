@@ -11,13 +11,14 @@ import torch
 import torch.nn.functional as F
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import Context, ParametersRecord, array_from_numpy
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import ConcatDataset, DataLoader, TensorDataset
 
 from Simulation.CVAE.task import (
     CVAE,
+    Decoder,
     DictTensorDataset,
     EmbeddingPairDataset,
-    augment_client_with_generated,
+    choose_minority_labels,
     create_classifier,
     create_feature_extractor,
     create_full_model,
@@ -115,13 +116,30 @@ class FlowerClient(NumPyClient):
         feature_extractor.load_state_dict(feature_state, strict=False)
         return feature_extractor
 
-    def _save_generated_embeddings(self, level: int, payload: bytes) -> None:
-        if not payload:
-            return
-        received = pickle.loads(payload)
+    def _decoder(self, level: int, config):
+        decoder_state_bytes = config.get("decoder_state", b"")
+        if not decoder_state_bytes:
+            raise RuntimeError(
+                f"Cliente {self.cid} nao recebeu decoder para gerar "
+                f"embeddings no nivel {level}."
+            )
+
+        decoder = Decoder(
+            input_dim=int(config["input_dim"]),
+            latent_dim=int(config["latent_dim"]),
+            hidden_dim=int(config["hidden_dim"]),
+            condition_dim=self.num_classes,
+            resblock=bool(config["resblock"]),
+            minmax=config["normalization"] == "minmax",
+        ).to(self.device)
+        decoder.load_state_dict(state_dict_from_bytes(decoder_state_bytes, self.device))
+        decoder.eval()
+        return decoder
+
+    def _save_generated_embeddings(self, level: int, generated_data: dict) -> None:
         record = ParametersRecord()
-        record["assets"] = array_from_numpy(received["assets"])
-        record["labels"] = array_from_numpy(received["labels"])
+        record["assets"] = array_from_numpy(generated_data["assets"])
+        record["labels"] = array_from_numpy(generated_data["labels"])
         record["level"] = array_from_numpy(np.array([level], dtype=np.int64))
         self.client_state.parameters_records["generated_embeddings"] = record
 
@@ -133,10 +151,6 @@ class FlowerClient(NumPyClient):
             "assets": record["assets"].numpy(),
             "labels": record["labels"].numpy(),
         }
-
-    def _generated_embeddings(self, level: int, payload: bytes):
-        self._save_generated_embeddings(level, payload)
-        return self._cached_generated_embeddings(level)
 
     def _cvae_state_matches(self, state: dict, config: dict) -> bool:
         expected = {
@@ -225,6 +239,112 @@ class FlowerClient(NumPyClient):
         )
         return loader, norm_stats
 
+    def _embedding_norm_stats(self, embeddings, normalization):
+        if normalization == "minmax":
+            min_ = embeddings.min(dim=0).values
+            max_ = embeddings.max(dim=0).values
+            scale = torch.clamp(max_ - min_, min=1e-8)
+            return {"min": min_, "scale": scale}
+        if normalization == "z":
+            mean = embeddings.mean(dim=0)
+            std = torch.clamp(embeddings.std(dim=0), min=1e-8)
+            return {"mean": mean, "std": std}
+        raise ValueError(f"normalization should be 'minmax' or 'z', got {normalization}")
+
+    def _local_generation_plan(self, trainloader, num_real_embeddings: int):
+        counts = get_label_counts(trainloader.dataset)
+        fill_to = max(1, int(num_real_embeddings / self.num_classes))
+        desired_labels = choose_minority_labels(
+            counts,
+            total_num_classes=self.num_classes,
+            method="threshold",
+            threshold=fill_to,
+        )
+        need_per_label = {
+            label: fill_to - counts.get(label, 0)
+            for label in desired_labels
+            if fill_to - counts.get(label, 0) > 0
+        }
+        return counts, fill_to, desired_labels, need_per_label
+
+    def _generate_embeddings_with_decoder(
+        self,
+        decoder,
+        embeddings,
+        trainloader,
+        config,
+    ):
+        feature_shape = tuple(pickle.loads(config["feature_shape"]))
+        counts, fill_to, desired_labels, need_per_label = self._local_generation_plan(
+            trainloader=trainloader,
+            num_real_embeddings=embeddings.size(0),
+        )
+
+        total_needed = sum(need_per_label.values())
+        if total_needed == 0:
+            return {
+                "assets": np.empty((0, *feature_shape), dtype=np.float32),
+                "labels": np.empty((0,), dtype=np.int64),
+                "stats": {
+                    "client_counts": counts,
+                    "desired_labels": desired_labels,
+                    "need_per_label": need_per_label,
+                    "fill_to": fill_to,
+                    "gen_selected_count": 0,
+                },
+            }
+
+        labels = torch.cat(
+            [
+                torch.full((need,), label, dtype=torch.long, device=self.device)
+                for label, need in need_per_label.items()
+            ]
+        )
+        labels = labels[torch.randperm(labels.numel(), device=self.device)]
+        latents = torch.randn(
+            (labels.numel(), int(config["latent_dim"])),
+            device=self.device,
+        )
+        one_hot = F.one_hot(labels, num_classes=self.num_classes).float()
+        norm_stats = self._embedding_norm_stats(embeddings, config["normalization"])
+
+        with torch.no_grad():
+            generated = decoder.decode(latents, one_hot)
+            if config["normalization"] == "minmax":
+                generated = generated * norm_stats["scale"] + norm_stats["min"]
+            else:
+                generated = generated * norm_stats["std"] + norm_stats["mean"]
+            generated = generated.view(-1, *feature_shape)
+
+        return {
+            "assets": generated.detach().cpu().numpy().astype(np.float32, copy=False),
+            "labels": labels.detach().cpu().numpy().astype(np.int64, copy=False),
+            "stats": {
+                "client_counts": counts,
+                "desired_labels": desired_labels,
+                "need_per_label": need_per_label,
+                "fill_to": fill_to,
+                "gen_selected_count": int(labels.numel()),
+            },
+        }
+
+    def _generated_embeddings(self, level: int, embeddings, trainloader, config):
+        cached = self._cached_generated_embeddings(level)
+        if cached is not None:
+            return cached, 0.0, None
+
+        start = time.time()
+        decoder = self._decoder(level, config)
+        generated_data = self._generate_embeddings_with_decoder(
+            decoder=decoder,
+            embeddings=embeddings,
+            trainloader=trainloader,
+            config=config,
+        )
+        generation_time = time.time() - start
+        self._save_generated_embeddings(level, generated_data)
+        return self._cached_generated_embeddings(level), generation_time, generated_data["stats"]
+
     def _train_classifier(self, classifier, trainloader, level, strategy, mu, mixup_type):
         criterion = torch.nn.CrossEntropyLoss().to(self.device)
         optimizer = torch.optim.SGD(classifier.parameters(), lr=self.lr_alvo)
@@ -287,8 +407,10 @@ class FlowerClient(NumPyClient):
 
         return running_loss / max(batches_seen, 1)
 
-    def _build_augmented_loader(self, trainloader, feature_extractor, generated_data):
+    def _build_augmented_loader(self, trainloader, feature_extractor, level, config):
         embeddings, labels = self._extract_embeddings(feature_extractor, trainloader)
+        feature_shape = tuple(pickle.loads(config["feature_shape"]))
+        embeddings = embeddings.view(-1, *feature_shape)
         embedding_dataset = EmbeddingPairDataset(
             embeddings=embeddings,
             labels=labels,
@@ -296,11 +418,23 @@ class FlowerClient(NumPyClient):
             label_col_name="label",
         )
 
+        generated_data, generation_time, stats = self._generated_embeddings(
+            level=level,
+            embeddings=embeddings.view(embeddings.size(0), -1),
+            trainloader=trainloader,
+            config=config,
+        )
         if not generated_data:
-            return DataLoader(embedding_dataset, batch_size=self.batch_size, shuffle=True)
+            return (
+                DataLoader(embedding_dataset, batch_size=self.batch_size, shuffle=True),
+                generation_time,
+            )
 
         if len(generated_data["assets"]) == 0:
-            return DataLoader(embedding_dataset, batch_size=self.batch_size, shuffle=True)
+            return (
+                DataLoader(embedding_dataset, batch_size=self.batch_size, shuffle=True),
+                generation_time,
+            )
 
         gen_assets = torch.from_numpy(generated_data["assets"]).float().to(self.device)
         gen_labels = torch.from_numpy(generated_data["labels"]).long().to(self.device)
@@ -311,30 +445,14 @@ class FlowerClient(NumPyClient):
             label_col_name="label",
         )
 
-        feature_shape = tuple(gen_assets.shape[1:])
-        embeddings = embeddings.view(-1, *feature_shape)
-        embedding_dataset = EmbeddingPairDataset(
-            embeddings=embeddings,
-            labels=labels,
-            asset_col_name=gen_dataset.asset_col_name,
-            label_col_name=gen_dataset.label_col_name,
-        )
-        counts = get_label_counts(trainloader.dataset)
-        fill_to = max(1, int(len(embedding_dataset) / 10))
-        combined_ds, stats = augment_client_with_generated(
-            client_train=embedding_dataset,
-            gen_dataset=gen_dataset,
-            counts=counts,
-            strategy="threshold",
-            fill_to=fill_to,
-            threshold=fill_to,
-            rng_seed=self.seed,
-        )
+        combined_ds = ConcatDataset([embedding_dataset, gen_dataset])
+        if stats is None:
+            stats = {"gen_selected_count": len(gen_dataset), "desired_labels": []}
         print(
             f"Cliente {self.cid}: adicionou {stats['gen_selected_count']} "
             f"amostras CVAE para as classes {stats['desired_labels']}"
         )
-        return DataLoader(combined_ds, batch_size=self.batch_size, shuffle=True)
+        return DataLoader(combined_ds, batch_size=self.batch_size, shuffle=True), generation_time
 
     def _fit_classifier(self, parameters, config):
         level = int(config["classifier_level"])
@@ -344,14 +462,14 @@ class FlowerClient(NumPyClient):
 
         if level > 0:
             feature_extractor = self._feature_extractor(level, config)
-            generated_data = self._generated_embeddings(
-                level, config.get("generated", b"")
-            )
-            trainloader = self._build_augmented_loader(
+            trainloader, img_syn_time = self._build_augmented_loader(
                 trainloader=trainloader,
                 feature_extractor=feature_extractor,
-                generated_data=generated_data,
+                level=level,
+                config=config,
             )
+        else:
+            img_syn_time = 0.0
 
         train_start = time.time()
         train_loss = self._train_classifier(
@@ -370,6 +488,7 @@ class FlowerClient(NumPyClient):
                 "cid": self.cid,
                 "train_loss": train_loss,
                 "tempo_treino_alvo": train_time,
+                "img_syn_time": float(img_syn_time),
             },
         )
 

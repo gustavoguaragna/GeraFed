@@ -1,26 +1,10 @@
 STATUS ATUAL:
-Enviar instrucoes para codex.
+proximo item em coisas para verificar
 
 PARA MANDAR PARA O CODEX:
-Ao meu ver não é necessário salvar o estado do best_model no checkpoint uma vez que no momento de salvar, o global_net é igual ao
-best_model, então ele pode ser utilizado futuramente para carregar o best_model se resumir de um checkpoint.
-A phase também não parece ser necessária, uma vez que sempre que se salva o checkpoint a phase é classifier e quando se carrega o
-checkpoint a phase também sempre é classifier, correto?
-Também acho que não há necessidade de salvar/carregar o status da flag finished, pois sempre está salvando como false e se for
-true não tem porque continuar o treinamento.
-Também parece que não há necessidade de salvar/carregar o self.epochs_no_improve já que sempre quando salva ele irá virar 0 e 
-quando carrega é 0 também, certo?
-Também não parece haver necessidade de salvar/carregar o self.cvae_round, aliás essa variável parece não ter mais função no meu
-código e poderia ser removida, concorda?
-self.cvae_trained_epochs é zerada sempre que inicia-se um novo nível e também não parece precisar estar no checkpoint.
-
-
-
 
 PARA EU VERIFICAR/ALTERAR:
 
-- Ver no playground o calculo do tamanho do config com a funcao _config_payload_size_mb.
-- Avaliar se é menos custoso compartilhar grande dataset de embeddings ou decoder para geracao local.
 - Reentender as variações de melhoria para o CVAE e avaliar se realmente é significativo. Tem explicações no chat e gráficos nos 
 slides de reuniao semanal. Os resultados completos estão armazenados no pillars. Se algo for ser mantido, seria bom ver refs
 sobre as técnicas.
