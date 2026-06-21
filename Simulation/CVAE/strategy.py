@@ -39,8 +39,10 @@ from Simulation.CVAE.task import (
     get_weights,
     infer_feature_dim,
     normalize_dataset_name,
+    normalize_stop_criterion,
     set_weights,
     state_dict_to_bytes,
+    uses_client_validation_criterion,
 )
 
 
@@ -73,6 +75,9 @@ class FLEG_CVAE(Strategy):
         mu: float = 0.5,
         seed: int = 42,
         patience: int = 10,
+        stop_criterion: str = "global_test_acc",
+        fixed_classifier_rounds: int = 1,
+        reset_best_metric_per_level: bool = True,
         levels: int = 4,
         lesslvl: bool = False,
         baseline: bool = False,
@@ -82,7 +87,7 @@ class FLEG_CVAE(Strategy):
         cvae_lr: float = 0.001,
         normalization: str = "minmax",
         resblock: bool = False,
-        anealing: bool = False,
+        annealing: bool = False,
         latent_dim_mode: str = "fixed",
         latent_dim: int = 100,
         num_syn: str = "dynamic",
@@ -115,6 +120,9 @@ class FLEG_CVAE(Strategy):
         self.mu = mu
         self.seed = seed
         self.patience = patience
+        self.stop_criterion = normalize_stop_criterion(stop_criterion)
+        self.fixed_classifier_rounds = max(1, int(fixed_classifier_rounds))
+        self.reset_best_metric_per_level = reset_best_metric_per_level
         self.levels = levels
         self.lesslvl = lesslvl
         self.baseline = baseline
@@ -124,7 +132,7 @@ class FLEG_CVAE(Strategy):
         self.cvae_lr = cvae_lr
         self.normalization = normalization
         self.resblock = resblock
-        self.anealing = anealing
+        self.annealing = annealing
         self.latent_dim_mode = latent_dim_mode
         self.fixed_latent_dim = latent_dim
         self.num_syn = num_syn
@@ -138,7 +146,9 @@ class FLEG_CVAE(Strategy):
         self.lvl = 0
         self.net_epochs = 0
         self.best_accuracy = 0.0
+        self.best_metric = self._initial_best_metric()
         self.epochs_no_improve = 0
+        self.classifier_rounds_current_level = 0
         self.finished = False
         self.decoder_payload: bytes = b""
         self.decoder_sent_to_cids: set[str] = set()
@@ -168,6 +178,8 @@ class FLEG_CVAE(Strategy):
             "avg_net_loss": [],
             "global_net_acc": [],
             "local_acc_epoch": [],
+            "local_val_loss_epoch": [],
+            "local_val_acc_epoch": [],
             "time_epoch_classifier": [],
             "time_epoch_cvae": [],
             "level_time": [],
@@ -185,9 +197,100 @@ class FLEG_CVAE(Strategy):
         os.makedirs(self.folder, exist_ok=True)
         if self.resume_from_checkpoint:
             self._load_latest_checkpoint()
+        self._ensure_metric_keys()
 
     def __repr__(self) -> str:
         return "FLEG_CVAE()"
+
+    def _ensure_metric_keys(self) -> None:
+        for key in (
+            "avg_cvae_loss",
+            "avg_net_loss",
+            "global_net_acc",
+            "local_acc_epoch",
+            "local_val_loss_epoch",
+            "local_val_acc_epoch",
+            "time_epoch_classifier",
+            "time_epoch_cvae",
+            "level_time",
+            "max_net_time",
+            "max_cvae_time",
+            "net_global_eval_time",
+            "img_syn_time",
+            "MB_transmission",
+            "traffic_cost_classifier",
+            "traffic_cost_cvae",
+            "epoch_transition",
+            "max_local_test_time",
+        ):
+            self.metrics_dict.setdefault(key, [])
+
+    def _uses_client_validation(self) -> bool:
+        return uses_client_validation_criterion(self.stop_criterion)
+
+    def _metric_is_loss(self) -> bool:
+        return self.stop_criterion == "client_val_loss"
+
+    def _metric_is_accuracy(self) -> bool:
+        return self.stop_criterion in {"global_test_acc", "client_val_acc"}
+
+    def _initial_best_metric(self) -> float:
+        if self._metric_is_loss():
+            return float("inf")
+        if self._metric_is_accuracy():
+            return float("-inf")
+        return 0.0
+
+    def _reset_classifier_stop_state(self) -> None:
+        self.epochs_no_improve = 0
+        self.classifier_rounds_current_level = 0
+        if self.reset_best_metric_per_level:
+            self.best_metric = self._initial_best_metric()
+            if self._metric_is_accuracy():
+                self.best_accuracy = 0.0
+            self.best_model.load_state_dict(self.global_net.state_dict())
+
+    @staticmethod
+    def _weighted_metric(
+        results: list[tuple[ClientProxy, EvaluateRes]],
+        metric_key: str,
+        examples_key: str,
+    ) -> float:
+        return weighted_loss_avg(
+            [
+                (
+                    int(evaluate_res.metrics[examples_key]),
+                    float(evaluate_res.metrics[metric_key]),
+                )
+                for _, evaluate_res in results
+            ]
+        )
+
+    def _record_stop_metric(self, current_metric: float, label: str) -> None:
+        improved = (
+            current_metric < self.best_metric
+            if self._metric_is_loss()
+            else current_metric > self.best_metric
+        )
+        if improved:
+            self.best_metric = current_metric
+            if self._metric_is_accuracy():
+                self.best_accuracy = current_metric
+            self.epochs_no_improve = 0
+            self.best_model.load_state_dict(self.global_net.state_dict())
+        else:
+            self.epochs_no_improve += 1
+
+        print(
+            f"{label} atual: {current_metric:.4f} | Melhor: "
+            f"{self.best_metric:.4f} | Sem melhorar: "
+            f"{self.epochs_no_improve}/{self.patience}"
+        )
+
+    def _classifier_stop_reached(self) -> bool:
+        if self.stop_criterion == "fixed_rounds":
+            return self.classifier_rounds_current_level >= self.fixed_classifier_rounds
+        return self.epochs_no_improve > self.patience
 
     def _classifier_level(self) -> int:
         return 0 if self.lvl == 0 else self.lvl + (1 if self.lesslvl else 0)
@@ -227,6 +330,7 @@ class FLEG_CVAE(Strategy):
             "level": self.lvl if level is None else level,
             "net_epochs": self.net_epochs,
             "best_accuracy": self.best_accuracy,
+            "best_metric": self.best_metric,
             "metrics_dict": self.metrics_dict,
             "decoder_payload": self.decoder_payload,
             "cvae_level": self.cvae_level,
@@ -249,7 +353,12 @@ class FLEG_CVAE(Strategy):
         self.lvl = int(checkpoint.get("level", self.lvl))
         self.net_epochs = int(checkpoint.get("net_epochs", self.net_epochs))
         self.best_accuracy = float(checkpoint.get("best_accuracy", self.best_accuracy))
+        if "best_metric" in checkpoint:
+            self.best_metric = float(checkpoint["best_metric"])
+        elif self._metric_is_accuracy():
+            self.best_metric = self.best_accuracy
         self.metrics_dict = checkpoint.get("metrics_dict", self.metrics_dict)
+        self._ensure_metric_keys()
         self.decoder_payload = checkpoint.get("decoder_payload", b"")
         self.decoder_sent_to_cids = set()
         self.cvae_level = checkpoint.get("cvae_level")
@@ -360,10 +469,10 @@ class FLEG_CVAE(Strategy):
     def _cvae_config(self, model: str) -> dict[str, Scalar]:
         warmup_epochs = self.cvae_epochs_target // 3
         beta = self.cvae_beta
-        if self.anealing:
+        if self.annealing:
             beta = min(
                 1.0,
-                self.cvae_trained_epochs / warmup_epochs if warmup_epochs > 0 else 0.0,
+                self.cvae_trained_epochs / warmup_epochs if warmup_epochs > 0 else 1.0,
             )
         remaining_epochs = max(0, self.cvae_epochs_target - self.cvae_trained_epochs)
         self.local_epochs = min(self.cvae_local_epochs, remaining_epochs)
@@ -534,6 +643,7 @@ class FLEG_CVAE(Strategy):
         base_config = {
             "round": self.net_epochs,
             "classifier_level": classifier_level,
+            "evaluation_split": "validation" if self._uses_client_validation() else "test",
         }
         sample_size, min_num_clients = self.num_evaluation_clients(
             client_manager.num_available()
@@ -613,18 +723,25 @@ class FLEG_CVAE(Strategy):
                 bucket="classifier",
             )
 
-            accuracy = self._global_eval()
-            if accuracy > self.best_accuracy:
-                self.best_accuracy = accuracy
-                self.epochs_no_improve = 0
+            if self.stop_criterion in {
+                "global_test_acc",
+                "client_val_loss",
+                "client_val_acc",
+            }:
+                accuracy = self._global_eval()
+                if self.stop_criterion == "global_test_acc":
+                    self._record_stop_metric(accuracy, "Acuracia global")
+            elif self.stop_criterion == "fixed_rounds":
                 self.best_model.load_state_dict(self.global_net.state_dict())
-            else:
-                self.epochs_no_improve += 1
-            print(
-                f"Sem melhorias por {self.epochs_no_improve} épocas. "
-                f"Melhor acurácia: {self.best_accuracy:.4f} x Acurácia atual: {accuracy:.4f}."
-            )
+
             self.net_epochs += 1
+            self.classifier_rounds_current_level += 1
+            if self.stop_criterion == "fixed_rounds":
+                print(
+                    "Rodada fixa do classificador: "
+                    f"{self.classifier_rounds_current_level}/"
+                    f"{self.fixed_classifier_rounds}"
+                )
             return self.parameters_classifier, {"avg_net_loss": avg_loss}
 
         if self.phase == "cvae":
@@ -662,7 +779,6 @@ class FLEG_CVAE(Strategy):
                 self._save_metrics()
 
                 self.lvl += 1
-                self.epochs_no_improve = 0
                 self.phase = "classifier"
                 self._skip_next_client_evaluation = True
                 self.decoder = None
@@ -670,6 +786,7 @@ class FLEG_CVAE(Strategy):
                 self.cvae_trained_epochs = 0
                 self.init_level_time = time.time()
                 self._setup_classifier_for_current_level()
+                self._reset_classifier_stop_state()
                 print(f"Avançando para o nível {self.lvl}.")
                 return self.parameters_classifier, {"avg_cvae_loss": avg_cvae_loss}
             return self.parameters_cvae, {"avg_cvae_loss": avg_cvae_loss}
@@ -696,12 +813,26 @@ class FLEG_CVAE(Strategy):
                 for _, evaluate_res in results
             ]
         )
-        self.metrics_dict["local_acc_epoch"].append(accuracy_aggregated)
+        local_test_accuracy_aggregated = self._weighted_metric(
+            results,
+            metric_key="local_test_accuracy",
+            examples_key="local_test_num_examples",
+        )
+        if self._uses_client_validation():
+            self.metrics_dict["local_val_loss_epoch"].append(loss_aggregated)
+            self.metrics_dict["local_val_acc_epoch"].append(accuracy_aggregated)
+            self.metrics_dict["local_acc_epoch"].append(local_test_accuracy_aggregated)
+            if self.stop_criterion == "client_val_loss":
+                self._record_stop_metric(loss_aggregated, "Loss de validacao")
+            else:
+                self._record_stop_metric(accuracy_aggregated, "Acuracia de validacao")
+        else:
+            self.metrics_dict["local_acc_epoch"].append(local_test_accuracy_aggregated)
         self.metrics_dict["max_local_test_time"].append(
             max(evaluate_res.metrics["local_test_time"] for _, evaluate_res in results)
         )
 
-        if self.epochs_no_improve > self.patience:
+        if self._classifier_stop_reached():
             self.global_net.load_state_dict(self.best_model.state_dict())
             self.metrics_dict["epoch_transition"].append(self.net_epochs)
             if self.baseline or self._is_final_level():
@@ -720,7 +851,11 @@ class FLEG_CVAE(Strategy):
                 self.feature_extractor_sent_to_cids = set()
                 print("Alternando para treinamento do CVAE.")
 
-        metrics = {"loss": loss_aggregated, "accuracy": accuracy_aggregated}
+        metrics = {
+            "loss": loss_aggregated,
+            "accuracy": accuracy_aggregated,
+            "local_test_accuracy": local_test_accuracy_aggregated,
+        }
         if self.evaluate_metrics_aggregation_fn:
             eval_metrics = [(res.num_examples, res.metrics) for _, res in results]
             metrics = self.evaluate_metrics_aggregation_fn(eval_metrics)

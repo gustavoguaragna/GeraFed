@@ -39,11 +39,12 @@ clientapp = "Simulation.CVAE.client_app:app"
 [tool.flwr.app.config]
 agg                  = "full"                   # 'disc', 'full', 'f2a', 'none'
 continue_epoch       = 0                        # int
-cvae_anealing        = true                     # boolean
+cvae_annealing        = true                     # boolean
 cvae_beta            = 1.0                      # float
 cvae_mixup_type      = "intraclass"             # 'none', 'intraclass', 'manifold'
 cvae_normalization   = "z"                      # 'z', 'minmax'
 cvae_resblock        = true                     # boolean
+criterio_parada      = "global_test_acc"        # 'global_test_acc', 'client_val_loss', 'client_val_acc', 'fixed_rounds'
 dataset              = "cifar10"                # 'mnist', 'cifar10'
 epocas_alvo          = 1                       # int
 epocas_gen           = 2                        # int
@@ -62,9 +63,10 @@ levels               = 4                        # int
 model                = "both"                   # 'alvo', 'gen', 'both'
 num_chunks           = 2                        # int
 num_clients          = 4                        # int
-num_epocas           = 30                       # int
+num_epocas           = 30                       # int, rodadas por nivel quando criterio_parada = 'fixed_rounds'
 partitioner          = "Class"                  # 'Class', 'Dir01', 'Dir05', 'IID' (IID no else)
 patience             = 2                        # int
+reset_best_metric_per_level = true             # boolean
 resume_from_checkpoint = true                  # boolean
 seed                 = 42                       # int
 strategy             = "fedavg"                 # 'fedavg', 'fedprox', 'scaffold'

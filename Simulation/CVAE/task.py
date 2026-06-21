@@ -50,6 +50,51 @@ DATASET_CONFIG = {
     },
 }
 
+STOP_CRITERION_ALIASES = {
+    "global_test_acc": "global_test_acc",
+    "global_test_accuracy": "global_test_acc",
+    "global_accuracy": "global_test_acc",
+    "server_global_acc": "global_test_acc",
+    "server_global_accuracy": "global_test_acc",
+    "test_acc": "global_test_acc",
+    "client_val_loss": "client_val_loss",
+    "client_validation_loss": "client_val_loss",
+    "val_loss": "client_val_loss",
+    "validation_loss": "client_val_loss",
+    "client_val_acc": "client_val_acc",
+    "client_val_accuracy": "client_val_acc",
+    "client_validation_acc": "client_val_acc",
+    "client_validation_accuracy": "client_val_acc",
+    "val_acc": "client_val_acc",
+    "val_accuracy": "client_val_acc",
+    "validation_acc": "client_val_acc",
+    "validation_accuracy": "client_val_acc",
+    "fixed_rounds": "fixed_rounds",
+    "fixed": "fixed_rounds",
+    "num_rounds": "fixed_rounds",
+    "rodadas_fixas": "fixed_rounds",
+}
+
+CLIENT_VALIDATION_STOP_CRITERIA = {"client_val_loss", "client_val_acc"}
+
+
+def normalize_stop_criterion(stop_criterion: str) -> str:
+    key = str(stop_criterion).strip().lower()
+    try:
+        return STOP_CRITERION_ALIASES[key]
+    except KeyError as exc:
+        valid = ", ".join(
+            ["global_test_acc", "client_val_loss", "client_val_acc", "fixed_rounds"]
+        )
+        raise ValueError(
+            f"criterio_parada invalido: {stop_criterion}. Use um de: {valid}"
+        ) from exc
+
+
+def uses_client_validation_criterion(stop_criterion: str) -> bool:
+    return normalize_stop_criterion(stop_criterion) in CLIENT_VALIDATION_STOP_CRITERIA
+
+
 class Net(nn.Module):
     def __init__(self, seed=None):
         if seed is not None:
@@ -382,9 +427,10 @@ def load_data(
     partitioner_type: str = "IID",
     alpha_dir: Optional[float] = None,
     seed: int = 42,
-)-> tuple[DataLoader, DataLoader, DataLoader]:
+    client_validation: bool = False,
+) -> tuple[DataLoader, DataLoader, Optional[DataLoader], DataLoader]:
     
-    """Carrega dataset com splits de treino e teste separados para o cliente específico."""
+    """Carrega dataset com splits globais e locais para o cliente especifico."""
 
     dataset = normalize_dataset_name(dataset)
     dataset_config = DATASET_CONFIG[dataset]
@@ -429,19 +475,40 @@ def load_data(
     train_partition = train_partition.with_transform(apply_transforms)
     test_partition = test_partition.with_transform(apply_transforms)
 
-    test_size = int(len(train_partition) * 0.2)
-    train_size = len(train_partition) - test_size
-    client_train, client_test = random_split(
-        train_partition,
-        [train_size, test_size],
-        generator=torch.Generator().manual_seed(seed),
-    )
+    num_client_samples = len(train_partition)
+    split_generator = torch.Generator().manual_seed(seed)
+    if client_validation:
+        train_size = int(num_client_samples * 0.70)
+        val_size = int(num_client_samples * 0.15)
+        test_size = num_client_samples - train_size - val_size
+        if num_client_samples >= 3:
+            if val_size == 0:
+                val_size = 1
+                train_size = max(1, train_size - 1)
+            if test_size == 0:
+                test_size = 1
+                train_size = max(1, train_size - 1)
+        client_train, client_val, client_test = random_split(
+            train_partition,
+            [train_size, val_size, test_size],
+            generator=split_generator,
+        )
+        valloader_local = DataLoader(client_val, batch_size=64, shuffle=False)
+    else:
+        test_size = int(num_client_samples * 0.2)
+        train_size = num_client_samples - test_size
+        client_train, client_test = random_split(
+            train_partition,
+            [train_size, test_size],
+            generator=split_generator,
+        )
+        valloader_local = None
 
     trainloader = DataLoader(client_train, batch_size=batch_size, shuffle=True)
     testloader = DataLoader(test_partition, batch_size=64, shuffle=False)
     testloader_local = DataLoader(client_test, batch_size=64, shuffle=False)
 
-    return trainloader, testloader, testloader_local
+    return trainloader, testloader, valloader_local, testloader_local
 
 
 def create_full_model(dataset: str, seed: Optional[int] = None) -> nn.Module:
@@ -817,11 +884,14 @@ def local_test(
     num_classes: int = 10,
     continue_epoch: int = 0,
     dataset: str = "mnist",
+    return_loss: bool = False,
 ):
     client_eval_time = time.time()
     class_correct = defaultdict(int)
     class_total = defaultdict(int)
     predictions_counter = defaultdict(int)
+    criterion = nn.CrossEntropyLoss(reduction="sum")
+    loss_total = 0.0
 
     net.eval()
     net.to(device)
@@ -831,6 +901,7 @@ def local_test(
         for batch in testloader:
             images, labels = batch[image].to(device), batch["label"].to(device)
             outputs = net(images)
+            loss_total += criterion(outputs, labels).item()
             _, predicted = torch.max(outputs, 1)
 
             for true_label, pred_label in zip(labels, predicted):
@@ -845,9 +916,11 @@ def local_test(
         overall_accuracy = (
             sum(class_correct.values()) / total_samples if total_samples > 0 else 0.0
         )
+        overall_loss = loss_total / total_samples if total_samples > 0 else 0.0
         results_metrics = {
             "class_metrics": {},
             "overall_accuracy": overall_accuracy,
+            "overall_loss": overall_loss,
             "prediction_distribution": dict(predictions_counter),
         }
 
@@ -887,6 +960,11 @@ def local_test(
                     "Overall Accuracy:", results_metrics["overall_accuracy"]
                 )
             )
+            f.write(
+                "\n{:<20} {:.4f}".format(
+                    "Overall Loss:", results_metrics["overall_loss"]
+                )
+            )
             f.write("\n{:<20} {}".format("Total Samples:", total_samples))
             f.write(
                 "\n{:<20} {}".format(
@@ -900,7 +978,9 @@ def local_test(
             )
             f.write("\n\n")
 
-    print("Results saved to accuracy_report.txt")
+    print(f"Results saved to {acc_filepath}")
+    if return_loss:
+        return results_metrics["overall_accuracy"], results_metrics["overall_loss"]
     return results_metrics["overall_accuracy"]
 
 

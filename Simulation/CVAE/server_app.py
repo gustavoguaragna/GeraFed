@@ -13,6 +13,7 @@ from Simulation.CVAE.task import (
     get_weights,
     load_data,
     normalize_dataset_name,
+    normalize_stop_criterion,
 )
 
 
@@ -46,6 +47,10 @@ def server_fn(context: Context):
     patience = _get(run_config, "patience", 10)
     levels = _get(run_config, "levels", 4)
     syn_input = _get(run_config, "syn_input", "dynamic")
+    stop_criterion = normalize_stop_criterion(
+        _get(run_config, "criterio_parada", "global_test_acc")
+    )
+    fixed_classifier_rounds = int(_get(run_config, "num_epocas", patience))
     alpha_dir = _alpha_from_partitioner(partitioner, run_config)
     if seed == 42:
         trial = 1
@@ -66,7 +71,7 @@ def server_fn(context: Context):
     classifier = create_full_model(dataset, seed=seed)
     parameters = ndarrays_to_parameters(get_weights(classifier))
 
-    _, valloader, _ = load_data(
+    _, valloader, _, _ = load_data(
         partition_id=0,
         num_partitions=num_clients,
         batch_size=batch_size,
@@ -78,7 +83,17 @@ def server_fn(context: Context):
     )
 
     # Flower needs a finite upper bound. The strategy stops itself when patience/levels finish.
-    num_rounds = patience * max(1, levels) * 10 + cvae_epochs * max(1, levels) + levels + 5
+    classifier_rounds_bound = (
+        fixed_classifier_rounds
+        if stop_criterion == "fixed_rounds"
+        else patience * 10
+    )
+    num_rounds = (
+        classifier_rounds_bound * max(1, levels)
+        + cvae_epochs * max(1, levels)
+        + levels
+        + 5
+    )
 
     strategy = FLEG_CVAE(
         fraction_fit_alvo=_get(run_config, "fraction_fit_alvo", 1.0),
@@ -94,6 +109,13 @@ def server_fn(context: Context):
         mu=_get(run_config, "mu", 0.5),
         seed=seed,
         patience=patience,
+        stop_criterion=stop_criterion,
+        fixed_classifier_rounds=fixed_classifier_rounds,
+        reset_best_metric_per_level=_get(
+            run_config,
+            "reset_best_metric_per_level",
+            True,
+        ),
         levels=levels,
         lesslvl=_get(run_config, "lesslvl", False),
         baseline=_get(run_config, "baseline", False),
@@ -103,7 +125,7 @@ def server_fn(context: Context):
         cvae_lr=_get(run_config, "learn_rate_gen", 0.001),
         normalization=_get(run_config, "cvae_normalization", "minmax"),
         resblock=_get(run_config, "cvae_resblock", False),
-        anealing=_get(run_config, "cvae_anealing", False),
+        annealing=_get(run_config, "cvae_annealing", False),
         latent_dim_mode=syn_input,
         latent_dim=_get(run_config, "tam_ruido", 100),
         num_syn=syn_input,

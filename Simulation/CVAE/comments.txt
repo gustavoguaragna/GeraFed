@@ -2,16 +2,11 @@ STATUS ATUAL:
 proximo item em coisas para verificar
 
 PARA MANDAR PARA O CODEX:
+Quero que a avaliação global seja feita independente do critério de parada, alterei o strategy para isso, 
+
 
 PARA EU VERIFICAR/ALTERAR:
 
-- Reentender as variações de melhoria para o CVAE e avaliar se realmente é significativo. Tem explicações no chat e gráficos nos 
-slides de reuniao semanal. Os resultados completos estão armazenados no pillars. Se algo for ser mantido, seria bom ver refs
-sobre as técnicas.
-- Estava dando erro em 'beta = min(1.0, self.cvae_round / warmup_epochs)' na função _cvae_config do strategy.py quando
-warmup_epochs era 0. Ajustei para retornar 0.0 nesse caso, mas é bom verificar se isso faz sentido.
-- Decidir onde ficará o baseline, no mesmo projeto ou separado em CNN.
-- Está sem alignment loss
 - A cada nivel eu retorno ao best_model. Isso dever ser evitado e continuar com modelo atual?
 - Add prints para acompanhamento do processo.
 - Ver se seed funciona bem, oq causa fonte de variação?
@@ -21,3 +16,6 @@ warmup_epochs era 0. Ajustei para retornar 0.0 nesse caso, mas é bom verificar 
 - Ver em refs sobre numero de epocas locais da cvae.
 - Após a geração, é preciso desnormalizar os embeddings com as estatísticas usadas no treinamento. Porém, o decoder gerador é
 agregado, então estou usando métricas do valloader. Testar usar métricas agregadas também.
+- Ver em imagens médicas. Selecionar banco de dados e testar arquiteturas e melhorias como as testadas no cifar e armazenadas em
+Users/Mara/Documents/Mestrado/Pesquisa/FLEGv2 ou home/guaragna/Documents/Pesquisa/GeraFed/CVAE/Teste_melhoria.
+- Está sem alignment loss

@@ -30,6 +30,7 @@ from Simulation.CVAE.task import (
     normalize_dataset_name,
     set_weights,
     state_dict_from_bytes,
+    uses_client_validation_criterion,
     unpack_batch,
 )
 
@@ -41,6 +42,7 @@ class FlowerClient(NumPyClient):
         dataset: str,
         batch_size: int,
         trainloader: DataLoader,
+        valloader_local: DataLoader | None,
         testloader_local: DataLoader,
         context: Context,
         folder: str,
@@ -55,6 +57,7 @@ class FlowerClient(NumPyClient):
         self.dataset = normalize_dataset_name(dataset)
         self.batch_size = batch_size
         self.trainloader = trainloader
+        self.valloader_local = valloader_local
         self.testloader_local = testloader_local
         self.client_state = context.state
         self.folder = folder
@@ -579,22 +582,73 @@ class FlowerClient(NumPyClient):
             set_weights(classifier, parameters)
             net.load_state_dict(classifier.state_dict(), strict=False)
 
-        local_test_start = time.time()
-        local_acc = local_test(
+        evaluation_split = str(config.get("evaluation_split", "test"))
+        if evaluation_split == "validation":
+            if self.valloader_local is None:
+                raise RuntimeError(
+                    f"Cliente {self.cid} nao possui loader de validacao local."
+                )
+            eval_loader = self.valloader_local
+            report_filename = "validation_report.txt"
+        elif evaluation_split == "test":
+            eval_loader = self.testloader_local
+            report_filename = "accuracy_report.txt"
+        else:
+            raise ValueError(
+                f"evaluation_split deve ser 'test' ou 'validation', recebeu {evaluation_split}"
+            )
+
+        eval_start = time.time()
+        local_acc, local_loss = local_test(
             net=net,
-            testloader=self.testloader_local,
+            testloader=eval_loader,
             device=self.device,
-            acc_filepath=f"{self.folder}/accuracy_report.txt",
+            acc_filepath=f"{self.folder}/{report_filename}",
             epoch=int(config["round"]),
             cliente=self.cid,
             continue_epoch=self.continue_epoch,
             dataset=self.dataset,
+            return_loss=True,
         )
-        local_test_time = time.time() - local_test_start
+        eval_time = time.time() - eval_start
+
+        local_test_acc = local_acc
+        local_test_loss = local_loss
+        local_test_time = eval_time
+        total_eval_time = eval_time
+        if evaluation_split == "validation":
+            local_test_start = time.time()
+            local_test_acc, local_test_loss = local_test(
+                net=net,
+                testloader=self.testloader_local,
+                device=self.device,
+                acc_filepath=f"{self.folder}/accuracy_report.txt",
+                epoch=int(config["round"]),
+                cliente=self.cid,
+                continue_epoch=self.continue_epoch,
+                dataset=self.dataset,
+                return_loss=True,
+            )
+            local_test_time = time.time() - local_test_start
+            total_eval_time += local_test_time
+
         return (
-            0.0,
-            len(self.testloader_local.dataset),
-            {"local_test_time": local_test_time, "local_accuracy": local_acc},
+            float(local_loss),
+            len(eval_loader.dataset),
+            {
+                "local_test_time": float(local_test_time),
+                "local_eval_time": float(total_eval_time),
+                "local_accuracy": float(local_acc),
+                "local_loss": float(local_loss),
+                "local_val_accuracy": float(local_acc),
+                "local_val_loss": float(local_loss),
+                "local_val_num_examples": len(eval_loader.dataset),
+                "local_val_time": float(eval_time),
+                "local_test_accuracy": float(local_test_acc),
+                "local_test_loss": float(local_test_loss),
+                "local_test_num_examples": len(self.testloader_local.dataset),
+                "evaluation_split": evaluation_split,
+            },
         )
 
 
@@ -620,6 +674,8 @@ def client_fn(context: Context):
     syn_input = run_config.get("num_syn", run_config.get("syn_input", "dynamic"))
     alpha = run_config.get("alpha", _alpha_from_partitioner(partitioner))
     partitioner_for_data = f"Dir{int(alpha * 10):02d}" if partitioner == "Dirichlet" else partitioner
+    stop_criterion = run_config.get("criterio_parada", "global_test_acc")
+    use_client_validation = uses_client_validation_criterion(stop_criterion)
 
     if seed == 42:
         trial = 1
@@ -636,7 +692,7 @@ def client_fn(context: Context):
         f"cvaeepochs{cvae_epochs}_{syn_input}_fleg_trial{trial}"
     )
 
-    trainloader, _, testloader_local = load_data(
+    trainloader, _, valloader_local, testloader_local = load_data(
         partition_id=partition_id,
         num_partitions=num_partitions,
         batch_size=batch_size,
@@ -645,6 +701,7 @@ def client_fn(context: Context):
         partitioner_type=partitioner_for_data,
         alpha_dir=alpha,
         seed=seed,
+        client_validation=use_client_validation,
     )
 
     return FlowerClient(
@@ -652,6 +709,7 @@ def client_fn(context: Context):
         dataset=dataset,
         batch_size=batch_size,
         trainloader=trainloader,
+        valloader_local=valloader_local,
         testloader_local=testloader_local,
         context=context,
         folder=folder,
