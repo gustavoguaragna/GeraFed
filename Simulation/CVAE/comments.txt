@@ -2,20 +2,18 @@ STATUS ATUAL:
 proximo item em coisas para verificar
 
 PARA MANDAR PARA O CODEX:
-Quero que a avaliação global seja feita independente do critério de parada, alterei o strategy para isso, 
+
 
 
 PARA EU VERIFICAR/ALTERAR:
 
-- A cada nivel eu retorno ao best_model. Isso dever ser evitado e continuar com modelo atual?
-- Add prints para acompanhamento do processo.
-- Ver se seed funciona bem, oq causa fonte de variação?
-- Analisar como ficaria para implementar Adam e FedProx com implementação do flwr.
-- Deixar codigo mais organizado para facilitar leitura (identação, nomes de variáveis, comentários, importações desnecessárias)
-- Levar para um projeto proprio, pyproject isolado
-- Ver em refs sobre numero de epocas locais da cvae.
-- Após a geração, é preciso desnormalizar os embeddings com as estatísticas usadas no treinamento. Porém, o decoder gerador é
-agregado, então estou usando métricas do valloader. Testar usar métricas agregadas também.
 - Ver em imagens médicas. Selecionar banco de dados e testar arquiteturas e melhorias como as testadas no cifar e armazenadas em
 Users/Mara/Documents/Mestrado/Pesquisa/FLEGv2 ou home/guaragna/Documents/Pesquisa/GeraFed/CVAE/Teste_melhoria.
 - Está sem alignment loss
+- Após a geração, é preciso desnormalizar os embeddings com as estatísticas usadas no treinamento. Porém, o decoder gerador é
+agregado. No momento estão sendo usadas as estatísticas de cada cliente. Testar usar métricas agregadas (pode ser um problema 
+para minmax, já que sabe-se o valor máximo e mínimo de um dos clientes).
+- Conferir certinho os prints
+- Levar para um projeto proprio, pyproject isolado
+- Analisar como ficaria para implementar Adam e FedProx com implementação do flwr
+- Deixar codigo mais organizado para facilitar leitura (identação, nomes de variáveis, comentários, importações desnecessárias)

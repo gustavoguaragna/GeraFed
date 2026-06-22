@@ -145,7 +145,7 @@ class FLEG_CVAE(Strategy):
         self.phase = "classifier"
         self.lvl = 0
         self.net_epochs = 0
-        self.best_accuracy = 0.0
+        self.global_accuracy = 0.0
         self.best_metric = self._initial_best_metric()
         self.epochs_no_improve = 0
         self.classifier_rounds_current_level = 0
@@ -167,7 +167,6 @@ class FLEG_CVAE(Strategy):
         self.decoder = None
         self.parameters_cvae = None
         self.cvae_trained_epochs = 0
-        self.cvae_level = None
         self.input_dim = None
         self.hidden_dim = None
         self.latent_dim = None
@@ -195,9 +194,12 @@ class FLEG_CVAE(Strategy):
         }
         self.init_level_time = time.time()
         os.makedirs(self.folder, exist_ok=True)
+        loaded_checkpoint = False
         if self.resume_from_checkpoint:
-            self._load_latest_checkpoint()
+            loaded_checkpoint = self._load_latest_checkpoint()
         self._ensure_metric_keys()
+        if self.phase == "classifier" and self.lvl == 0 and not loaded_checkpoint:
+            print("Starting warmup classifier level 0.")
 
     def __repr__(self) -> str:
         return "FLEG_CVAE()"
@@ -246,8 +248,6 @@ class FLEG_CVAE(Strategy):
         self.classifier_rounds_current_level = 0
         if self.reset_best_metric_per_level:
             self.best_metric = self._initial_best_metric()
-            if self._metric_is_accuracy():
-                self.best_accuracy = 0.0
             self.best_model.load_state_dict(self.global_net.state_dict())
 
     @staticmethod
@@ -274,16 +274,14 @@ class FLEG_CVAE(Strategy):
         )
         if improved:
             self.best_metric = current_metric
-            if self._metric_is_accuracy():
-                self.best_accuracy = current_metric
             self.epochs_no_improve = 0
             self.best_model.load_state_dict(self.global_net.state_dict())
         else:
             self.epochs_no_improve += 1
 
         print(
-            f"{label} atual: {current_metric:.4f} | Melhor: "
-            f"{self.best_metric:.4f} | Sem melhorar: "
+            f"Current {label}: {current_metric:.4f} | Best: "
+            f"{self.best_metric:.4f} | No improvement: "
             f"{self.epochs_no_improve}/{self.patience}"
         )
 
@@ -292,11 +290,39 @@ class FLEG_CVAE(Strategy):
             return self.classifier_rounds_current_level >= self.fixed_classifier_rounds
         return self.epochs_no_improve > self.patience
 
-    def _classifier_level(self) -> int:
-        return 0 if self.lvl == 0 else self.lvl + (1 if self.lesslvl else 0)
+    def _next_level_after_classifier(self) -> int:
+        if self.lesslvl and self.lvl == 0:
+            print("lesslvl is enabled. Level 1 will be skipped after warmup.")
+            return 2
+        return self.lvl + 1
 
     def _is_final_level(self) -> bool:
-        return self.lvl + (1 if self.lesslvl else 0) >= self.levels
+        return self.lvl >= self.levels
+
+    def _save_completed_level_state(self, final_checkpoint: bool = False) -> None:
+        self.metrics_dict["level_time"].append(time.time() - self.init_level_time)
+        self._record_level_transmission()
+        checkpoint_filename = (
+            "checkpoint_end.pth"
+            if final_checkpoint
+            else f"checkpoint_level{self.lvl}.pth"
+        )
+        self._save_checkpoint(checkpoint_filename, level=self.lvl)
+        self._save_metrics()
+
+    def _switch_to_next_cvae_phase(self) -> None:
+        self.lvl = self._next_level_after_classifier()
+
+        self.phase = "cvae"
+        self.decoder = None
+        self.parameters_cvae = None
+        self.cvae_trained_epochs = 0
+        self.decoder_payload = b""
+        self.decoder_sent_to_cids = set()
+        self.feature_extractor_payload = b""
+        self.feature_extractor_sent_to_cids = set()
+        self.init_level_time = time.time()
+        print(f"Switching to CVAE level {self.lvl}.")
 
     def _save_metrics(self) -> None:
         metrics_filename = f"{self.folder}/metrics.json"
@@ -309,9 +335,9 @@ class FLEG_CVAE(Strategy):
 
     def _checkpoint_files(self) -> list[Path]:
         folder = Path(self.folder)
-        candidates = list(folder.glob("checkpoint_level*.pth"))
-        candidates.extend(folder.glob("checkpoint.pth"))
-        return [path for path in candidates if path.is_file()]
+        return [
+            path for path in folder.glob("checkpoint_level*.pth") if path.is_file()
+        ]
 
     def _latest_checkpoint_path(self) -> Optional[Path]:
         checkpoints = self._checkpoint_files()
@@ -329,48 +355,33 @@ class FLEG_CVAE(Strategy):
             "classifier_state_dict": self.global_net.state_dict(),
             "level": self.lvl if level is None else level,
             "net_epochs": self.net_epochs,
-            "best_accuracy": self.best_accuracy,
             "best_metric": self.best_metric,
             "metrics_dict": self.metrics_dict,
-            "decoder_payload": self.decoder_payload,
-            "cvae_level": self.cvae_level,
-            "input_dim": self.input_dim,
-            "hidden_dim": self.hidden_dim,
-            "latent_dim": self.latent_dim,
-            "feature_shape": self.feature_shape,
         }
         torch.save(checkpoint, f"{self.folder}/{filename}")
 
-    def _load_latest_checkpoint(self) -> None:
+    def _load_latest_checkpoint(self) -> bool:
         checkpoint_path = self._latest_checkpoint_path()
         if checkpoint_path is None:
-            print("Nenhum checkpoint CVAE encontrado para retomada.")
-            return
+            print("No CVAE checkpoint found for resume.")
+            return False
 
         checkpoint = torch.load(checkpoint_path, map_location=self.device)
         self.global_net.load_state_dict(checkpoint["classifier_state_dict"])
         self.best_model.load_state_dict(checkpoint["classifier_state_dict"])
         self.lvl = int(checkpoint.get("level", self.lvl))
         self.net_epochs = int(checkpoint.get("net_epochs", self.net_epochs))
-        self.best_accuracy = float(checkpoint.get("best_accuracy", self.best_accuracy))
-        if "best_metric" in checkpoint:
-            self.best_metric = float(checkpoint["best_metric"])
-        elif self._metric_is_accuracy():
-            self.best_metric = self.best_accuracy
+        self.best_metric = float(checkpoint["best_metric"])
         self.metrics_dict = checkpoint.get("metrics_dict", self.metrics_dict)
         self._ensure_metric_keys()
-        self.decoder_payload = checkpoint.get("decoder_payload", b"")
-        self.decoder_sent_to_cids = set()
-        self.cvae_level = checkpoint.get("cvae_level")
-        self.input_dim = checkpoint.get("input_dim")
-        self.hidden_dim = checkpoint.get("hidden_dim")
-        self.latent_dim = checkpoint.get("latent_dim")
-        self.feature_shape = checkpoint.get("feature_shape")
 
-        self._setup_classifier_for_current_level()
-
-        self.init_level_time = time.time()
-        print(f"Retomando treinamento a partir de {checkpoint_path}.")
+        print(f"Resuming training from {checkpoint_path}.")
+        if self.baseline or self._is_final_level():
+            self.finished = True
+            print("Loaded checkpoint is already at the final level.")
+        else:
+            self._switch_to_next_cvae_phase()
+        return True
 
     @staticmethod
     def _bytes_size_mb(payload) -> float:
@@ -406,10 +417,9 @@ class FLEG_CVAE(Strategy):
         self._level_cvae_traffic_mb = 0.0
 
     def _setup_classifier_for_current_level(self) -> None:
-        level = self._classifier_level()
-        self.classifier = create_classifier(self.dataset, level=level, seed=self.seed).to(
-            self.device
-        )
+        self.classifier = create_classifier(
+            self.dataset, level=self.lvl, seed=self.seed
+        ).to(self.device)
         self.classifier.load_state_dict(self.global_net.state_dict(), strict=False)
         self.parameters_classifier = ndarrays_to_parameters(get_weights(self.classifier))
 
@@ -418,9 +428,10 @@ class FLEG_CVAE(Strategy):
         return batch[self.image_key][0]
 
     def _setup_cvae_for_current_level(self) -> None:
-        self.cvae_level = self.lvl + (2 if self.lesslvl else 1)
+        if self.lvl <= 0:
+            raise RuntimeError("CVAE cannot be trained at warmup level 0.")
         feature_extractor = create_feature_extractor(
-            self.dataset, level=self.cvae_level, seed=self.seed
+            self.dataset, level=self.lvl, seed=self.seed
         ).to(self.device)
         feature_extractor.load_state_dict(self.global_net.state_dict(), strict=False)
 
@@ -451,18 +462,20 @@ class FLEG_CVAE(Strategy):
         self.cvae_trained_epochs = 0
 
     def _num_generated_samples(self) -> int:
+        if self.lvl <= 0:
+            return 0
         total_examples = self._last_total_examples or self.num_clients
         if self.num_syn == "dynamic":
             num_samples = int(
                 max(1, torch.ceil(torch.tensor(total_examples / self.num_clients)).item())
                 / self.levels
-                * (self.lvl + 1)
+                * self.lvl
             )
             num_samples = max(1, num_samples)
         elif self.num_syn == "fixed":
             num_samples = 48000 if self.dataset == "mnist" else 40000
         else:
-            raise ValueError(f"num_syn deve ser 'dynamic' ou 'fixed', recebeu {self.num_syn}")
+            raise ValueError(f"num_syn must be 'dynamic' or 'fixed', got {self.num_syn}")
 
         return num_samples
 
@@ -479,7 +492,7 @@ class FLEG_CVAE(Strategy):
 
         return {
             "model": model,
-            "cvae_level": self.cvae_level,
+            "level": self.lvl,
             "input_dim": self.input_dim,
             "hidden_dim": self.hidden_dim,
             "latent_dim": self.latent_dim,
@@ -489,6 +502,8 @@ class FLEG_CVAE(Strategy):
             "resblock": self.resblock,
             "num_samples": self._num_generated_samples(),
             "local_epochs": self.local_epochs,
+            "cvae_epoch_start": self.cvae_trained_epochs,
+            "cvae_epochs_total": self.cvae_epochs_target,
         }
 
     def _feature_payload_for_client(self, cid: str, level: int) -> bytes:
@@ -563,24 +578,21 @@ class FLEG_CVAE(Strategy):
         )
 
         if self.phase == "classifier":
-            classifier_level = self._classifier_level()
+            num_samples = self._num_generated_samples()
             classifier_parameters_mb = self._parameters_size_mb(self.parameters_classifier)
+
             fit_instructions = []
             for client in clients:
                 cid = str(client.cid)
-                feature_payload = self._feature_payload_for_client(
-                    cid, classifier_level
-                )
                 decoder_payload = self._decoder_payload_for_client(
-                    cid, classifier_level
+                    cid, self.lvl
                 )
                 config = {
                     "model": "classifier",
-                    "classifier_level": classifier_level,
+                    "level": self.lvl,
                     "strategy": self.strategy_name,
                     "mu": self.mu,
                     "mixup_type": self.mixup_type,
-                    "feature_extractor_state": feature_payload,
                     "decoder_state": decoder_payload,
                     "input_dim": self.input_dim or 0,
                     "hidden_dim": self.hidden_dim or 0,
@@ -588,12 +600,15 @@ class FLEG_CVAE(Strategy):
                     "feature_shape": pickle.dumps(self.feature_shape),
                     "normalization": self.normalization,
                     "resblock": self.resblock,
+                    "num_samples": num_samples,
                 }
                 self._add_level_traffic(
-                    classifier_parameters_mb/len(clients)
-                    + self._bytes_size_mb(feature_payload)/len(clients)
-                    + self._bytes_size_mb(decoder_payload)/len(clients),
+                    classifier_parameters_mb/len(clients),
                     bucket="classifier",
+                )
+                self._add_level_traffic(
+                    self._bytes_size_mb(decoder_payload)/len(clients),
+                    bucket="cvae",
                 )
                 fit_instructions.append(
                     (client, FitIns(parameters=self.parameters_classifier, config=config))
@@ -609,7 +624,7 @@ class FLEG_CVAE(Strategy):
             for client in clients:
                 config = dict(base_config)
                 feature_payload = self._feature_payload_for_client(
-                    str(client.cid), self.cvae_level
+                    str(client.cid), self.lvl
                 )
                 config["feature_extractor_state"] = feature_payload
                 self._add_level_traffic(
@@ -624,7 +639,7 @@ class FLEG_CVAE(Strategy):
                 )
             return fit_instructions
 
-        raise ValueError(f"Fase desconhecida: {self.phase}")
+        raise ValueError(f"Unknown phase: {self.phase}")
 
     def configure_evaluate(
         self, server_round: int, parameters: Parameters, client_manager: ClientManager
@@ -639,10 +654,9 @@ class FLEG_CVAE(Strategy):
         ):
             return []
 
-        classifier_level = self._classifier_level()
         base_config = {
             "round": self.net_epochs,
-            "classifier_level": classifier_level,
+            "level": self.lvl,
             "evaluation_split": "validation" if self._uses_client_validation() else "test",
         }
         sample_size, min_num_clients = self.num_evaluation_clients(
@@ -655,10 +669,6 @@ class FLEG_CVAE(Strategy):
         parameters_classifier_mb = self._parameters_size_mb(self.parameters_classifier)
         for client in clients:
             config = dict(base_config)
-            feature_payload = self._feature_payload_for_client(
-                str(client.cid), classifier_level
-            )
-            config["feature_extractor_state"] = feature_payload
             self._add_level_traffic(
                 (
                     parameters_classifier_mb/len(clients)
@@ -723,14 +733,15 @@ class FLEG_CVAE(Strategy):
                 bucket="classifier",
             )
 
-            if self.stop_criterion in {
-                "global_test_acc",
-                "client_val_loss",
-                "client_val_acc",
-            }:
-                accuracy = self._global_eval()
-                if self.stop_criterion == "global_test_acc":
-                    self._record_stop_metric(accuracy, "Acuracia global")
+            self.global_accuracy = self._global_eval()
+            print(
+                f"Server: classifier level {self.lvl} "
+                f"round {self.classifier_rounds_current_level + 1} "
+                f"- avg train loss: {avg_loss:.6f} "
+                f"- global accuracy: {self.global_accuracy:.4f}"
+            )
+            if self.stop_criterion == "global_test_acc":
+                self._record_stop_metric(self.global_accuracy, "global accuracy")
             elif self.stop_criterion == "fixed_rounds":
                 self.best_model.load_state_dict(self.global_net.state_dict())
 
@@ -738,7 +749,7 @@ class FLEG_CVAE(Strategy):
             self.classifier_rounds_current_level += 1
             if self.stop_criterion == "fixed_rounds":
                 print(
-                    "Rodada fixa do classificador: "
+                    "Classifier fixed round: "
                     f"{self.classifier_rounds_current_level}/"
                     f"{self.fixed_classifier_rounds}"
                 )
@@ -766,28 +777,28 @@ class FLEG_CVAE(Strategy):
                 bucket="cvae",
             )
 
+            next_cvae_epoch = min(
+                self.cvae_trained_epochs + self.local_epochs,
+                self.cvae_epochs_target,
+            )
+            print(
+                f"Server: CVAE level {self.lvl} epoch "
+                f"{next_cvae_epoch}/{self.cvae_epochs_target} "
+                f"- avg loss: {avg_cvae_loss:.6f}"
+            )
             self.cvae_trained_epochs += self.local_epochs
             if self.cvae_trained_epochs >= self.cvae_epochs_target:
                 self.decoder_payload = state_dict_to_bytes(self.decoder.state_dict())
                 self.decoder_sent_to_cids = set()
-                self.metrics_dict["level_time"].append(time.time() - self.init_level_time)
-                self._record_level_transmission()
-                self._save_checkpoint(
-                    f"checkpoint_level{self.lvl + 1}.pth",
-                    level=self.lvl + 1,
-                )
-                self._save_metrics()
 
-                self.lvl += 1
                 self.phase = "classifier"
                 self._skip_next_client_evaluation = True
                 self.decoder = None
                 self.parameters_cvae = None
                 self.cvae_trained_epochs = 0
-                self.init_level_time = time.time()
                 self._setup_classifier_for_current_level()
                 self._reset_classifier_stop_state()
-                print(f"Avançando para o nível {self.lvl}.")
+                print(f"Switching to classifier level {self.lvl}.")
                 return self.parameters_classifier, {"avg_cvae_loss": avg_cvae_loss}
             return self.parameters_cvae, {"avg_cvae_loss": avg_cvae_loss}
 
@@ -823,9 +834,9 @@ class FLEG_CVAE(Strategy):
             self.metrics_dict["local_val_acc_epoch"].append(accuracy_aggregated)
             self.metrics_dict["local_acc_epoch"].append(local_test_accuracy_aggregated)
             if self.stop_criterion == "client_val_loss":
-                self._record_stop_metric(loss_aggregated, "Loss de validacao")
+                self._record_stop_metric(loss_aggregated, "validation loss")
             else:
-                self._record_stop_metric(accuracy_aggregated, "Acuracia de validacao")
+                self._record_stop_metric(accuracy_aggregated, "validation accuracy")
         else:
             self.metrics_dict["local_acc_epoch"].append(local_test_accuracy_aggregated)
         self.metrics_dict["max_local_test_time"].append(
@@ -835,30 +846,25 @@ class FLEG_CVAE(Strategy):
         if self._classifier_stop_reached():
             self.global_net.load_state_dict(self.best_model.state_dict())
             self.metrics_dict["epoch_transition"].append(self.net_epochs)
-            if self.baseline or self._is_final_level():
+            final_checkpoint = self.baseline or self._is_final_level()
+            self._save_completed_level_state(final_checkpoint=final_checkpoint)
+            print(f"Completed level {self.lvl}.")
+            if final_checkpoint:
                 self.finished = True
-                self.metrics_dict["level_time"].append(time.time() - self.init_level_time)
-                self._record_level_transmission()
-                self._save_checkpoint("checkpoint_end.pth")
-                self._save_metrics()
-                print("Treinamento finalizado.")
+                print("Training finished.")
             else:
-                self.phase = "cvae"
-                self.parameters_cvae = None
-                self.decoder_payload = b""
-                self.decoder_sent_to_cids = set()
-                self.feature_extractor_payload = b""
-                self.feature_extractor_sent_to_cids = set()
-                print("Alternando para treinamento do CVAE.")
+                self._switch_to_next_cvae_phase()
 
         metrics = {
             "loss": loss_aggregated,
-            "accuracy": accuracy_aggregated,
+            "global_accuracy": self.global_accuracy,
             "local_test_accuracy": local_test_accuracy_aggregated,
         }
         if self.evaluate_metrics_aggregation_fn:
             eval_metrics = [(res.num_examples, res.metrics) for _, res in results]
-            metrics = self.evaluate_metrics_aggregation_fn(eval_metrics)
+            metrics.update(self.evaluate_metrics_aggregation_fn(eval_metrics))
+            metrics["global_accuracy"] = self.global_accuracy
+            metrics.pop("accuracy", None)
         elif server_round == 1:
             log(WARNING, "No evaluate_metrics_aggregation_fn provided")
 

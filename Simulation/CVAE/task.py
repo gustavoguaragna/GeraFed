@@ -978,7 +978,6 @@ def local_test(
             )
             f.write("\n\n")
 
-    print(f"Results saved to {acc_filepath}")
     if return_loss:
         return results_metrics["overall_accuracy"], results_metrics["overall_loss"]
     return results_metrics["overall_accuracy"]

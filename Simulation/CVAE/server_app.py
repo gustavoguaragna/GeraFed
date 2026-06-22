@@ -47,6 +47,7 @@ def server_fn(context: Context):
     patience = _get(run_config, "patience", 10)
     levels = _get(run_config, "levels", 4)
     syn_input = _get(run_config, "syn_input", "dynamic")
+    latent_dim_mode = _get(run_config, "cvae_latent_dim_mode", "fixed")
     stop_criterion = normalize_stop_criterion(
         _get(run_config, "criterio_parada", "global_test_acc")
     )
@@ -126,7 +127,7 @@ def server_fn(context: Context):
         normalization=_get(run_config, "cvae_normalization", "minmax"),
         resblock=_get(run_config, "cvae_resblock", False),
         annealing=_get(run_config, "cvae_annealing", False),
-        latent_dim_mode=syn_input,
+        latent_dim_mode=latent_dim_mode,
         latent_dim=_get(run_config, "tam_ruido", 100),
         num_syn=syn_input,
         mixup_type=_get(run_config, "cvae_mixup_type", "none"),

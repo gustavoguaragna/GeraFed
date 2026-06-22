@@ -112,8 +112,8 @@ class FlowerClient(NumPyClient):
         feature_state_bytes = self._cached_feature_extractor_state(level)
         if feature_state_bytes is None:
             raise RuntimeError(
-                f"Cliente {self.cid} nao possui feature extractor em cache "
-                f"para o nivel {level}."
+                f"Client {self.cid} does not have a cached feature extractor "
+                f"for level {level}."
             )
         feature_state = state_dict_from_bytes(feature_state_bytes, self.device)
         feature_extractor.load_state_dict(feature_state, strict=False)
@@ -123,8 +123,8 @@ class FlowerClient(NumPyClient):
         decoder_state_bytes = config.get("decoder_state", b"")
         if not decoder_state_bytes:
             raise RuntimeError(
-                f"Cliente {self.cid} nao recebeu decoder para gerar "
-                f"embeddings no nivel {level}."
+                f"Client {self.cid} did not receive a decoder to generate "
+                f"embeddings at level {level}."
             )
 
         decoder = Decoder(
@@ -139,7 +139,11 @@ class FlowerClient(NumPyClient):
         decoder.eval()
         return decoder
 
-    def _save_generated_embeddings(self, level: int, generated_data: dict) -> None:
+    def _save_generated_embeddings(
+        self,
+        level: int,
+        generated_data: dict,
+    ) -> None:
         record = ParametersRecord()
         record["assets"] = array_from_numpy(generated_data["assets"])
         record["labels"] = array_from_numpy(generated_data["labels"])
@@ -157,7 +161,7 @@ class FlowerClient(NumPyClient):
 
     def _cvae_state_matches(self, state: dict, config: dict) -> bool:
         expected = {
-            "level": int(config["cvae_level"]),
+            "level": int(config["level"]),
             "input_dim": int(config["input_dim"]),
             "latent_dim": int(config["latent_dim"]),
             "hidden_dim": int(config["hidden_dim"]),
@@ -182,7 +186,7 @@ class FlowerClient(NumPyClient):
 
     def _save_cvae_training_state(self, cvae, optimizer, config: dict) -> None:
         state = {
-            "level": int(config["cvae_level"]),
+            "level": int(config["level"]),
             "input_dim": int(config["input_dim"]),
             "latent_dim": int(config["latent_dim"]),
             "hidden_dim": int(config["hidden_dim"]),
@@ -198,7 +202,7 @@ class FlowerClient(NumPyClient):
         self._save_bytes_record(
             "cvae_training_state",
             buffer.getvalue(),
-            int(config["cvae_level"]),
+            int(config["level"]),
         )
 
     def _extract_embeddings(self, feature_extractor, trainloader):
@@ -254,7 +258,12 @@ class FlowerClient(NumPyClient):
             return {"mean": mean, "std": std}
         raise ValueError(f"normalization should be 'minmax' or 'z', got {normalization}")
 
-    def _local_generation_plan(self, trainloader, num_real_embeddings: int):
+    def _local_generation_plan(
+        self,
+        trainloader,
+        num_real_embeddings: int,
+        num_samples: int | None,
+    ):
         counts = get_label_counts(trainloader.dataset)
         fill_to = max(1, int(num_real_embeddings / self.num_classes))
         desired_labels = choose_minority_labels(
@@ -268,6 +277,35 @@ class FlowerClient(NumPyClient):
             for label in desired_labels
             if fill_to - counts.get(label, 0) > 0
         }
+        requested_total = sum(need_per_label.values())
+        if num_samples is not None:
+            requested_total = max(0, min(int(num_samples), requested_total))
+            total_needed = sum(need_per_label.values())
+            if requested_total == 0:
+                need_per_label = {}
+            elif requested_total < total_needed:
+                scaled_need = {}
+                allocated = 0
+                fractions = []
+                for label, need in need_per_label.items():
+                    exact = requested_total * need / total_needed
+                    base = int(exact)
+                    scaled_need[label] = base
+                    allocated += base
+                    fractions.append((exact - base, label))
+                remaining = requested_total - allocated
+                for _, label in sorted(fractions, reverse=True):
+                    if remaining <= 0:
+                        break
+                    if scaled_need[label] < need_per_label[label]:
+                        scaled_need[label] += 1
+                        remaining -= 1
+                need_per_label = {
+                    label: need for label, need in scaled_need.items() if need > 0
+                }
+            desired_labels = [
+                label for label in desired_labels if need_per_label.get(label, 0) > 0
+            ]
         return counts, fill_to, desired_labels, need_per_label
 
     def _generate_embeddings_with_decoder(
@@ -278,9 +316,11 @@ class FlowerClient(NumPyClient):
         config,
     ):
         feature_shape = tuple(pickle.loads(config["feature_shape"]))
+        num_samples = int(config["num_samples"]) if "num_samples" in config else None
         counts, fill_to, desired_labels, need_per_label = self._local_generation_plan(
             trainloader=trainloader,
             num_real_embeddings=embeddings.size(0),
+            num_samples=num_samples,
         )
 
         total_needed = sum(need_per_label.values())
@@ -293,6 +333,7 @@ class FlowerClient(NumPyClient):
                     "desired_labels": desired_labels,
                     "need_per_label": need_per_label,
                     "fill_to": fill_to,
+                    "requested_num_samples": num_samples,
                     "gen_selected_count": 0,
                 },
             }
@@ -327,6 +368,7 @@ class FlowerClient(NumPyClient):
                 "desired_labels": desired_labels,
                 "need_per_label": need_per_label,
                 "fill_to": fill_to,
+                "requested_num_samples": num_samples,
                 "gen_selected_count": int(labels.numel()),
             },
         }
@@ -346,7 +388,11 @@ class FlowerClient(NumPyClient):
         )
         generation_time = time.time() - start
         self._save_generated_embeddings(level, generated_data)
-        return self._cached_generated_embeddings(level), generation_time, generated_data["stats"]
+        return (
+            self._cached_generated_embeddings(level),
+            generation_time,
+            generated_data["stats"],
+        )
 
     def _train_classifier(self, classifier, trainloader, level, strategy, mu, mixup_type):
         criterion = torch.nn.CrossEntropyLoss().to(self.device)
@@ -452,13 +498,14 @@ class FlowerClient(NumPyClient):
         if stats is None:
             stats = {"gen_selected_count": len(gen_dataset), "desired_labels": []}
         print(
-            f"Cliente {self.cid}: adicionou {stats['gen_selected_count']} "
-            f"amostras CVAE para as classes {stats['desired_labels']}"
+            f"Client {self.cid}: added {stats['gen_selected_count']} CVAE samples "
+            f"for classes {stats['desired_labels']} "
+            f"(requested target: {stats.get('requested_num_samples', 'cached')})."
         )
         return DataLoader(combined_ds, batch_size=self.batch_size, shuffle=True), generation_time
 
     def _fit_classifier(self, parameters, config):
-        level = int(config["classifier_level"])
+        level = int(config["level"])
         trainloader = self.trainloader
         classifier = create_classifier(self.dataset, level=level, seed=self.seed).to(self.device)
         set_weights(classifier, parameters)
@@ -496,7 +543,7 @@ class FlowerClient(NumPyClient):
         )
 
     def _fit_cvae(self, parameters, config):
-        level = int(config["cvae_level"])
+        level = int(config["level"])
         trainloader = self.trainloader
         feature_extractor = self._feature_extractor(level, config)
         embedding_loader, _ = self._normalized_embedding_loader(
@@ -527,7 +574,9 @@ class FlowerClient(NumPyClient):
         start = time.time()
         avg_loss = 0.0
         local_epochs = int(config.get("local_epochs", self.cvae_local_epochs))
-        for _ in range(local_epochs):
+        epoch_start = int(config.get("cvae_epoch_start", 0))
+        epoch_total = int(config.get("cvae_epochs_total", local_epochs))
+        for local_epoch in range(local_epochs):
             local_loss = 0.0
             batches = 0
             for embeddings, labels in embedding_loader:
@@ -542,6 +591,8 @@ class FlowerClient(NumPyClient):
                 local_loss += loss.item()
                 batches += 1
             avg_loss = local_loss / max(batches, 1)
+            current_epoch = epoch_start + local_epoch + 1
+            
         cvae_time = time.time() - start
         self._save_cvae_training_state(cvae, optimizer, config)
 
@@ -558,10 +609,10 @@ class FlowerClient(NumPyClient):
             return self._fit_classifier(parameters, config)
         if config["model"] == "cvae":
             return self._fit_cvae(parameters, config)
-        raise ValueError(f"Modelo desconhecido em config['model']: {config['model']}")
+        raise ValueError(f"Unknown model in config['model']: {config['model']}")
 
     def evaluate(self, parameters, config):
-        level = int(config["classifier_level"])
+        level = int(config["level"])
         if level == 0:
             net = create_full_model(self.dataset, seed=self.seed).to(self.device)
             set_weights(net, parameters)
@@ -573,8 +624,8 @@ class FlowerClient(NumPyClient):
             feature_state_bytes = self._cached_feature_extractor_state(level)
             if feature_state_bytes is None:
                 raise RuntimeError(
-                    f"Cliente {self.cid} nao possui feature extractor em cache "
-                    f"para avaliar o nivel {level}."
+                    f"Client {self.cid} does not have a cached feature extractor "
+                    f"to evaluate level {level}."
                 )
             feature_state = state_dict_from_bytes(feature_state_bytes, self.device)
             net.load_state_dict(feature_state, strict=False)
@@ -586,7 +637,7 @@ class FlowerClient(NumPyClient):
         if evaluation_split == "validation":
             if self.valloader_local is None:
                 raise RuntimeError(
-                    f"Cliente {self.cid} nao possui loader de validacao local."
+                    f"Client {self.cid} does not have a local validation loader."
                 )
             eval_loader = self.valloader_local
             report_filename = "validation_report.txt"
@@ -595,7 +646,7 @@ class FlowerClient(NumPyClient):
             report_filename = "accuracy_report.txt"
         else:
             raise ValueError(
-                f"evaluation_split deve ser 'test' ou 'validation', recebeu {evaluation_split}"
+                f"evaluation_split must be 'test' or 'validation', got {evaluation_split}"
             )
 
         eval_start = time.time()
