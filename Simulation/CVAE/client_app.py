@@ -24,6 +24,7 @@ from Simulation.CVAE.task import (
     create_full_model,
     get_image_key,
     get_label_counts,
+    get_num_classes,
     get_weights,
     load_data,
     local_test,
@@ -67,7 +68,7 @@ class FlowerClient(NumPyClient):
         self.local_epochs_alvo = local_epochs_alvo
         self.cvae_local_epochs = cvae_local_epochs
         self.continue_epoch = continue_epoch
-        self.num_classes = 10
+        self.num_classes = get_num_classes(self.dataset)
         self.image_key = get_image_key(self.dataset)
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -591,7 +592,6 @@ class FlowerClient(NumPyClient):
                 local_loss += loss.item()
                 batches += 1
             avg_loss = local_loss / max(batches, 1)
-            current_epoch = epoch_start + local_epoch + 1
             
         cvae_time = time.time() - start
         self._save_cvae_training_state(cvae, optimizer, config)
@@ -657,6 +657,7 @@ class FlowerClient(NumPyClient):
             acc_filepath=f"{self.folder}/{report_filename}",
             epoch=int(config["round"]),
             cliente=self.cid,
+            num_classes=self.num_classes,
             continue_epoch=self.continue_epoch,
             dataset=self.dataset,
             return_loss=True,
@@ -676,6 +677,7 @@ class FlowerClient(NumPyClient):
                 acc_filepath=f"{self.folder}/accuracy_report.txt",
                 epoch=int(config["round"]),
                 cliente=self.cid,
+                num_classes=self.num_classes,
                 continue_epoch=self.continue_epoch,
                 dataset=self.dataset,
                 return_loss=True,
@@ -753,6 +755,8 @@ def client_fn(context: Context):
         alpha_dir=alpha,
         seed=seed,
         client_validation=use_client_validation,
+        data_root=run_config.get("data_root", "data"),
+        download_datasets=run_config.get("download_datasets", True),
     )
 
     return FlowerClient(

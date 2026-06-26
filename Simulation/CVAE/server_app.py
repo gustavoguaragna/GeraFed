@@ -42,6 +42,8 @@ def server_fn(context: Context):
     num_clients = _get(run_config, "num_clients", 10)
     batch_size = _get(run_config, "tam_batch", 32)
     teste = _get(run_config, "teste", False)
+    data_root = _get(run_config, "data_root", "data")
+    download_datasets = _get(run_config, "download_datasets", True)
     cvae_epochs = _get(run_config, "epocas_gen", 25)
     cvae_local_epochs = _get(run_config, "epocas_locais_gen",1)
     patience = _get(run_config, "patience", 10)
@@ -69,9 +71,6 @@ def server_fn(context: Context):
     )
     os.makedirs(folder, exist_ok=True)
 
-    classifier = create_full_model(dataset, seed=seed)
-    parameters = ndarrays_to_parameters(get_weights(classifier))
-
     _, valloader, _, _ = load_data(
         partition_id=0,
         num_partitions=num_clients,
@@ -81,7 +80,12 @@ def server_fn(context: Context):
         partitioner_type=partitioner,
         alpha_dir=alpha_dir,
         seed=seed,
+        data_root=data_root,
+        download_datasets=download_datasets,
     )
+
+    classifier = create_full_model(dataset, seed=seed)
+    parameters = ndarrays_to_parameters(get_weights(classifier))
 
     # Flower needs a finite upper bound. The strategy stops itself when patience/levels finish.
     classifier_rounds_bound = (

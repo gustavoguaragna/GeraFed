@@ -36,6 +36,7 @@ from Simulation.CVAE.task import (
     create_full_model,
     get_image_key,
     get_model_size_mb,
+    get_num_classes,
     get_weights,
     infer_feature_dim,
     normalize_dataset_name,
@@ -115,6 +116,7 @@ class FLEG_CVAE(Strategy):
 
         self.dataset = normalize_dataset_name(dataset)
         self.image_key = get_image_key(self.dataset)
+        self.num_classes = get_num_classes(self.dataset)
         self.folder = folder
         self.strategy_name = strategy_name
         self.mu = mu
@@ -454,7 +456,7 @@ class FLEG_CVAE(Strategy):
             input_dim=self.input_dim,
             latent_dim=self.latent_dim,
             hidden_dim=self.hidden_dim,
-            condition_dim=10,
+            condition_dim=self.num_classes,
             resblock=self.resblock,
             minmax=self.normalization == "minmax",
         ).to(self.device)
@@ -473,7 +475,12 @@ class FLEG_CVAE(Strategy):
             )
             num_samples = max(1, num_samples)
         elif self.num_syn == "fixed":
-            num_samples = 48000 if self.dataset == "mnist" else 40000
+            if self.dataset == "mnist":
+                num_samples = 48000
+            elif self.dataset == "cifar10":
+                num_samples = 40000
+            else:
+                num_samples = max(1, total_examples)
         else:
             raise ValueError(f"num_syn must be 'dynamic' or 'fixed', got {self.num_syn}")
 

@@ -2,13 +2,37 @@ STATUS ATUAL:
 proximo item em coisas para verificar
 
 PARA MANDAR PARA O CODEX:
+Aparentemente, a função _set_runtime_num_classes não precisa fazer dataset = normalize_dataset_name(dataset), já que sempre que
+essa função é chamada a partir de load_data, o dataset já passou pelo normalize_dataset_name. Apesar de não alterar na
+funcionalidade do código, é desnecessário. Indo mais a fundo, qual seria a função do método _set_runtime_num_classes
+no meu código? Caso eu esteja correto e seja redundante chamar normalize_dataset_name, sobraria adicionar o número de classes do
+dataset como valor da chave string do dataset em um dicionário inicialmente vazio e que só é utilizado em outras funções que só
+são utilizadas em outras chamadas no client_app.py. O dicionário mantém os valores adicionados mesmo depois de sair da função
+load_data? Me explique como funciona isso. E da mesma forma não bastaria para exclusivamente o caso que não tem o
+número de classes pré-definido? Agora não existe mais caso assim, pois definimos o do skinl_derm também. Se concordar comigo, 
+retire a chamada normalize_dataset_name da função _set_runtime_num_classes, ou até a própria função _set_runtime_num_classes
+como um todo. Caso contrário me explique.
 
+
+Me explique a parte exception da função _normalize_label
+Explique detalhadamente as diferenças nas funcoes que carregam cada dataset.
+Explique passo a passo da função _labels_from_array
 
 
 PARA EU VERIFICAR/ALTERAR:
 
 - Ver em imagens médicas. Selecionar banco de dados e testar arquiteturas e melhorias como as testadas no cifar e armazenadas em
 Users/Mara/Documents/Mestrado/Pesquisa/FLEGv2 ou home/guaragna/Documents/Pesquisa/GeraFed/CVAE/Teste_melhoria.
+- Porque fazer o resize em _build_torch_transform se quero usar o formato original? o formato no config não é original?
+- De forma similar com a situação anterior, a construção dos datasets de imagens médicas usa configurações pré-setadas ao invés
+de pegar automático durante download. Isso acontece com o image_key, label_key e com o tamanho da imagem.
+- Vou testar assim, mas acho que a classe da cnn adaptativa está reduzindo muito bruscamente no adaptiveavgpool, para imagens
+224x224, vai de 56x56 para 4x4. Testar uma rede mais longa para esses casos e talvez especifica para cada dataset e nao
+adaptativa.
+- Trocar condicao num_samples para sempre ser total_examples na condicao fixed, independentemente do dataset.
+- Posso calcular quantas classes tem em cada dataset para deixar setado, evitando ter que carregar skinfl_dem no servidor.
+- Depois de adicionar imagens medicas e testa-las posso alterar o camelyon para aceitar a divisao original dos hospitais e também
+verificar a divisão dos datasets que tem train/val/tes originalmente.
 - Está sem alignment loss
 - Após a geração, é preciso desnormalizar os embeddings com as estatísticas usadas no treinamento. Porém, o decoder gerador é
 agregado. No momento estão sendo usadas as estatísticas de cada cliente. Testar usar métricas agregadas (pode ser um problema 
