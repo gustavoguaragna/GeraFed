@@ -24,7 +24,7 @@ from torch.utils.data import (
     random_split,
 )
 from torchvision.datasets import ImageFolder
-from torchvision.transforms import Compose, Normalize, Resize, ToTensor
+from torchvision.transforms import Compose, Normalize, ToTensor
 
 
 DATASET_ALIASES = {
@@ -53,7 +53,7 @@ DATASET_CONFIG = {
         "source": "hf",
         "hf_name": "mnist",
         "image_key": "image",
-        "input_shape": (1, 28, 28),
+        "num_channels": 1,
         "mean": (0.5,),
         "std": (0.5,),
         "num_classes": 10,
@@ -62,7 +62,7 @@ DATASET_CONFIG = {
         "source": "hf",
         "hf_name": "uoft-cs/cifar10",
         "image_key": "img",
-        "input_shape": (3, 32, 32),
+        "num_channels": 3,
         "mean": (0.5, 0.5, 0.5),
         "std": (0.5, 0.5, 0.5),
         "num_classes": 10,
@@ -71,7 +71,8 @@ DATASET_CONFIG = {
         "source": "medmnist",
         "medmnist_name": "organsmnist",
         "image_key": "image",
-        "input_shape": (3, 224, 224),
+        "num_channels": 3,
+        "medmnist_size": 224,
         "mean": (0.5, 0.5, 0.5),
         "std": (0.5, 0.5, 0.5),
         "num_classes": 11,
@@ -80,7 +81,8 @@ DATASET_CONFIG = {
         "source": "medmnist",
         "medmnist_name": "breastmnist",
         "image_key": "image",
-        "input_shape": (3, 224, 224),
+        "num_channels": 3,
+        "medmnist_size": 224,
         "mean": (0.5, 0.5, 0.5),
         "std": (0.5, 0.5, 0.5),
         "num_classes": 2,
@@ -89,7 +91,7 @@ DATASET_CONFIG = {
         "source": "wilds",
         "wilds_name": "camelyon17",
         "image_key": "image",
-        "input_shape": (3, 96, 96),
+        "num_channels": 3,
         "mean": (0.5, 0.5, 0.5),
         "std": (0.5, 0.5, 0.5),
         "num_classes": 2,
@@ -98,7 +100,7 @@ DATASET_CONFIG = {
         "source": "imagefolder",
         "imagefolder_root": ("octdl", "dataset_1"),
         "image_key": "image",
-        "input_shape": (3, 224, 224),
+        "num_channels": 3,
         "mean": (0.5, 0.5, 0.5),
         "std": (0.5, 0.5, 0.5),
         "num_classes": 7,
@@ -108,7 +110,7 @@ DATASET_CONFIG = {
         "medimeta_name": "skinl_derm",
         "medimeta_target": "Diagnosis grouped",
         "image_key": "image",
-        "input_shape": (3, 224, 224),
+        "num_channels": 3,
         "mean": (0.5, 0.5, 0.5),
         "std": (0.5, 0.5, 0.5),
         "num_classes": 5,
@@ -118,15 +120,14 @@ DATASET_CONFIG = {
         "medimeta_name": "organs_axial",
         "medimeta_target": "organ label",
         "image_key": "image",
-        "input_shape": (3, 224, 224),
-        "mean": (0.5, 0.5, 0.5),
-        "std": (0.5, 0.5, 0.5),
+        "num_channels": 1,
+        "mean": (0.5,),
+        "std": (0.5,),
         "num_classes": 11,
     },
 }
 
 TORCH_DATASET_SOURCES = {"medmnist", "medimeta", "wilds", "imagefolder"}
-_runtime_num_classes: dict[str, int] = {}
 
 STOP_CRITERION_ALIASES = {
     "global_test_acc": "global_test_acc",
@@ -650,18 +651,8 @@ def get_image_key(dataset: str) -> str:
     return get_dataset_config(dataset)["image_key"]
 
 
-def get_input_shape(dataset: str) -> tuple[int, int, int]:
-    return tuple(get_dataset_config(dataset)["input_shape"])
-
-
 def get_num_channels(dataset: str) -> int:
-    return int(get_input_shape(dataset)[0])
-
-
-def _set_runtime_num_classes(dataset: str, num_classes: int | None) -> None:
-    dataset = normalize_dataset_name(dataset)
-    if num_classes is not None:
-        _runtime_num_classes[dataset] = int(num_classes)
+    return int(get_dataset_config(dataset)["num_channels"])
 
 
 def get_num_classes(dataset: str) -> int:
@@ -669,11 +660,9 @@ def get_num_classes(dataset: str) -> int:
     config_num_classes = DATASET_CONFIG[dataset].get("num_classes")
     if config_num_classes is not None:
         return int(config_num_classes)
-    if dataset in _runtime_num_classes:
-        return _runtime_num_classes[dataset]
     raise ValueError(
-        f"Number of classes for dataset '{dataset}' is not known before loading it. "
-        "Load the dataset first so labels can be inspected."
+        f"Number of classes for dataset '{dataset}' is not configured. "
+        "Set DATASET_CONFIG[dataset]['num_classes'] before creating models."
     )
 
 
@@ -728,10 +717,8 @@ class _TorchImageDataset(TorchDataset):
 
 def _build_torch_transform(dataset: str):
     config = get_dataset_config(dataset)
-    _, height, width = config["input_shape"]
     return Compose(
         [
-            Resize((height, width)),
             ToTensor(),
             Normalize(config["mean"], config["std"]),
         ]
@@ -747,6 +734,18 @@ def _missing_dependency(dataset: str, package: str, exc: ImportError) -> ImportE
     return error
 
 
+def _ensure_dataset_dir(path: Path, download_datasets: bool, dataset: str) -> bool:
+    if path.exists():
+        return False
+    if download_datasets:
+        path.mkdir(parents=True, exist_ok=True)
+        return True
+    raise FileNotFoundError(
+        f"Expected directory for dataset '{dataset}' does not exist: {path}. "
+        "Set download_datasets=true to create/download when supported."
+    )
+
+
 def _load_medmnist_datasets(dataset: str, data_root: str, download_datasets: bool):
     config = get_dataset_config(dataset)
     try:
@@ -760,7 +759,8 @@ def _load_medmnist_datasets(dataset: str, data_root: str, download_datasets: boo
     data_class = getattr(medmnist, info["python_class"])
     transform = _build_torch_transform(dataset)
     root = Path(data_root).expanduser() / "medmnist"
-    size = int(config["input_shape"][1])
+    _ensure_dataset_dir(root, download_datasets, dataset)
+    size = int(config["medmnist_size"])
 
     common_kwargs = {
         "transform": transform,
@@ -785,7 +785,6 @@ def _load_medmnist_datasets(dataset: str, data_root: str, download_datasets: boo
 
 
 def _load_medimeta_datasets(dataset: str, data_root: str, download_datasets: bool):
-    del download_datasets
     config = get_dataset_config(dataset)
     try:
         from medimeta import MedIMeta
@@ -794,6 +793,19 @@ def _load_medimeta_datasets(dataset: str, data_root: str, download_datasets: boo
 
     transform = _build_torch_transform(dataset)
     root = Path(data_root).expanduser() / "medimeta"
+    _ensure_dataset_dir(root, download_datasets, dataset)
+    dataset_dir = root / config["medimeta_name"]
+    created_dataset_dir = _ensure_dataset_dir(
+        dataset_dir,
+        download_datasets,
+        dataset,
+    )
+    if created_dataset_dir or not (dataset_dir / "info.yaml").exists():
+        raise FileNotFoundError(
+            f"Created/checked expected MedIMeta directory for '{dataset}' at "
+            f"{dataset_dir}, but the dataset files are not present. Download and "
+            f"extract the MedIMeta zip into {root} before training."
+        )
     label_mapping: dict[Any, int] = {}
 
     def make_split(split: str):
@@ -810,22 +822,44 @@ def _load_medimeta_datasets(dataset: str, data_root: str, download_datasets: boo
 
 
 def _load_octdl_datasets(dataset: str, data_root: str, download_datasets: bool):
-    del download_datasets
     config = get_dataset_config(dataset)
     transform = _build_torch_transform(dataset)
     root = Path(data_root).expanduser().joinpath(*config["imagefolder_root"])
     required = [root / split for split in ("train", "val", "test")]
-    missing = [str(path) for path in required if not path.exists()]
+    created = []
+    missing = []
+    for path in required:
+        try:
+            was_created = _ensure_dataset_dir(path, download_datasets, dataset)
+            if was_created:
+                created.append(str(path))
+        except FileNotFoundError:
+            missing.append(str(path))
     if missing:
         raise FileNotFoundError(
             "OCTDL must be available as an ImageFolder tree with "
             f"train/val/test splits under '{root}'. Missing: {missing}"
         )
+    if created:
+        raise FileNotFoundError(
+            "Created expected OCTDL ImageFolder directories, but the dataset files "
+            f"are not present yet. Add preprocessed class folders under: {root}. "
+            f"Created: {created}"
+        )
+    empty_splits = [
+        str(path)
+        for path in required
+        if not any(child.is_dir() for child in path.iterdir())
+    ]
+    if empty_splits:
+        raise FileNotFoundError(
+            "OCTDL directories exist but do not contain ImageFolder class "
+            f"subdirectories. Populate these splits before training: {empty_splits}"
+        )
 
     train_ds = ImageFolder(root / "train", transform=transform)
     val_ds = ImageFolder(root / "val", transform=transform)
     test_ds = ImageFolder(root / "test", transform=transform)
-    _set_runtime_num_classes(dataset, len(train_ds.classes))
     return (
         ConcatDataset(
             [
@@ -856,6 +890,7 @@ def _load_wilds_datasets(dataset: str, data_root: str, download_datasets: bool):
 
     transform = _build_torch_transform(dataset)
     root = Path(data_root).expanduser() / "wilds"
+    _ensure_dataset_dir(root, download_datasets, dataset)
     wilds_ds = wilds_get_dataset(
         dataset=config["wilds_name"],
         root_dir=str(root),
@@ -1029,7 +1064,6 @@ def _load_torch_partitioned_data(
             download_datasets=download_datasets,
         )
         labels = _dataset_labels(train_pool)
-        _set_runtime_num_classes(dataset, len(set(labels)))
         partitions = _partition_torch_indices(
             labels=labels,
             num_partitions=num_partitions,
@@ -1068,7 +1102,6 @@ def load_data(
 
     dataset = normalize_dataset_name(dataset)
     dataset_config = DATASET_CONFIG[dataset]
-    _set_runtime_num_classes(dataset, dataset_config.get("num_classes"))
 
     if dataset_config["source"] in TORCH_DATASET_SOURCES:
         train_partition, test_partition = _load_torch_partitioned_data(

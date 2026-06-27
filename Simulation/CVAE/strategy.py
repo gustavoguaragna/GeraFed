@@ -475,12 +475,7 @@ class FLEG_CVAE(Strategy):
             )
             num_samples = max(1, num_samples)
         elif self.num_syn == "fixed":
-            if self.dataset == "mnist":
-                num_samples = 48000
-            elif self.dataset == "cifar10":
-                num_samples = 40000
-            else:
-                num_samples = max(1, total_examples)
+            num_samples = max(1, total_examples)
         else:
             raise ValueError(f"num_syn must be 'dynamic' or 'fixed', got {self.num_syn}")
 
