@@ -36,6 +36,24 @@ DATASET_ALIASES = {
     "organsmnist": "organsmnist",
     "organ_s_mnist": "organsmnist",
     "organ-smnist": "organsmnist",
+    "bloodmnist": "bloodmnist",
+    "blood-mnist": "bloodmnist",
+    "tissuemnist": "tissuemnist",
+    "tissue-mnist": "tissuemnist",
+    "pathmnist": "pathmnist",
+    "path-mnist": "pathmnist",
+    "octmnist": "octmnist",
+    "oct-mnist": "octmnist",
+    "dermamnist": "dermamnist",
+    "derma-mnist": "dermamnist",
+    "chestmnist": "chestmnist",
+    "chest-mnist": "chestmnist",
+    "pneumoniamnist": "pneumoniamnist",
+    "pneumonia-mnist": "pneumoniamnist",
+    "organamnist": "organamnist",
+    "organa-mnist": "organamnist",
+    "organcmnist": "organcmnist",
+    "organc-mnist": "organcmnist",
     "camelyon17": "camelyon17",
     "camelyon": "camelyon17",
     "octdl": "octdl",
@@ -71,8 +89,7 @@ DATASET_CONFIG = {
         "source": "medmnist",
         "medmnist_name": "organsmnist",
         "image_key": "image",
-        "num_channels": 3,
-        "medmnist_size": 224,
+        "num_channels": 1,
         "mean": (0.5, 0.5, 0.5),
         "std": (0.5, 0.5, 0.5),
         "num_classes": 11,
@@ -81,11 +98,82 @@ DATASET_CONFIG = {
         "source": "medmnist",
         "medmnist_name": "breastmnist",
         "image_key": "image",
-        "num_channels": 3,
-        "medmnist_size": 224,
+        "num_channels": 1,
         "mean": (0.5, 0.5, 0.5),
         "std": (0.5, 0.5, 0.5),
         "num_classes": 2,
+    },
+    "bloodmnist": {
+        "source": "medmnist",
+        "medmnist_name": "bloodmnist",
+        "image_key": "image",
+        "num_channels": 3,
+        "mean": (0.5, 0.5, 0.5),
+        "std": (0.5, 0.5, 0.5),
+        "num_classes": 8,
+    },
+    "tissuemnist": {
+        "source": "medmnist",
+        "medmnist_name": "tissuemnist",
+        "image_key": "image",
+        "num_channels": 1,
+        "mean": (0.5, 0.5, 0.5),
+        "std": (0.5, 0.5, 0.5),
+        "num_classes": 8,
+    },
+    "pathmnist": {
+        "source": "medmnist",
+        "medmnist_name": "pathmnist",
+        "image_key": "image",
+        "num_channels": 3,
+        "mean": (0.5, 0.5, 0.5),
+        "std": (0.5, 0.5, 0.5),
+        "num_classes": 9,
+    },
+    "octmnist": {
+        "source": "medmnist",
+        "medmnist_name": "octmnist",
+        "image_key": "image",
+        "num_channels": 1,
+        "mean": (0.5, 0.5, 0.5),
+        "std": (0.5, 0.5, 0.5),
+        "num_classes": 4,
+    },
+    "dermamnist": {
+        "source": "medmnist",
+        "medmnist_name": "dermamnist",
+        "image_key": "image",
+        "num_channels": 3,
+        "mean": (0.5, 0.5, 0.5),
+        "std": (0.5, 0.5, 0.5),
+        "num_classes": 7,
+    },
+    "pneumoniamnist": {
+        "source": "medmnist",
+        "medmnist_name": "pneumoniamnist",
+        "image_key": "image",
+        "num_channels": 1,
+        "mean": (0.5, 0.5, 0.5),
+        "std": (0.5, 0.5, 0.5),
+        "num_classes": 2,
+    },
+    "organamnist": {
+        "source": "medmnist",
+        "medmnist_name": "organamnist",
+        "image_key": "image",
+        "num_channels": 1,
+        "mean": (0.5, 0.5, 0.5),
+        "std": (0.5, 0.5, 0.5),
+        "num_classes": 11,
+    },
+    "organcmnist": {
+        "source": "medmnist",
+        "medmnist_name": "organcmnist",
+        "image_key": "image",
+        "num_channels": 1,
+        "mean": (0.5, 0.5, 0.5),
+        "std": (0.5, 0.5, 0.5),
+        "num_classes": 11,
     },
     "camelyon17": {
         "source": "wilds",
@@ -128,6 +216,7 @@ DATASET_CONFIG = {
 }
 
 TORCH_DATASET_SOURCES = {"medmnist", "medimeta", "wilds", "imagefolder"}
+MEDMNIST_SIZES = {28, 128, 224}
 
 STOP_CRITERION_ALIASES = {
     "global_test_acc": "global_test_acc",
@@ -746,8 +835,22 @@ def _ensure_dataset_dir(path: Path, download_datasets: bool, dataset: str) -> bo
     )
 
 
-def _load_medmnist_datasets(dataset: str, data_root: str, download_datasets: bool):
+def _validate_medmnist_size(medmnist_size: int) -> int:
+    medmnist_size = int(medmnist_size)
+    if medmnist_size not in MEDMNIST_SIZES:
+        valid = ", ".join(str(size) for size in sorted(MEDMNIST_SIZES))
+        raise ValueError(f"medmnist_size must be one of: {valid}")
+    return medmnist_size
+
+
+def _load_medmnist_datasets(
+    dataset: str,
+    data_root: str,
+    download_datasets: bool,
+    medmnist_size: int,
+):
     config = get_dataset_config(dataset)
+    
     try:
         import medmnist
         from medmnist import INFO
@@ -760,7 +863,7 @@ def _load_medmnist_datasets(dataset: str, data_root: str, download_datasets: boo
     transform = _build_torch_transform(dataset)
     root = Path(data_root).expanduser() / "medmnist"
     _ensure_dataset_dir(root, download_datasets, dataset)
-    size = int(config["medmnist_size"])
+    size = _validate_medmnist_size(medmnist_size)
 
     common_kwargs = {
         "transform": transform,
@@ -915,10 +1018,16 @@ def _load_torch_source_datasets(
     dataset: str,
     data_root: str,
     download_datasets: bool,
+    medmnist_size: int,
 ) -> tuple[TorchDataset, TorchDataset]:
     source = get_dataset_config(dataset)["source"]
     if source == "medmnist":
-        return _load_medmnist_datasets(dataset, data_root, download_datasets)
+        return _load_medmnist_datasets(
+            dataset,
+            data_root,
+            download_datasets,
+            medmnist_size,
+        )
     if source == "medimeta":
         return _load_medimeta_datasets(dataset, data_root, download_datasets)
     if source == "wilds":
@@ -1047,11 +1156,13 @@ def _load_torch_partitioned_data(
     seed: int,
     data_root: str,
     download_datasets: bool,
+    medmnist_size: int,
 ) -> tuple[TorchDataset, TorchDataset]:
     cache_key = (
         dataset,
         str(Path(data_root).expanduser()),
         bool(download_datasets),
+        int(medmnist_size),
         num_partitions,
         partitioner_type,
         alpha_dir,
@@ -1062,6 +1173,7 @@ def _load_torch_partitioned_data(
             dataset=dataset,
             data_root=data_root,
             download_datasets=download_datasets,
+            medmnist_size=medmnist_size,
         )
         labels = _dataset_labels(train_pool)
         partitions = _partition_torch_indices(
@@ -1097,6 +1209,7 @@ def load_data(
     client_validation: bool = False,
     data_root: str = "data",
     download_datasets: bool = True,
+    medmnist_size: int = 224,
 ) -> tuple[DataLoader, DataLoader, Optional[DataLoader], DataLoader]:
     """Carrega dataset com splits globais e locais para o cliente especifico."""
 
@@ -1114,6 +1227,7 @@ def load_data(
             seed=seed,
             data_root=data_root,
             download_datasets=download_datasets,
+            medmnist_size=medmnist_size,
         )
     else:
         cache_key = (dataset, num_partitions, partitioner_type, alpha_dir, seed)

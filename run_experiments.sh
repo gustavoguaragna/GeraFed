@@ -2,17 +2,16 @@
 set -euo pipefail
 
 DATASETS=(
-  "mnist"
-  "cifar10"
   "breastmnist"
   "organsmnist"
-  "skinl_derm"
-  "organs_axial"
-)
-
-BASELINES=(
-  "false"
-  "true"
+  "bloodmnist"
+  "tissuemnist"
+  "pathmnist"
+  "octmnist"
+  "dermamnist"
+  "pneumoniamnist"
+  "organamnist"
+  "organcmnist"
 )
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -25,27 +24,25 @@ mkdir -p logs
 RUN_CONFIG_EXTRA="${RUN_CONFIG_EXTRA:-}"
 
 for dataset in "${DATASETS[@]}"; do
-  for baseline in "${BASELINES[@]}"; do
-    echo "============================================================"
-    echo "Starting experiment for dataset: ${dataset}, baseline: ${baseline}"
-    echo "============================================================"
+  echo "============================================================"
+  echo "Starting experiment for dataset: ${dataset}"
+  echo "============================================================"
 
-    run_config="dataset='${dataset}' baseline=${baseline}"
-    if [[ -n "$RUN_CONFIG_EXTRA" ]]; then
-      run_config="${run_config} ${RUN_CONFIG_EXTRA}"
-    fi
+  run_config="dataset='${dataset}'"
+  if [[ -n "$RUN_CONFIG_EXTRA" ]]; then
+    run_config="${run_config} ${RUN_CONFIG_EXTRA}"
+  fi
 
-    exp_name="${dataset}_baseline_${baseline}"
+  exp_name="${dataset}"
 
-    if flwr run . --stream --run-config "$run_config" 2>&1 | tee "logs/${exp_name}.log"; then
-      echo "Experiment for dataset: ${dataset}, baseline: ${baseline} completed successfully."
-    else
-      echo "Experiment for dataset: ${dataset}, baseline: ${baseline} failed."
-    fi
+  if flwr run . --stream --run-config "$run_config" 2>&1 | tee "logs/${exp_name}.log"; then
+    echo "Experiment for dataset: ${dataset} completed successfully."
+  else
+    echo "Experiment for dataset: ${dataset} failed."
+  fi
 
-    echo "Finished experiment for dataset: ${dataset}, baseline: ${baseline}"
-    echo
-  done
+  echo "Finished experiment for dataset: ${dataset}"
+  echo
 done
 
 echo "All experiments finished."

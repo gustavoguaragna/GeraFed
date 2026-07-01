@@ -44,6 +44,7 @@ def server_fn(context: Context):
     teste = _get(run_config, "teste", False)
     data_root = _get(run_config, "data_root", "data")
     download_datasets = _get(run_config, "download_datasets", True)
+    medmnist_size = int(_get(run_config, "medmnist_size", 224))
     cvae_epochs = _get(run_config, "epocas_gen", 25)
     cvae_local_epochs = _get(run_config, "epocas_locais_gen",1)
     patience = _get(run_config, "patience", 10)
@@ -64,9 +65,13 @@ def server_fn(context: Context):
     else:
         trial = seed
 
+    dataset_folder_name = dataset
+    if dataset.endswith("mnist") and dataset not in {"mnist"}:
+        dataset_folder_name = f"{dataset}_size{medmnist_size}"
+
     folder = (
         f"{_get(run_config, 'Exp_name_folder', 'Experimentos/Flwr_run/')}CVAE/"
-        f"{dataset}_{partitioner}_{strategy_name}_"
+        f"{dataset_folder_name}_{partitioner}_{strategy_name}_"
         f"cvaeepochs{cvae_epochs}_{syn_input}_fleg_trial{trial}"
     )
     os.makedirs(folder, exist_ok=True)
@@ -82,6 +87,7 @@ def server_fn(context: Context):
         seed=seed,
         data_root=data_root,
         download_datasets=download_datasets,
+        medmnist_size=medmnist_size,
     )
 
     classifier = create_full_model(dataset, seed=seed)

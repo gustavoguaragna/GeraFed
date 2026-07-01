@@ -725,10 +725,12 @@ def client_fn(context: Context):
     cvae_epochs = run_config.get("epocas_gen", 25)
     cvae_local_epochs = run_config.get("epocas_locais_gen", 1)
     syn_input = run_config.get("num_syn", run_config.get("syn_input", "dynamic"))
+    medmnist_size = int(run_config.get("medmnist_size", 224))
     alpha = run_config.get("alpha", _alpha_from_partitioner(partitioner))
     partitioner_for_data = f"Dir{int(alpha * 10):02d}" if partitioner == "Dirichlet" else partitioner
     stop_criterion = run_config.get("criterio_parada", "global_test_acc")
     use_client_validation = uses_client_validation_criterion(stop_criterion)
+    baseline = run_config.get("baseline", False)
 
     if seed == 42:
         trial = 1
@@ -739,11 +741,19 @@ def client_fn(context: Context):
     else:
         trial = seed
 
+    dataset_folder_name = dataset
+    if dataset.endswith("mnist") and dataset not in {"mnist"}:
+        dataset_folder_name = f"{dataset}_size{medmnist_size}"
+
+
+    method = "baseline" if baseline else "fleg"
+
     folder = (
         f"{run_config['Exp_name_folder']}CVAE/"
-        f"{dataset}_{partitioner_for_data}_{run_config['strategy']}_"
-        f"cvaeepochs{cvae_epochs}_{syn_input}_fleg_trial{trial}"
+        f"{dataset_folder_name}_{partitioner_for_data}_{run_config['strategy']}_"
+        f"cvaeepochs{cvae_epochs}_{syn_input}_{method}_trial{trial}"
     )
+
 
     trainloader, _, valloader_local, testloader_local = load_data(
         partition_id=partition_id,
@@ -757,6 +767,7 @@ def client_fn(context: Context):
         client_validation=use_client_validation,
         data_root=run_config.get("data_root", "data"),
         download_datasets=run_config.get("download_datasets", True),
+        medmnist_size=medmnist_size,
     )
 
     return FlowerClient(
