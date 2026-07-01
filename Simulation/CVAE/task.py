@@ -1782,6 +1782,7 @@ def local_test(
                 "accuracy": accuracy,
             }
 
+        Path(acc_filepath).parent.mkdir(parents=True, exist_ok=True)
         with open(acc_filepath, "a", encoding="utf-8") as f:
             f.write(f"Epoch {epoch + continue_epoch} - Client {cliente}\n")
             f.write("{:<10} {:<10} {:<10} {:<10}\n".format(

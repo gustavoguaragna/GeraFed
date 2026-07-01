@@ -68,11 +68,13 @@ def server_fn(context: Context):
     dataset_folder_name = dataset
     if dataset.endswith("mnist") and dataset not in {"mnist"}:
         dataset_folder_name = f"{dataset}_size{medmnist_size}"
+    baseline = _get(run_config, "baseline", False)
+    method = "baseline" if baseline else "fleg"
 
     folder = (
         f"{_get(run_config, 'Exp_name_folder', 'Experimentos/Flwr_run/')}CVAE/"
         f"{dataset_folder_name}_{partitioner}_{strategy_name}_"
-        f"cvaeepochs{cvae_epochs}_{syn_input}_fleg_trial{trial}"
+        f"cvaeepochs{cvae_epochs}_{syn_input}_{method}_trial{trial}"
     )
     os.makedirs(folder, exist_ok=True)
 
@@ -129,7 +131,7 @@ def server_fn(context: Context):
         ),
         levels=levels,
         lesslvl=_get(run_config, "lesslvl", False),
-        baseline=_get(run_config, "baseline", False),
+        baseline=baseline,
         cvae_epochs=cvae_epochs,
         cvae_local_epochs=cvae_local_epochs,
         cvae_beta=_get(run_config, "cvae_beta", 1.0),
