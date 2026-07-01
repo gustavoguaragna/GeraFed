@@ -90,8 +90,8 @@ DATASET_CONFIG = {
         "medmnist_name": "organsmnist",
         "image_key": "image",
         "num_channels": 1,
-        "mean": (0.5, 0.5, 0.5),
-        "std": (0.5, 0.5, 0.5),
+        "mean": (0.5,),
+        "std": (0.5,),
         "num_classes": 11,
     },
     "breastmnist": {
@@ -99,8 +99,8 @@ DATASET_CONFIG = {
         "medmnist_name": "breastmnist",
         "image_key": "image",
         "num_channels": 1,
-        "mean": (0.5, 0.5, 0.5),
-        "std": (0.5, 0.5, 0.5),
+        "mean": (0.5,),
+        "std": (0.5,),
         "num_classes": 2,
     },
     "bloodmnist": {
@@ -117,8 +117,8 @@ DATASET_CONFIG = {
         "medmnist_name": "tissuemnist",
         "image_key": "image",
         "num_channels": 1,
-        "mean": (0.5, 0.5, 0.5),
-        "std": (0.5, 0.5, 0.5),
+        "mean": (0.5,),
+        "std": (0.5,),
         "num_classes": 8,
     },
     "pathmnist": {
@@ -135,8 +135,8 @@ DATASET_CONFIG = {
         "medmnist_name": "octmnist",
         "image_key": "image",
         "num_channels": 1,
-        "mean": (0.5, 0.5, 0.5),
-        "std": (0.5, 0.5, 0.5),
+        "mean": (0.5,),
+        "std": (0.5,),
         "num_classes": 4,
     },
     "dermamnist": {
@@ -153,8 +153,8 @@ DATASET_CONFIG = {
         "medmnist_name": "pneumoniamnist",
         "image_key": "image",
         "num_channels": 1,
-        "mean": (0.5, 0.5, 0.5),
-        "std": (0.5, 0.5, 0.5),
+        "mean": (0.5,),
+        "std": (0.5,),
         "num_classes": 2,
     },
     "organamnist": {
@@ -162,8 +162,8 @@ DATASET_CONFIG = {
         "medmnist_name": "organamnist",
         "image_key": "image",
         "num_channels": 1,
-        "mean": (0.5, 0.5, 0.5),
-        "std": (0.5, 0.5, 0.5),
+        "mean": (0.5,),
+        "std": (0.5,),
         "num_classes": 11,
     },
     "organcmnist": {
@@ -171,8 +171,8 @@ DATASET_CONFIG = {
         "medmnist_name": "organcmnist",
         "image_key": "image",
         "num_channels": 1,
-        "mean": (0.5, 0.5, 0.5),
-        "std": (0.5, 0.5, 0.5),
+        "mean": (0.5,),
+        "std": (0.5,),
         "num_classes": 11,
     },
     "camelyon17": {
@@ -868,7 +868,7 @@ def _load_medmnist_datasets(
     common_kwargs = {
         "transform": transform,
         "download": download_datasets,
-        "as_rgb": True,
+        "as_rgb": config["num_channels"] == 3,
         "root": str(root),
         "size": size,
     }
