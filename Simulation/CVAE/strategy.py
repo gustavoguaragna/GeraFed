@@ -39,8 +39,10 @@ from Simulation.CVAE.task import (
     get_num_classes,
     get_weights,
     infer_feature_dim,
+    log_memory_event,
     normalize_dataset_name,
     normalize_stop_criterion,
+    object_tensor_size_mb,
     set_weights,
     state_dict_to_bytes,
     uses_client_validation_criterion,
@@ -96,6 +98,7 @@ class FLEG_CVAE(Strategy):
         valloader=None,
         num_clients: int = 4,
         resume_from_checkpoint: bool = False,
+        memory_logging: bool = False,
     ) -> None:
         super().__init__()
 
@@ -142,6 +145,10 @@ class FLEG_CVAE(Strategy):
         self.valloader = valloader
         self.num_clients = num_clients
         self.resume_from_checkpoint = resume_from_checkpoint
+        self.memory_logging = memory_logging
+        self.memory_log_path = (
+            f"{self.folder}/memory_server.jsonl" if self.memory_logging else None
+        )
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.phase = "classifier"
@@ -196,6 +203,13 @@ class FLEG_CVAE(Strategy):
         }
         self.init_level_time = time.time()
         os.makedirs(self.folder, exist_ok=True)
+        self._log_memory(
+            "strategy_init",
+            dataset=self.dataset,
+            num_clients=self.num_clients,
+            levels=self.levels,
+            baseline=self.baseline,
+        )
         loaded_checkpoint = False
         if self.resume_from_checkpoint:
             loaded_checkpoint = self._load_latest_checkpoint()
@@ -205,6 +219,16 @@ class FLEG_CVAE(Strategy):
 
     def __repr__(self) -> str:
         return "FLEG_CVAE()"
+
+    def _log_memory(self, event: str, **fields) -> None:
+        log_memory_event(
+            self.memory_log_path,
+            event,
+            dataset=self.dataset,
+            phase=self.phase,
+            level=self.lvl,
+            **fields,
+        )
 
     def _ensure_metric_keys(self) -> None:
         for key in (
@@ -432,15 +456,25 @@ class FLEG_CVAE(Strategy):
     def _setup_cvae_for_current_level(self) -> None:
         if self.lvl <= 0:
             raise RuntimeError("CVAE cannot be trained at warmup level 0.")
+        self._log_memory("setup_cvae_start")
         feature_extractor = create_feature_extractor(
             self.dataset, level=self.lvl, seed=self.seed
         ).to(self.device)
         feature_extractor.load_state_dict(self.global_net.state_dict(), strict=False)
+        self._log_memory(
+            "setup_cvae_feature_extractor_loaded",
+            feature_extractor_mb=object_tensor_size_mb(feature_extractor.state_dict()),
+        )
 
         self.input_dim, self.feature_shape = infer_feature_dim(
             feature_extractor=feature_extractor,
             sample_input=self._first_validation_image(),
             device=self.device,
+        )
+        self._log_memory(
+            "setup_cvae_feature_dim_inferred",
+            input_dim=self.input_dim,
+            feature_shape=self.feature_shape,
         )
         self.feature_extractor_payload = state_dict_to_bytes(
             feature_extractor.state_dict()
@@ -462,6 +496,14 @@ class FLEG_CVAE(Strategy):
         ).to(self.device)
         self.parameters_cvae = ndarrays_to_parameters(get_weights(self.decoder.decoder))
         self.cvae_trained_epochs = 0
+        self._log_memory(
+            "setup_cvae_done",
+            input_dim=self.input_dim,
+            hidden_dim=self.hidden_dim,
+            latent_dim=self.latent_dim,
+            feature_extractor_payload_mb=len(self.feature_extractor_payload) / 10**6,
+            decoder_state_mb=object_tensor_size_mb(self.decoder.state_dict()),
+        )
 
     def _num_generated_samples(self) -> int:
         if self.lvl <= 0:
@@ -695,6 +737,12 @@ class FLEG_CVAE(Strategy):
             return None, {}
 
         self._last_total_examples = sum(fit_res.num_examples for _, fit_res in results)
+        self._log_memory(
+            "aggregate_fit_start",
+            server_round=server_round,
+            results=len(results),
+            total_examples=self._last_total_examples,
+        )
 
         if self.phase == "classifier":
             if self.inplace:
@@ -709,6 +757,13 @@ class FLEG_CVAE(Strategy):
             self.parameters_classifier = ndarrays_to_parameters(aggregated_ndarrays)
             set_weights(self.classifier, aggregated_ndarrays)
             self.global_net.load_state_dict(self.classifier.state_dict(), strict=False)
+            self._log_memory(
+                "aggregate_classifier_weights_done",
+                server_round=server_round,
+                aggregated_weights_mb=object_tensor_size_mb(aggregated_ndarrays),
+                classifier_state_mb=object_tensor_size_mb(self.classifier.state_dict()),
+                global_state_mb=object_tensor_size_mb(self.global_net.state_dict()),
+            )
 
             avg_loss = weighted_loss_avg(
                 [(fit_res.num_examples, fit_res.metrics["train_loss"]) for _, fit_res in results]
@@ -755,12 +810,23 @@ class FLEG_CVAE(Strategy):
                     f"{self.classifier_rounds_current_level}/"
                     f"{self.fixed_classifier_rounds}"
                 )
+            self._log_memory(
+                "aggregate_classifier_done",
+                server_round=server_round,
+                global_accuracy=float(self.global_accuracy),
+            )
             return self.parameters_classifier, {"avg_net_loss": avg_loss}
 
         if self.phase == "cvae":
             aggregated_ndarrays = aggregate_inplace(results)
             set_weights(self.decoder.decoder, aggregated_ndarrays)
             self.parameters_cvae = ndarrays_to_parameters(aggregated_ndarrays)
+            self._log_memory(
+                "aggregate_cvae_weights_done",
+                server_round=server_round,
+                aggregated_weights_mb=object_tensor_size_mb(aggregated_ndarrays),
+                decoder_state_mb=object_tensor_size_mb(self.decoder.state_dict()),
+            )
 
             avg_cvae_loss = weighted_loss_avg(
                 [(fit_res.num_examples, fit_res.metrics["cvae_loss"]) for _, fit_res in results]
@@ -792,16 +858,28 @@ class FLEG_CVAE(Strategy):
             if self.cvae_trained_epochs >= self.cvae_epochs_target:
                 self.decoder_payload = state_dict_to_bytes(self.decoder.state_dict())
                 self.decoder_sent_to_cids = set()
+                self._log_memory(
+                    "aggregate_cvae_decoder_payload_ready",
+                    server_round=server_round,
+                    decoder_payload_mb=len(self.decoder_payload) / 10**6,
+                )
 
                 self.phase = "classifier"
                 self._skip_next_client_evaluation = True
                 self.decoder = None
                 self.parameters_cvae = None
                 self.cvae_trained_epochs = 0
+                self._log_memory("aggregate_cvae_before_classifier_setup")
                 self._setup_classifier_for_current_level()
                 self._reset_classifier_stop_state()
+                self._log_memory("aggregate_cvae_switched_to_classifier")
                 print(f"Switching to classifier level {self.lvl}.")
                 return self.parameters_classifier, {"avg_cvae_loss": avg_cvae_loss}
+            self._log_memory(
+                "aggregate_cvae_done",
+                server_round=server_round,
+                cvae_trained_epochs=self.cvae_trained_epochs,
+            )
             return self.parameters_cvae, {"avg_cvae_loss": avg_cvae_loss}
 
         return None, {}

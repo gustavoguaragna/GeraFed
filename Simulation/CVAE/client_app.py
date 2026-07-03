@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gc
 import io
 import pickle
 import time
@@ -27,10 +28,13 @@ from Simulation.CVAE.task import (
     get_num_classes,
     get_weights,
     load_data,
+    log_memory_event,
     local_test,
     normalize_dataset_name,
+    object_tensor_size_mb,
     set_weights,
     state_dict_from_bytes,
+    tensor_size_mb,
     uses_client_validation_criterion,
     unpack_batch,
 )
@@ -53,6 +57,7 @@ class FlowerClient(NumPyClient):
         local_epochs_alvo: int = 1,
         cvae_local_epochs: int = 1,
         continue_epoch: int = 0,
+        memory_logging: bool = False,
     ):
         self.cid = cid
         self.dataset = normalize_dataset_name(dataset)
@@ -68,9 +73,32 @@ class FlowerClient(NumPyClient):
         self.local_epochs_alvo = local_epochs_alvo
         self.cvae_local_epochs = cvae_local_epochs
         self.continue_epoch = continue_epoch
+        self.memory_logging = memory_logging
+        self.memory_log_path = (
+            f"{self.folder}/memory_client_{self.cid}.jsonl"
+            if self.memory_logging
+            else None
+        )
         self.num_classes = get_num_classes(self.dataset)
         self.image_key = get_image_key(self.dataset)
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self._log_memory(
+            "client_init",
+            dataset=self.dataset,
+            batch_size=self.batch_size,
+            train_examples=len(self.trainloader.dataset),
+            local_test_examples=len(self.testloader_local.dataset),
+            has_validation_loader=self.valloader_local is not None,
+        )
+
+    def _log_memory(self, event: str, **fields) -> None:
+        log_memory_event(
+            self.memory_log_path,
+            event,
+            cid=self.cid,
+            dataset=self.dataset,
+            **fields,
+        )
 
     def _record_bytes(self, key: str) -> bytes | None:
         if key not in self.client_state.parameters_records:
@@ -198,33 +226,85 @@ class FlowerClient(NumPyClient):
             "fc_logvar_state_dict": cvae.fc_logvar.state_dict(),
             "optimizer_state_dict": optimizer.state_dict(),
         }
+        self._log_memory(
+            "cvae_state_before_serialize",
+            level=int(config["level"]),
+            cvae_state_tensor_mb=object_tensor_size_mb(state),
+        )
         buffer = io.BytesIO()
         torch.save(state, buffer)
+        payload = buffer.getvalue()
+        self._log_memory(
+            "cvae_state_after_serialize",
+            level=int(config["level"]),
+            serialized_state_mb=len(payload) / 10**6,
+        )
         self._save_bytes_record(
             "cvae_training_state",
-            buffer.getvalue(),
+            payload,
             int(config["level"]),
+        )
+        self._log_memory(
+            "cvae_state_saved_to_context",
+            level=int(config["level"]),
+            serialized_state_mb=len(payload) / 10**6,
         )
 
     def _extract_embeddings(self, feature_extractor, trainloader):
         all_embeddings = []
         all_labels = []
         feature_extractor.eval()
+        self._log_memory(
+            "extract_embeddings_start",
+            train_examples=len(trainloader.dataset),
+        )
 
         with torch.no_grad():
-            for batch in trainloader:
+            for batch_idx, batch in enumerate(trainloader):
                 images, labels = unpack_batch(batch, image_key=self.image_key)
                 embeddings = feature_extractor(images.to(self.device))
                 embeddings = embeddings.view(embeddings.size(0), -1)
                 all_embeddings.append(embeddings)
                 all_labels.append(labels.to(self.device))
+                if batch_idx == 0 or (batch_idx + 1) % 25 == 0:
+                    self._log_memory(
+                        "extract_embeddings_batch",
+                        batch=batch_idx + 1,
+                        batches_cached=len(all_embeddings),
+                        cached_embeddings_mb=sum(
+                            tensor_size_mb(item) for item in all_embeddings
+                        ),
+                        cached_labels_mb=sum(
+                            tensor_size_mb(item) for item in all_labels
+                        ),
+                        current_batch_embeddings_mb=tensor_size_mb(embeddings),
+                    )
 
+        self._log_memory(
+            "extract_embeddings_before_cat",
+            batches_cached=len(all_embeddings),
+            cached_embeddings_mb=sum(tensor_size_mb(item) for item in all_embeddings),
+            cached_labels_mb=sum(tensor_size_mb(item) for item in all_labels),
+        )
         final_embeddings = torch.cat(all_embeddings, dim=0)
         final_labels = torch.cat(all_labels, dim=0)
+        self._log_memory(
+            "extract_embeddings_after_cat",
+            embeddings_shape=tuple(final_embeddings.shape),
+            labels_shape=tuple(final_labels.shape),
+            final_embeddings_mb=tensor_size_mb(final_embeddings),
+            final_labels_mb=tensor_size_mb(final_labels),
+        )
         return final_embeddings, final_labels
 
     def _normalized_embedding_loader(self, feature_extractor, trainloader, normalization):
         embeddings, labels = self._extract_embeddings(feature_extractor, trainloader)
+        self._log_memory(
+            "normalize_embeddings_start",
+            normalization=normalization,
+            embeddings_mb=tensor_size_mb(embeddings),
+            labels_mb=tensor_size_mb(labels),
+        )
 
         if normalization == "minmax":
             min_ = embeddings.min(dim=0).values
@@ -240,10 +320,21 @@ class FlowerClient(NumPyClient):
         else:
             raise ValueError(f"normalization should be 'minmax' or 'z', got {normalization}")
 
+        self._log_memory(
+            "normalize_embeddings_done",
+            normalized_mb=tensor_size_mb(normalized),
+            labels_mb=tensor_size_mb(labels),
+            norm_stats_mb=object_tensor_size_mb(norm_stats),
+        )
         loader = DataLoader(
             TensorDataset(normalized, labels),
             batch_size=self.batch_size,
             shuffle=True,
+        )
+        self._log_memory(
+            "embedding_loader_created",
+            normalized_mb=tensor_size_mb(normalized),
+            labels_mb=tensor_size_mb(labels),
         )
         return loader, norm_stats
 
@@ -377,10 +468,26 @@ class FlowerClient(NumPyClient):
     def _generated_embeddings(self, level: int, embeddings, trainloader, config):
         cached = self._cached_generated_embeddings(level)
         if cached is not None:
+            self._log_memory(
+                "generated_embeddings_cache_hit",
+                level=level,
+                cached_assets_mb=tensor_size_mb(cached["assets"]),
+                cached_labels_mb=tensor_size_mb(cached["labels"]),
+            )
             return cached, 0.0, None
 
         start = time.time()
+        self._log_memory(
+            "generated_embeddings_start",
+            level=level,
+            real_embeddings_mb=tensor_size_mb(embeddings),
+        )
         decoder = self._decoder(level, config)
+        self._log_memory(
+            "generated_embeddings_decoder_loaded",
+            level=level,
+            decoder_state_mb=object_tensor_size_mb(decoder.state_dict()),
+        )
         generated_data = self._generate_embeddings_with_decoder(
             decoder=decoder,
             embeddings=embeddings,
@@ -388,7 +495,21 @@ class FlowerClient(NumPyClient):
             config=config,
         )
         generation_time = time.time() - start
+        self._log_memory(
+            "generated_embeddings_created",
+            level=level,
+            generated_assets_mb=tensor_size_mb(generated_data["assets"]),
+            generated_labels_mb=tensor_size_mb(generated_data["labels"]),
+            generation_time=float(generation_time),
+            gen_selected_count=generated_data["stats"].get("gen_selected_count", 0),
+        )
         self._save_generated_embeddings(level, generated_data)
+        self._log_memory(
+            "generated_embeddings_saved_to_context",
+            level=level,
+            generated_assets_mb=tensor_size_mb(generated_data["assets"]),
+            generated_labels_mb=tensor_size_mb(generated_data["labels"]),
+        )
         return (
             self._cached_generated_embeddings(level),
             generation_time,
@@ -458,9 +579,21 @@ class FlowerClient(NumPyClient):
         return running_loss / max(batches_seen, 1)
 
     def _build_augmented_loader(self, trainloader, feature_extractor, level, config):
+        self._log_memory(
+            "build_augmented_loader_start",
+            level=level,
+            train_examples=len(trainloader.dataset),
+        )
         embeddings, labels = self._extract_embeddings(feature_extractor, trainloader)
         feature_shape = tuple(pickle.loads(config["feature_shape"]))
         embeddings = embeddings.view(-1, *feature_shape)
+        self._log_memory(
+            "build_augmented_loader_real_embeddings_ready",
+            level=level,
+            embeddings_shape=tuple(embeddings.shape),
+            embeddings_mb=tensor_size_mb(embeddings),
+            labels_mb=tensor_size_mb(labels),
+        )
         embedding_dataset = EmbeddingPairDataset(
             embeddings=embeddings,
             labels=labels,
@@ -475,12 +608,22 @@ class FlowerClient(NumPyClient):
             config=config,
         )
         if not generated_data:
+            self._log_memory(
+                "build_augmented_loader_no_generated_data",
+                level=level,
+                embedding_dataset_examples=len(embedding_dataset),
+            )
             return (
                 DataLoader(embedding_dataset, batch_size=self.batch_size, shuffle=True),
                 generation_time,
             )
 
         if len(generated_data["assets"]) == 0:
+            self._log_memory(
+                "build_augmented_loader_empty_generated_data",
+                level=level,
+                embedding_dataset_examples=len(embedding_dataset),
+            )
             return (
                 DataLoader(embedding_dataset, batch_size=self.batch_size, shuffle=True),
                 generation_time,
@@ -488,12 +631,18 @@ class FlowerClient(NumPyClient):
 
         gen_assets = torch.from_numpy(generated_data["assets"]).float().to(self.device)
         gen_labels = torch.from_numpy(generated_data["labels"]).long().to(self.device)
+        self._log_memory(
+            "build_augmented_loader_generated_tensors_ready",
+            level=level,
+            gen_assets_mb=tensor_size_mb(gen_assets),
+            gen_labels_mb=tensor_size_mb(gen_labels),
+        )
         gen_dataset = DictTensorDataset(
             assets=gen_assets,
             labels=gen_labels,
             asset_col_name=self.image_key,
             label_col_name="label",
-        )
+            )
 
         combined_ds = ConcatDataset([embedding_dataset, gen_dataset])
         if stats is None:
@@ -503,13 +652,29 @@ class FlowerClient(NumPyClient):
             f"for classes {stats['desired_labels']} "
             f"(requested target: {stats.get('requested_num_samples', 'cached')})."
         )
+        self._log_memory(
+            "build_augmented_loader_done",
+            level=level,
+            real_examples=len(embedding_dataset),
+            generated_examples=len(gen_dataset),
+        )
         return DataLoader(combined_ds, batch_size=self.batch_size, shuffle=True), generation_time
 
     def _fit_classifier(self, parameters, config):
         level = int(config["level"])
         trainloader = self.trainloader
+        self._log_memory(
+            "fit_classifier_start",
+            level=level,
+            train_examples=len(trainloader.dataset),
+        )
         classifier = create_classifier(self.dataset, level=level, seed=self.seed).to(self.device)
         set_weights(classifier, parameters)
+        self._log_memory(
+            "fit_classifier_model_loaded",
+            level=level,
+            classifier_state_mb=object_tensor_size_mb(classifier.state_dict()),
+        )
 
         if level > 0:
             feature_extractor = self._feature_extractor(level, config)
@@ -532,8 +697,23 @@ class FlowerClient(NumPyClient):
             mixup_type=config["mixup_type"],
         )
         train_time = time.time() - train_start
+        classifier_weights = get_weights(classifier)
+        self._log_memory(
+            "fit_classifier_done",
+            level=level,
+            train_loss=float(train_loss),
+            train_time=float(train_time),
+            classifier_weights_mb=object_tensor_size_mb(classifier_weights),
+        )
+        del classifier
+        if level > 0:
+            del feature_extractor
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        self._log_memory("fit_classifier_after_cleanup", level=level)
         return (
-            get_weights(classifier),
+            classifier_weights,
             len(self.trainloader.dataset),
             {
                 "cid": self.cid,
@@ -546,11 +726,39 @@ class FlowerClient(NumPyClient):
     def _fit_cvae(self, parameters, config):
         level = int(config["level"])
         trainloader = self.trainloader
+        self._log_memory(
+            "fit_cvae_start",
+            level=level,
+            input_dim=int(config["input_dim"]),
+            latent_dim=int(config["latent_dim"]),
+            hidden_dim=int(config["hidden_dim"]),
+            local_epochs=int(config.get("local_epochs", self.cvae_local_epochs)),
+            cvae_epoch_start=int(config.get("cvae_epoch_start", 0)),
+            cvae_epochs_total=int(config.get("cvae_epochs_total", 0)),
+        )
         feature_extractor = self._feature_extractor(level, config)
+        self._log_memory(
+            "fit_cvae_feature_extractor_loaded",
+            level=level,
+            feature_extractor_mb=object_tensor_size_mb(feature_extractor.state_dict()),
+        )
         embedding_loader, _ = self._normalized_embedding_loader(
             feature_extractor=feature_extractor,
             trainloader=trainloader,
             normalization=config["normalization"],
+        )
+        embedding_dataset = embedding_loader.dataset
+        if isinstance(embedding_dataset, TensorDataset):
+            embedding_loader_tensor_mb = sum(
+                tensor_size_mb(tensor) for tensor in embedding_dataset.tensors
+            )
+        else:
+            embedding_loader_tensor_mb = 0.0
+        self._log_memory(
+            "fit_cvae_embedding_loader_ready",
+            level=level,
+            embedding_loader_tensor_mb=embedding_loader_tensor_mb,
+            embedding_loader_examples=len(embedding_dataset),
         )
 
         input_dim = int(config["input_dim"])
@@ -568,9 +776,26 @@ class FlowerClient(NumPyClient):
             minmax=minmax,
         ).to(self.device)
         set_weights(cvae.decoder, parameters)
+        self._log_memory(
+            "fit_cvae_model_created",
+            level=level,
+            cvae_state_mb=object_tensor_size_mb(cvae.state_dict()),
+            decoder_state_mb=object_tensor_size_mb(cvae.decoder.state_dict()),
+        )
 
         optimizer = torch.optim.Adam(cvae.parameters(), lr=self.cvae_lr)
+        self._log_memory(
+            "fit_cvae_optimizer_created",
+            level=level,
+            optimizer_state_mb=object_tensor_size_mb(optimizer.state_dict()),
+        )
         self._load_cvae_training_state(cvae, optimizer, config)
+        self._log_memory(
+            "fit_cvae_state_loaded",
+            level=level,
+            cvae_state_mb=object_tensor_size_mb(cvae.state_dict()),
+            optimizer_state_mb=object_tensor_size_mb(optimizer.state_dict()),
+        )
         cvae.train()
         start = time.time()
         avg_loss = 0.0
@@ -592,9 +817,25 @@ class FlowerClient(NumPyClient):
                 local_loss += loss.item()
                 batches += 1
             avg_loss = local_loss / max(batches, 1)
+            self._log_memory(
+                "fit_cvae_epoch_done",
+                level=level,
+                local_epoch=local_epoch + 1,
+                global_cvae_epoch=epoch_start + local_epoch + 1,
+                cvae_epochs_total=epoch_total,
+                avg_loss=float(avg_loss),
+                optimizer_state_mb=object_tensor_size_mb(optimizer.state_dict()),
+            )
             
         cvae_time = time.time() - start
         self._save_cvae_training_state(cvae, optimizer, config)
+        decoder_weights = get_weights(cvae.decoder)
+        self._log_memory(
+            "fit_cvae_decoder_weights_ready",
+            level=level,
+            decoder_weights_mb=object_tensor_size_mb(decoder_weights),
+            cvae_time=float(cvae_time),
+        )
 
         metrics = {
             "cid": self.cid,
@@ -602,7 +843,18 @@ class FlowerClient(NumPyClient):
             "cvae_time": float(cvae_time)
         }
 
-        return get_weights(cvae.decoder), len(trainloader.dataset), metrics
+        self._log_memory("fit_cvae_before_cleanup", level=level)
+        del cvae
+        del optimizer
+        del embedding_loader
+        del embedding_dataset
+        del feature_extractor
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        self._log_memory("fit_cvae_after_cleanup", level=level)
+
+        return decoder_weights, len(trainloader.dataset), metrics
 
     def fit(self, parameters, config):
         if config["model"] == "classifier":
@@ -785,6 +1037,7 @@ def client_fn(context: Context):
         local_epochs_alvo=run_config.get("epocas_alvo", 1),
         cvae_local_epochs=cvae_local_epochs,
         continue_epoch=run_config.get("continue_epoch", 0),
+        memory_logging=run_config.get("memory_logging", False),
     ).to_client()
 
 

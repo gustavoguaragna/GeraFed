@@ -45,6 +45,7 @@ def server_fn(context: Context):
     data_root = _get(run_config, "data_root", "data")
     download_datasets = _get(run_config, "download_datasets", True)
     medmnist_size = int(_get(run_config, "medmnist_size", 224))
+    memory_logging = _get(run_config, "memory_logging", False)
     cvae_epochs = _get(run_config, "epocas_gen", 25)
     cvae_local_epochs = _get(run_config, "epocas_locais_gen",1)
     patience = _get(run_config, "patience", 10)
@@ -146,6 +147,7 @@ def server_fn(context: Context):
         valloader=valloader,
         num_clients=num_clients,
         resume_from_checkpoint=_get(run_config, "resume_from_checkpoint", False),
+        memory_logging=memory_logging,
     )
 
     return ServerAppComponents(

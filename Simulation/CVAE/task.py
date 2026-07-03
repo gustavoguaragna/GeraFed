@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import io
+import json
 import math
+import os
 import random
 import time
 from collections import Counter, OrderedDict, defaultdict
@@ -757,6 +759,89 @@ def get_num_classes(dataset: str) -> int:
 
 _fds_cache = {}
 _torch_dataset_cache = {}
+
+
+def _linux_rss_mb() -> Optional[float]:
+    status_path = Path("/proc/self/status")
+    if not status_path.exists():
+        return None
+    for line in status_path.read_text().splitlines():
+        if line.startswith("VmRSS:"):
+            parts = line.split()
+            if len(parts) >= 2:
+                return int(parts[1]) / 1024
+    return None
+
+
+def _peak_rss_mb() -> Optional[float]:
+    try:
+        import resource
+    except ImportError:
+        return None
+
+    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    if hasattr(os, "uname") and os.uname().sysname == "Darwin":
+        return peak / 10**6
+    return peak / 1024
+
+
+def process_memory_snapshot() -> dict[str, Optional[float] | int]:
+    rss_mb = _linux_rss_mb()
+    if rss_mb is None:
+        try:
+            import psutil
+
+            rss_mb = psutil.Process(os.getpid()).memory_info().rss / 10**6
+        except Exception:
+            rss_mb = None
+
+    snapshot: dict[str, Optional[float] | int] = {
+        "pid": os.getpid(),
+        "rss_mb": rss_mb,
+        "peak_rss_mb": _peak_rss_mb(),
+    }
+    if torch.cuda.is_available():
+        snapshot.update(
+            {
+                "cuda_allocated_mb": torch.cuda.memory_allocated() / 10**6,
+                "cuda_reserved_mb": torch.cuda.memory_reserved() / 10**6,
+                "cuda_peak_allocated_mb": torch.cuda.max_memory_allocated() / 10**6,
+            }
+        )
+    return snapshot
+
+
+def tensor_size_mb(value) -> float:
+    if isinstance(value, torch.Tensor):
+        return value.numel() * value.element_size() / 10**6
+    if isinstance(value, np.ndarray):
+        return value.nbytes / 10**6
+    return 0.0
+
+
+def object_tensor_size_mb(value) -> float:
+    if isinstance(value, (torch.Tensor, np.ndarray)):
+        return tensor_size_mb(value)
+    if isinstance(value, dict):
+        return sum(object_tensor_size_mb(item) for item in value.values())
+    if isinstance(value, (list, tuple)):
+        return sum(object_tensor_size_mb(item) for item in value)
+    return 0.0
+
+
+def log_memory_event(filepath: Optional[str], event: str, **fields) -> None:
+    if not filepath:
+        return
+    payload = {
+        "time": time.time(),
+        "event": event,
+        **process_memory_snapshot(),
+        **fields,
+    }
+    path = Path(filepath)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as file:
+        file.write(json.dumps(payload, default=str) + "\n")
 
 
 def _coerce_label(label) -> int:
