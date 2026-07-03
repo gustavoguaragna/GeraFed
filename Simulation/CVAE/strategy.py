@@ -221,13 +221,16 @@ class FLEG_CVAE(Strategy):
         return "FLEG_CVAE()"
 
     def _log_memory(self, event: str, **fields) -> None:
+        payload = {
+            "dataset": self.dataset,
+            "phase": self.phase,
+            "level": self.lvl,
+        }
+        payload.update(fields)
         log_memory_event(
             self.memory_log_path,
             event,
-            dataset=self.dataset,
-            phase=self.phase,
-            level=self.lvl,
-            **fields,
+            **payload,
         )
 
     def _ensure_metric_keys(self) -> None:

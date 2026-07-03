@@ -92,12 +92,12 @@ class FlowerClient(NumPyClient):
         )
 
     def _log_memory(self, event: str, **fields) -> None:
+        payload = {"cid": self.cid, "dataset": self.dataset}
+        payload.update(fields)
         log_memory_event(
             self.memory_log_path,
             event,
-            cid=self.cid,
-            dataset=self.dataset,
-            **fields,
+            **payload,
         )
 
     def _record_bytes(self, key: str) -> bytes | None:
