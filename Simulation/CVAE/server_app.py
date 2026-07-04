@@ -139,6 +139,7 @@ def server_fn(context: Context):
         cvae_lr=_get(run_config, "learn_rate_gen", 0.001),
         normalization=_get(run_config, "cvae_normalization", "minmax"),
         resblock=_get(run_config, "cvae_resblock", False),
+        cvae_depth=_get(run_config, "cvae_depth", 2),
         annealing=_get(run_config, "cvae_annealing", False),
         latent_dim_mode=latent_dim_mode,
         latent_dim=_get(run_config, "tam_ruido", 100),

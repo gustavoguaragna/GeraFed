@@ -90,6 +90,7 @@ class FLEG_CVAE(Strategy):
         cvae_lr: float = 0.001,
         normalization: str = "minmax",
         resblock: bool = False,
+        cvae_depth: int = 2,
         annealing: bool = False,
         latent_dim_mode: str = "fixed",
         latent_dim: int = 100,
@@ -137,6 +138,7 @@ class FLEG_CVAE(Strategy):
         self.cvae_lr = cvae_lr
         self.normalization = normalization
         self.resblock = resblock
+        self.cvae_depth = max(0, int(cvae_depth))
         self.annealing = annealing
         self.latent_dim_mode = latent_dim_mode
         self.fixed_latent_dim = latent_dim
@@ -496,6 +498,7 @@ class FLEG_CVAE(Strategy):
             condition_dim=self.num_classes,
             resblock=self.resblock,
             minmax=self.normalization == "minmax",
+            depth=self.cvae_depth,
         ).to(self.device)
         self.parameters_cvae = ndarrays_to_parameters(get_weights(self.decoder.decoder))
         self.cvae_trained_epochs = 0
@@ -504,6 +507,7 @@ class FLEG_CVAE(Strategy):
             input_dim=self.input_dim,
             hidden_dim=self.hidden_dim,
             latent_dim=self.latent_dim,
+            cvae_depth=self.cvae_depth,
             feature_extractor_payload_mb=len(self.feature_extractor_payload) / 10**6,
             decoder_state_mb=object_tensor_size_mb(self.decoder.state_dict()),
         )
@@ -547,6 +551,7 @@ class FLEG_CVAE(Strategy):
             "normalization": self.normalization,
             "beta": beta,
             "resblock": self.resblock,
+            "cvae_depth": self.cvae_depth,
             "num_samples": self._num_generated_samples(),
             "local_epochs": self.local_epochs,
             "cvae_epoch_start": self.cvae_trained_epochs,
@@ -647,6 +652,7 @@ class FLEG_CVAE(Strategy):
                     "feature_shape": pickle.dumps(self.feature_shape),
                     "normalization": self.normalization,
                     "resblock": self.resblock,
+                    "cvae_depth": self.cvae_depth,
                     "num_samples": num_samples,
                 }
                 self._add_level_traffic(

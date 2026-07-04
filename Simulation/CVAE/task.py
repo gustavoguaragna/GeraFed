@@ -1954,6 +1954,23 @@ class ResidualBlock(nn.Module):
         return self.act(h + residual)
 
 
+def _cvae_hidden_layers(
+    hidden_dim: int,
+    depth: int,
+    *,
+    resblock: bool,
+    minmax: bool,
+) -> list[nn.Module]:
+    depth = max(0, int(depth))
+    if resblock:
+        return [ResidualBlock(hidden_dim, minmax=minmax) for _ in range(depth)]
+
+    layers: list[nn.Module] = []
+    for _ in range(depth):
+        layers.extend([nn.Linear(hidden_dim, hidden_dim), nn.ReLU()])
+    return layers
+
+
 class CVAE(nn.Module):
     def __init__(
         self,
@@ -1965,6 +1982,7 @@ class CVAE(nn.Module):
         beta: float = 0.1,
         resblock: bool = False,
         minmax: bool = True,
+        depth: int = 2,
     ):
         super().__init__()
         self.latent_dim = latent_dim
@@ -1972,29 +1990,30 @@ class CVAE(nn.Module):
         self.condition_dim = condition_dim
         self.device = device
         self.beta = beta
+        self.depth = max(0, int(depth))
 
         encoder_layers = [nn.Linear(input_dim + condition_dim, hidden_dim), nn.ReLU()]
-        if resblock:
-            encoder_layers.extend(
-                [ResidualBlock(hidden_dim, minmax=minmax), ResidualBlock(hidden_dim, minmax=minmax)]
+        encoder_layers.extend(
+            _cvae_hidden_layers(
+                hidden_dim,
+                self.depth,
+                resblock=resblock,
+                minmax=minmax,
             )
-        else:
-            encoder_layers.extend(
-                [nn.Linear(hidden_dim, hidden_dim), nn.ReLU(), nn.Linear(hidden_dim, hidden_dim), nn.ReLU()]
-            )
+        )
         self.encoder = nn.Sequential(*encoder_layers)
         self.fc_mu = nn.Linear(hidden_dim, latent_dim)
         self.fc_logvar = nn.Linear(hidden_dim, latent_dim)
 
         decoder_layers = [nn.Linear(latent_dim + condition_dim, hidden_dim), nn.ReLU()]
-        if resblock:
-            decoder_layers.extend(
-                [ResidualBlock(hidden_dim, minmax=minmax), ResidualBlock(hidden_dim, minmax=minmax)]
+        decoder_layers.extend(
+            _cvae_hidden_layers(
+                hidden_dim,
+                self.depth,
+                resblock=resblock,
+                minmax=minmax,
             )
-        else:
-            decoder_layers.extend(
-                [nn.Linear(hidden_dim, hidden_dim), nn.ReLU(), nn.Linear(hidden_dim, hidden_dim), nn.ReLU()]
-            )
+        )
         decoder_layers.append(nn.Linear(hidden_dim, input_dim))
         if minmax:
             decoder_layers.append(nn.Sigmoid())
@@ -2032,17 +2051,19 @@ class Decoder(nn.Module):
         input_dim: int,
         resblock: bool = False,
         minmax: bool = True,
+        depth: int = 2,
     ):
         super().__init__()
+        self.depth = max(0, int(depth))
         decoder_layers = [nn.Linear(latent_dim + condition_dim, hidden_dim), nn.ReLU()]
-        if resblock:
-            decoder_layers.extend(
-                [ResidualBlock(hidden_dim, minmax=minmax), ResidualBlock(hidden_dim, minmax=minmax)]
+        decoder_layers.extend(
+            _cvae_hidden_layers(
+                hidden_dim,
+                self.depth,
+                resblock=resblock,
+                minmax=minmax,
             )
-        else:
-            decoder_layers.extend(
-                [nn.Linear(hidden_dim, hidden_dim), nn.ReLU(), nn.Linear(hidden_dim, hidden_dim), nn.ReLU()]
-            )
+        )
         decoder_layers.append(nn.Linear(hidden_dim, input_dim))
         if minmax:
             decoder_layers.append(nn.Sigmoid())

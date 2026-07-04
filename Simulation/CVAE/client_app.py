@@ -163,6 +163,7 @@ class FlowerClient(NumPyClient):
             condition_dim=self.num_classes,
             resblock=bool(config["resblock"]),
             minmax=config["normalization"] == "minmax",
+            depth=int(config.get("cvae_depth", 2)),
         ).to(self.device)
         decoder.load_state_dict(state_dict_from_bytes(decoder_state_bytes, self.device))
         decoder.eval()
@@ -196,6 +197,7 @@ class FlowerClient(NumPyClient):
             "hidden_dim": int(config["hidden_dim"]),
             "normalization": config["normalization"],
             "resblock": bool(config["resblock"]),
+            "cvae_depth": int(config.get("cvae_depth", 2)),
         }
         return all(state.get(key) == value for key, value in expected.items())
 
@@ -221,6 +223,7 @@ class FlowerClient(NumPyClient):
             "hidden_dim": int(config["hidden_dim"]),
             "normalization": config["normalization"],
             "resblock": bool(config["resblock"]),
+            "cvae_depth": int(config.get("cvae_depth", 2)),
             "encoder_state_dict": cvae.encoder.state_dict(),
             "fc_mu_state_dict": cvae.fc_mu.state_dict(),
             "fc_logvar_state_dict": cvae.fc_logvar.state_dict(),
@@ -732,6 +735,7 @@ class FlowerClient(NumPyClient):
             input_dim=int(config["input_dim"]),
             latent_dim=int(config["latent_dim"]),
             hidden_dim=int(config["hidden_dim"]),
+            cvae_depth=int(config.get("cvae_depth", 2)),
             local_epochs=int(config.get("local_epochs", self.cvae_local_epochs)),
             cvae_epoch_start=int(config.get("cvae_epoch_start", 0)),
             cvae_epochs_total=int(config.get("cvae_epochs_total", 0)),
@@ -774,11 +778,13 @@ class FlowerClient(NumPyClient):
             beta=float(config["beta"]),
             resblock=bool(config["resblock"]),
             minmax=minmax,
+            depth=int(config.get("cvae_depth", 2)),
         ).to(self.device)
         set_weights(cvae.decoder, parameters)
         self._log_memory(
             "fit_cvae_model_created",
             level=level,
+            cvae_depth=int(config.get("cvae_depth", 2)),
             cvae_state_mb=object_tensor_size_mb(cvae.state_dict()),
             decoder_state_mb=object_tensor_size_mb(cvae.decoder.state_dict()),
         )
