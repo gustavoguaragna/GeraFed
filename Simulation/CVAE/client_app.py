@@ -984,6 +984,7 @@ def client_fn(context: Context):
     cvae_local_epochs = run_config.get("epocas_locais_gen", 1)
     syn_input = run_config.get("num_syn", run_config.get("syn_input", "dynamic"))
     medmnist_size = int(run_config.get("medmnist_size", 224))
+    cvae_depth = int(run_config.get("cvae_depth", 2))
     alpha = run_config.get("alpha", _alpha_from_partitioner(partitioner))
     partitioner_for_data = f"Dir{int(alpha * 10):02d}" if partitioner == "Dirichlet" else partitioner
     stop_criterion = run_config.get("criterio_parada", "global_test_acc")
@@ -1009,7 +1010,7 @@ def client_fn(context: Context):
     folder = (
         f"{run_config['Exp_name_folder']}CVAE/"
         f"{dataset_folder_name}_{partitioner_for_data}_{run_config['strategy']}_"
-        f"cvaeepochs{cvae_epochs}_{syn_input}_{method}_trial{trial}"
+        f"cvaeepochs{cvae_epochs}_depth_{cvae_depth}_{syn_input}_{method}_trial{trial}"
     )
 
 

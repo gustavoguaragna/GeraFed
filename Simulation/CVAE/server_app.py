@@ -47,6 +47,7 @@ def server_fn(context: Context):
     medmnist_size = int(_get(run_config, "medmnist_size", 224))
     memory_logging = _get(run_config, "memory_logging", False)
     cvae_epochs = _get(run_config, "epocas_gen", 25)
+    cvae_depth = int(_get(run_config, "cvae_depth", 2))
     cvae_local_epochs = _get(run_config, "epocas_locais_gen",1)
     patience = _get(run_config, "patience", 10)
     levels = _get(run_config, "levels", 4)
@@ -75,7 +76,7 @@ def server_fn(context: Context):
     folder = (
         f"{_get(run_config, 'Exp_name_folder', 'Experimentos/Flwr_run/')}CVAE/"
         f"{dataset_folder_name}_{partitioner}_{strategy_name}_"
-        f"cvaeepochs{cvae_epochs}_{syn_input}_{method}_trial{trial}"
+        f"cvaeepochs{cvae_epochs}_depth_{cvae_depth}_{syn_input}_{method}_trial{trial}"
     )
     os.makedirs(folder, exist_ok=True)
 
@@ -139,7 +140,7 @@ def server_fn(context: Context):
         cvae_lr=_get(run_config, "learn_rate_gen", 0.001),
         normalization=_get(run_config, "cvae_normalization", "minmax"),
         resblock=_get(run_config, "cvae_resblock", False),
-        cvae_depth=_get(run_config, "cvae_depth", 2),
+        cvae_depth=cvae_depth,
         annealing=_get(run_config, "cvae_annealing", False),
         latent_dim_mode=latent_dim_mode,
         latent_dim=_get(run_config, "tam_ruido", 100),
