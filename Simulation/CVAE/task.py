@@ -218,7 +218,7 @@ DATASET_CONFIG = {
 }
 
 TORCH_DATASET_SOURCES = {"medmnist", "medimeta", "wilds", "imagefolder"}
-MEDMNIST_SIZES = {28, 128, 224}
+MEDMNIST_SIZES = {28, 64, 128, 224}
 
 STOP_CRITERION_ALIASES = {
     "global_test_acc": "global_test_acc",
@@ -553,21 +553,64 @@ class ClassifierHead4_Cifar(nn.Module):
         return self.fc3(x)
 
 
+def _generic_pool_output_size(image_size: Optional[int]) -> int:
+    """Choose the adaptive pooling size for the generic image models."""
+    if image_size is None:
+        return 4
+    image_size = int(image_size)
+    if image_size <= 32:
+        return 4
+    return 8
+
+
+def _generic_block1_output_size(image_size: Optional[int]) -> Optional[int]:
+    if image_size is None:
+        return None
+    image_size = int(image_size)
+    if image_size <= 32:
+        return max(4, image_size // 2)
+    return 16
+
+
+def _adaptive_pool_or_identity(output_size: Optional[int]) -> nn.Module:
+    if output_size is None:
+        return nn.Identity()
+    return nn.AdaptiveAvgPool2d((output_size, output_size))
+
+
+def _generic_flatten_dim(image_size: Optional[int]) -> int:
+    pool_size = _generic_pool_output_size(image_size)
+    return 64 * pool_size * pool_size
+
+
 class GenericAdaptiveNet(nn.Module):
-    def __init__(self, in_channels: int, num_classes: int, seed=None):
+    def __init__(
+        self,
+        in_channels: int,
+        num_classes: int,
+        image_size: Optional[int] = None,
+        seed=None,
+    ):
         if seed is not None:
             torch.manual_seed(seed)
         super().__init__()
+        pool_output_size = _generic_pool_output_size(image_size)
         self.conv1 = nn.Conv2d(in_channels, 32, kernel_size=3, padding=1)
         self.pool = nn.MaxPool2d(2, 2)
+        self.block1_pool = _adaptive_pool_or_identity(
+            _generic_block1_output_size(image_size)
+        )
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
-        self.adaptive_pool = nn.AdaptiveAvgPool2d((4, 4))
-        self.fc1 = nn.Linear(64 * 4 * 4, 256)
+        self.adaptive_pool = nn.AdaptiveAvgPool2d(
+            (pool_output_size, pool_output_size)
+        )
+        self.fc1 = nn.Linear(_generic_flatten_dim(image_size), 256)
         self.fc2 = nn.Linear(256, 128)
         self.fc3 = nn.Linear(128, num_classes)
 
     def forward(self, x):
         x = self.pool(F.relu(self.conv1(x)))
+        x = self.block1_pool(x)
         x = self.pool(F.relu(self.conv2(x)))
         x = self.adaptive_pool(x)
         x = torch.flatten(x, 1)
@@ -577,26 +620,43 @@ class GenericAdaptiveNet(nn.Module):
 
 
 class GenericFeatureExtractor1(nn.Module):
-    def __init__(self, in_channels: int, seed=None):
+    def __init__(
+        self,
+        in_channels: int,
+        image_size: Optional[int] = None,
+        seed=None,
+    ):
         if seed is not None:
             torch.manual_seed(seed)
         super().__init__()
         self.conv1 = nn.Conv2d(in_channels, 32, kernel_size=3, padding=1)
         self.pool = nn.MaxPool2d(2, 2)
+        self.block1_pool = _adaptive_pool_or_identity(
+            _generic_block1_output_size(image_size)
+        )
 
     def forward(self, x):
-        return self.pool(F.relu(self.conv1(x)))
+        x = self.pool(F.relu(self.conv1(x)))
+        return self.block1_pool(x)
 
 
 class GenericClassifierHead1(nn.Module):
-    def __init__(self, num_classes: int, seed=None):
+    def __init__(
+        self,
+        num_classes: int,
+        image_size: Optional[int] = None,
+        seed=None,
+    ):
         if seed is not None:
             torch.manual_seed(seed)
         super().__init__()
+        pool_output_size = _generic_pool_output_size(image_size)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
-        self.adaptive_pool = nn.AdaptiveAvgPool2d((4, 4))
-        self.fc1 = nn.Linear(64 * 4 * 4, 256)
+        self.adaptive_pool = nn.AdaptiveAvgPool2d(
+            (pool_output_size, pool_output_size)
+        )
+        self.fc1 = nn.Linear(_generic_flatten_dim(image_size), 256)
         self.fc2 = nn.Linear(256, 128)
         self.fc3 = nn.Linear(128, num_classes)
 
@@ -610,28 +670,45 @@ class GenericClassifierHead1(nn.Module):
 
 
 class GenericFeatureExtractor2(nn.Module):
-    def __init__(self, in_channels: int, seed=None):
+    def __init__(
+        self,
+        in_channels: int,
+        image_size: Optional[int] = None,
+        seed=None,
+    ):
         if seed is not None:
             torch.manual_seed(seed)
         super().__init__()
+        pool_output_size = _generic_pool_output_size(image_size)
         self.conv1 = nn.Conv2d(in_channels, 32, kernel_size=3, padding=1)
         self.pool = nn.MaxPool2d(2, 2)
+        self.block1_pool = _adaptive_pool_or_identity(
+            _generic_block1_output_size(image_size)
+        )
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
-        self.adaptive_pool = nn.AdaptiveAvgPool2d((4, 4))
+        self.adaptive_pool = nn.AdaptiveAvgPool2d(
+            (pool_output_size, pool_output_size)
+        )
 
     def forward(self, x):
         x = self.pool(F.relu(self.conv1(x)))
+        x = self.block1_pool(x)
         x = self.pool(F.relu(self.conv2(x)))
         x = self.adaptive_pool(x)
         return torch.flatten(x, 1)
 
 
 class GenericClassifierHead2(nn.Module):
-    def __init__(self, num_classes: int, seed=None):
+    def __init__(
+        self,
+        num_classes: int,
+        image_size: Optional[int] = None,
+        seed=None,
+    ):
         if seed is not None:
             torch.manual_seed(seed)
         super().__init__()
-        self.fc1 = nn.Linear(64 * 4 * 4, 256)
+        self.fc1 = nn.Linear(_generic_flatten_dim(image_size), 256)
         self.fc2 = nn.Linear(256, 128)
         self.fc3 = nn.Linear(128, num_classes)
 
@@ -642,18 +719,30 @@ class GenericClassifierHead2(nn.Module):
 
 
 class GenericFeatureExtractor3(nn.Module):
-    def __init__(self, in_channels: int, seed=None):
+    def __init__(
+        self,
+        in_channels: int,
+        image_size: Optional[int] = None,
+        seed=None,
+    ):
         if seed is not None:
             torch.manual_seed(seed)
         super().__init__()
+        pool_output_size = _generic_pool_output_size(image_size)
         self.conv1 = nn.Conv2d(in_channels, 32, kernel_size=3, padding=1)
         self.pool = nn.MaxPool2d(2, 2)
+        self.block1_pool = _adaptive_pool_or_identity(
+            _generic_block1_output_size(image_size)
+        )
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
-        self.adaptive_pool = nn.AdaptiveAvgPool2d((4, 4))
-        self.fc1 = nn.Linear(64 * 4 * 4, 256)
+        self.adaptive_pool = nn.AdaptiveAvgPool2d(
+            (pool_output_size, pool_output_size)
+        )
+        self.fc1 = nn.Linear(_generic_flatten_dim(image_size), 256)
 
     def forward(self, x):
         x = self.pool(F.relu(self.conv1(x)))
+        x = self.block1_pool(x)
         x = self.pool(F.relu(self.conv2(x)))
         x = self.adaptive_pool(x)
         x = torch.flatten(x, 1)
@@ -674,19 +763,31 @@ class GenericClassifierHead3(nn.Module):
 
 
 class GenericFeatureExtractor4(nn.Module):
-    def __init__(self, in_channels: int, seed=None):
+    def __init__(
+        self,
+        in_channels: int,
+        image_size: Optional[int] = None,
+        seed=None,
+    ):
         if seed is not None:
             torch.manual_seed(seed)
         super().__init__()
+        pool_output_size = _generic_pool_output_size(image_size)
         self.conv1 = nn.Conv2d(in_channels, 32, kernel_size=3, padding=1)
         self.pool = nn.MaxPool2d(2, 2)
+        self.block1_pool = _adaptive_pool_or_identity(
+            _generic_block1_output_size(image_size)
+        )
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
-        self.adaptive_pool = nn.AdaptiveAvgPool2d((4, 4))
-        self.fc1 = nn.Linear(64 * 4 * 4, 256)
+        self.adaptive_pool = nn.AdaptiveAvgPool2d(
+            (pool_output_size, pool_output_size)
+        )
+        self.fc1 = nn.Linear(_generic_flatten_dim(image_size), 256)
         self.fc2 = nn.Linear(256, 128)
 
     def forward(self, x):
         x = self.pool(F.relu(self.conv1(x)))
+        x = self.block1_pool(x)
         x = self.pool(F.relu(self.conv2(x)))
         x = self.adaptive_pool(x)
         x = torch.flatten(x, 1)
@@ -1392,16 +1493,28 @@ def load_data(
     return trainloader, testloader, valloader_local, testloader_local
 
 
-def create_full_model(dataset: str, seed: Optional[int] = None) -> nn.Module:
+def _model_image_size(dataset: str, medmnist_size: Optional[int]) -> Optional[int]:
+    if DATASET_CONFIG[dataset]["source"] == "medmnist":
+        return _validate_medmnist_size(medmnist_size or 28)
+    return None
+
+
+def create_full_model(
+    dataset: str,
+    seed: Optional[int] = None,
+    medmnist_size: Optional[int] = None,
+) -> nn.Module:
     dataset = normalize_dataset_name(dataset)
     if dataset == "mnist":
         return Net(seed=seed)
     if dataset == "cifar10":
         return Net_Cifar(seed=seed)
     if DATASET_CONFIG[dataset]["source"] in TORCH_DATASET_SOURCES:
+        image_size = _model_image_size(dataset, medmnist_size)
         return GenericAdaptiveNet(
             in_channels=get_num_channels(dataset),
             num_classes=get_num_classes(dataset),
+            image_size=image_size,
             seed=seed,
         )
     raise ValueError(f"Dataset {dataset} nao identificado")
@@ -1417,14 +1530,20 @@ def get_component_classes(dataset: str, level: int):
         ) from exc
 
 
-def create_classifier(dataset: str, level: int, seed: Optional[int] = None) -> nn.Module:
+def create_classifier(
+    dataset: str,
+    level: int,
+    seed: Optional[int] = None,
+    medmnist_size: Optional[int] = None,
+) -> nn.Module:
     dataset = normalize_dataset_name(dataset)
     if dataset in NET_COMPONENTS:
         classifier_class, _ = get_component_classes(dataset, level)
         return classifier_class(seed=seed)
     if DATASET_CONFIG[dataset]["source"] in TORCH_DATASET_SOURCES:
         if level == 0:
-            return create_full_model(dataset, seed=seed)
+            return create_full_model(dataset, seed=seed, medmnist_size=medmnist_size)
+        image_size = _model_image_size(dataset, medmnist_size)
         num_classes = get_num_classes(dataset)
         classifier_heads = {
             1: GenericClassifierHead1,
@@ -1433,6 +1552,12 @@ def create_classifier(dataset: str, level: int, seed: Optional[int] = None) -> n
             4: GenericClassifierHead4,
         }
         try:
+            if level in {1, 2}:
+                return classifier_heads[level](
+                    num_classes=num_classes,
+                    image_size=image_size,
+                    seed=seed,
+                )
             return classifier_heads[level](num_classes=num_classes, seed=seed)
         except KeyError as exc:
             raise ValueError(
@@ -1442,7 +1567,10 @@ def create_classifier(dataset: str, level: int, seed: Optional[int] = None) -> n
 
 
 def create_feature_extractor(
-    dataset: str, level: int, seed: Optional[int] = None
+    dataset: str,
+    level: int,
+    seed: Optional[int] = None,
+    medmnist_size: Optional[int] = None,
 ) -> Optional[nn.Module]:
     dataset = normalize_dataset_name(dataset)
     if dataset in NET_COMPONENTS:
@@ -1453,6 +1581,7 @@ def create_feature_extractor(
     if DATASET_CONFIG[dataset]["source"] in TORCH_DATASET_SOURCES:
         if level == 0:
             return None
+        image_size = _model_image_size(dataset, medmnist_size)
         feature_extractors = {
             1: GenericFeatureExtractor1,
             2: GenericFeatureExtractor2,
@@ -1460,8 +1589,15 @@ def create_feature_extractor(
             4: GenericFeatureExtractor4,
         }
         try:
+            if level == 1:
+                return feature_extractors[level](
+                    in_channels=get_num_channels(dataset),
+                    image_size=image_size,
+                    seed=seed,
+                )
             return feature_extractors[level](
                 in_channels=get_num_channels(dataset),
+                image_size=image_size,
                 seed=seed,
             )
         except KeyError as exc:

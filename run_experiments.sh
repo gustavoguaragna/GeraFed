@@ -2,18 +2,17 @@
 set -euo pipefail
 
 DATASETS=(
-  "bloodmnist"
-  "octmnist"
-  "organamnist"
-  "organcmnist"
-  "organsmnist"
+  "tissuemnist"
   "pathmnist"
+  "organsmnist"
+  "octmnist"
+  "bloodmnist"
 )
 
-CVAE_EPOCHS=(
-  "40"
-  "70"
-  "100"
+MEDMNIST_SIZES=(
+  "64"
+  "128"
+  "224"
 )
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -26,25 +25,25 @@ mkdir -p logs
 RUN_CONFIG_EXTRA="${RUN_CONFIG_EXTRA:-}"
 
 for dataset in "${DATASETS[@]}"; do
-  for epocas_gen in "${CVAE_EPOCHS[@]}"; do
+  for medmnist_size in "${MEDMNIST_SIZES[@]}"; do
     echo "============================================================"
-    echo "Starting experiment for dataset: ${dataset}, epocas_gen: ${epocas_gen}"
+    echo "Starting experiment for dataset: ${dataset}, medmnist_size: ${medmnist_size}"
     echo "============================================================"
 
-    run_config="dataset='${dataset}' epocas_gen=${epocas_gen}"
+    run_config="dataset='${dataset}' medmnist_size=${medmnist_size}"
     if [[ -n "$RUN_CONFIG_EXTRA" ]]; then
       run_config="${run_config} ${RUN_CONFIG_EXTRA}"
     fi
 
-    exp_name="${dataset}_epocas_gen_${epocas_gen}"
+    exp_name="${dataset}_size_${medmnist_size}"
 
     if flwr run . --stream --run-config "$run_config" 2>&1 | tee "logs/${exp_name}.log"; then
-      echo "Experiment for dataset: ${dataset}, epocas_gen: ${epocas_gen} completed successfully."
+      echo "Experiment for dataset: ${dataset}, medmnist_size: ${medmnist_size} completed successfully."
     else
-      echo "Experiment for dataset: ${dataset}, epocas_gen: ${epocas_gen} failed."
+      echo "Experiment for dataset: ${dataset}, medmnist_size: ${medmnist_size} failed."
     fi
 
-    echo "Finished experiment for dataset: ${dataset}, epocas_gen: ${epocas_gen}"
+    echo "Finished experiment for dataset: ${dataset}, medmnist_size: ${medmnist_size}"
     echo
   done
 done

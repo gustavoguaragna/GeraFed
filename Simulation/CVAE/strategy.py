@@ -73,6 +73,7 @@ class FLEG_CVAE(Strategy):
         evaluate_metrics_aggregation_fn: Optional[MetricsAggregationFn] = None,
         inplace: bool = True,
         dataset: str = "mnist",
+        medmnist_size: int = 28,
         folder: str = ".",
         strategy_name: str = "fedavg",
         mu: float = 0.5,
@@ -119,6 +120,7 @@ class FLEG_CVAE(Strategy):
         self.inplace = inplace
 
         self.dataset = normalize_dataset_name(dataset)
+        self.medmnist_size = int(medmnist_size)
         self.image_key = get_image_key(self.dataset)
         self.num_classes = get_num_classes(self.dataset)
         self.folder = folder
@@ -171,9 +173,22 @@ class FLEG_CVAE(Strategy):
         self._level_classifier_traffic_mb = 0.0
         self._level_cvae_traffic_mb = 0.0
 
-        self.global_net = create_full_model(self.dataset, seed=self.seed).to(self.device)
-        self.best_model = create_full_model(self.dataset, seed=self.seed).to(self.device)
-        self.classifier = create_classifier(self.dataset, level=0, seed=self.seed).to(self.device)
+        self.global_net = create_full_model(
+            self.dataset,
+            seed=self.seed,
+            medmnist_size=self.medmnist_size,
+        ).to(self.device)
+        self.best_model = create_full_model(
+            self.dataset,
+            seed=self.seed,
+            medmnist_size=self.medmnist_size,
+        ).to(self.device)
+        self.classifier = create_classifier(
+            self.dataset,
+            level=0,
+            seed=self.seed,
+            medmnist_size=self.medmnist_size,
+        ).to(self.device)
 
         self.decoder = None
         self.parameters_cvae = None
@@ -449,7 +464,10 @@ class FLEG_CVAE(Strategy):
 
     def _setup_classifier_for_current_level(self) -> None:
         self.classifier = create_classifier(
-            self.dataset, level=self.lvl, seed=self.seed
+            self.dataset,
+            level=self.lvl,
+            seed=self.seed,
+            medmnist_size=self.medmnist_size,
         ).to(self.device)
         self.classifier.load_state_dict(self.global_net.state_dict(), strict=False)
         self.parameters_classifier = ndarrays_to_parameters(get_weights(self.classifier))
@@ -463,7 +481,10 @@ class FLEG_CVAE(Strategy):
             raise RuntimeError("CVAE cannot be trained at warmup level 0.")
         self._log_memory("setup_cvae_start")
         feature_extractor = create_feature_extractor(
-            self.dataset, level=self.lvl, seed=self.seed
+            self.dataset,
+            level=self.lvl,
+            seed=self.seed,
+            medmnist_size=self.medmnist_size,
         ).to(self.device)
         feature_extractor.load_state_dict(self.global_net.state_dict(), strict=False)
         self._log_memory(
@@ -563,7 +584,10 @@ class FLEG_CVAE(Strategy):
             return b""
         if not self.feature_extractor_payload:
             feature_extractor = create_feature_extractor(
-                self.dataset, level=level, seed=self.seed
+                self.dataset,
+                level=level,
+                seed=self.seed,
+                medmnist_size=self.medmnist_size,
             ).to(self.device)
             feature_extractor.load_state_dict(self.global_net.state_dict(), strict=False)
             self.feature_extractor_payload = state_dict_to_bytes(

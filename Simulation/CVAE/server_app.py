@@ -94,7 +94,7 @@ def server_fn(context: Context):
         medmnist_size=medmnist_size,
     )
 
-    classifier = create_full_model(dataset, seed=seed)
+    classifier = create_full_model(dataset, seed=seed, medmnist_size=medmnist_size)
     parameters = ndarrays_to_parameters(get_weights(classifier))
 
     # Flower needs a finite upper bound. The strategy stops itself when patience/levels finish.
@@ -119,6 +119,7 @@ def server_fn(context: Context):
         min_evaluate_clients=min(2, num_clients),
         initial_parameters=parameters,
         dataset=dataset,
+        medmnist_size=medmnist_size,
         folder=folder,
         strategy_name=strategy_name,
         mu=_get(run_config, "mu", 0.5),

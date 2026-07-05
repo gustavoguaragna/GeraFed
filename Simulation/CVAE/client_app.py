@@ -57,6 +57,7 @@ class FlowerClient(NumPyClient):
         local_epochs_alvo: int = 1,
         cvae_local_epochs: int = 1,
         continue_epoch: int = 0,
+        medmnist_size: int = 28,
         memory_logging: bool = False,
     ):
         self.cid = cid
@@ -73,6 +74,7 @@ class FlowerClient(NumPyClient):
         self.local_epochs_alvo = local_epochs_alvo
         self.cvae_local_epochs = cvae_local_epochs
         self.continue_epoch = continue_epoch
+        self.medmnist_size = int(medmnist_size)
         self.memory_logging = memory_logging
         self.memory_log_path = (
             f"{self.folder}/memory_client_{self.cid}.jsonl"
@@ -85,6 +87,7 @@ class FlowerClient(NumPyClient):
         self._log_memory(
             "client_init",
             dataset=self.dataset,
+            medmnist_size=self.medmnist_size,
             batch_size=self.batch_size,
             train_examples=len(self.trainloader.dataset),
             local_test_examples=len(self.testloader_local.dataset),
@@ -133,7 +136,10 @@ class FlowerClient(NumPyClient):
 
     def _feature_extractor(self, level: int, config):
         feature_extractor = create_feature_extractor(
-            self.dataset, level=level, seed=self.seed
+            self.dataset,
+            level=level,
+            seed=self.seed,
+            medmnist_size=self.medmnist_size,
         ).to(self.device)
         self._save_feature_extractor_state(
             level, config.get("feature_extractor_state", b"")
@@ -522,7 +528,12 @@ class FlowerClient(NumPyClient):
     def _train_classifier(self, classifier, trainloader, level, strategy, mu, mixup_type):
         criterion = torch.nn.CrossEntropyLoss().to(self.device)
         optimizer = torch.optim.SGD(classifier.parameters(), lr=self.lr_alvo)
-        global_ref = create_classifier(self.dataset, level=level, seed=self.seed).to(self.device)
+        global_ref = create_classifier(
+            self.dataset,
+            level=level,
+            seed=self.seed,
+            medmnist_size=self.medmnist_size,
+        ).to(self.device)
         global_ref.load_state_dict(classifier.state_dict())
         for param in global_ref.parameters():
             param.requires_grad = False
@@ -671,7 +682,12 @@ class FlowerClient(NumPyClient):
             level=level,
             train_examples=len(trainloader.dataset),
         )
-        classifier = create_classifier(self.dataset, level=level, seed=self.seed).to(self.device)
+        classifier = create_classifier(
+            self.dataset,
+            level=level,
+            seed=self.seed,
+            medmnist_size=self.medmnist_size,
+        ).to(self.device)
         set_weights(classifier, parameters)
         self._log_memory(
             "fit_classifier_model_loaded",
@@ -872,10 +888,18 @@ class FlowerClient(NumPyClient):
     def evaluate(self, parameters, config):
         level = int(config["level"])
         if level == 0:
-            net = create_full_model(self.dataset, seed=self.seed).to(self.device)
+            net = create_full_model(
+                self.dataset,
+                seed=self.seed,
+                medmnist_size=self.medmnist_size,
+            ).to(self.device)
             set_weights(net, parameters)
         else:
-            net = create_full_model(self.dataset, seed=self.seed).to(self.device)
+            net = create_full_model(
+                self.dataset,
+                seed=self.seed,
+                medmnist_size=self.medmnist_size,
+            ).to(self.device)
             self._save_feature_extractor_state(
                 level, config.get("feature_extractor_state", b"")
             )
@@ -887,7 +911,12 @@ class FlowerClient(NumPyClient):
                 )
             feature_state = state_dict_from_bytes(feature_state_bytes, self.device)
             net.load_state_dict(feature_state, strict=False)
-            classifier = create_classifier(self.dataset, level=level, seed=self.seed).to(self.device)
+            classifier = create_classifier(
+                self.dataset,
+                level=level,
+                seed=self.seed,
+                medmnist_size=self.medmnist_size,
+            ).to(self.device)
             set_weights(classifier, parameters)
             net.load_state_dict(classifier.state_dict(), strict=False)
 
@@ -1044,6 +1073,7 @@ def client_fn(context: Context):
         local_epochs_alvo=run_config.get("epocas_alvo", 1),
         cvae_local_epochs=cvae_local_epochs,
         continue_epoch=run_config.get("continue_epoch", 0),
+        medmnist_size=medmnist_size,
         memory_logging=run_config.get("memory_logging", False),
     ).to_client()
 
