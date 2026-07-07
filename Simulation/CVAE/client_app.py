@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import gc
-import io
+import os
 import pickle
 import time
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -68,6 +69,12 @@ class FlowerClient(NumPyClient):
         self.testloader_local = testloader_local
         self.client_state = context.state
         self.folder = folder
+        self.client_cache_dir = (
+            Path(self.folder)
+            / "client_disk_cache"
+            / f"client_{self.cid}_pid{os.getpid()}"
+        )
+        self.client_cache_dir.mkdir(parents=True, exist_ok=True)
         self.seed = seed
         self.lr_alvo = lr_alvo
         self.cvae_lr = cvae_lr
@@ -92,6 +99,7 @@ class FlowerClient(NumPyClient):
             train_examples=len(self.trainloader.dataset),
             local_test_examples=len(self.testloader_local.dataset),
             has_validation_loader=self.valloader_local is not None,
+            disk_cache_dir=str(self.client_cache_dir),
         )
 
     def _log_memory(self, event: str, **fields) -> None:
@@ -133,6 +141,12 @@ class FlowerClient(NumPyClient):
         if self._record_level("feature_extractor_state") != level:
             return None
         return self._record_bytes("feature_extractor_state")
+
+    def _generated_embeddings_path(self, level: int) -> Path:
+        return self.client_cache_dir / f"generated_embeddings_level{level}.npz"
+
+    def _cvae_training_state_path(self, level: int) -> Path:
+        return self.client_cache_dir / f"cvae_training_state_level{level}.pth"
 
     def _feature_extractor(self, level: int, config):
         feature_extractor = create_feature_extractor(
@@ -180,19 +194,27 @@ class FlowerClient(NumPyClient):
         level: int,
         generated_data: dict,
     ) -> None:
-        record = ParametersRecord()
-        record["assets"] = array_from_numpy(generated_data["assets"])
-        record["labels"] = array_from_numpy(generated_data["labels"])
-        record["level"] = array_from_numpy(np.array([level], dtype=np.int64))
-        self.client_state.parameters_records["generated_embeddings"] = record
+        path = self._generated_embeddings_path(level)
+        np.savez(
+            path,
+            assets=generated_data["assets"],
+            labels=generated_data["labels"],
+            level=np.array([level], dtype=np.int64),
+        )
 
     def _cached_generated_embeddings(self, level: int):
-        if self._record_level("generated_embeddings") != level:
+        path = self._generated_embeddings_path(level)
+        if not path.exists():
             return None
-        record = self.client_state.parameters_records["generated_embeddings"]
+        with np.load(path) as data:
+            cached_level = int(data["level"][0]) if "level" in data.files else level
+            if cached_level != level:
+                return None
+            assets = data["assets"].copy()
+            labels = data["labels"].copy()
         return {
-            "assets": record["assets"].numpy(),
-            "labels": record["labels"].numpy(),
+            "assets": assets,
+            "labels": labels,
         }
 
     def _cvae_state_matches(self, state: dict, config: dict) -> bool:
@@ -208,11 +230,12 @@ class FlowerClient(NumPyClient):
         return all(state.get(key) == value for key, value in expected.items())
 
     def _load_cvae_training_state(self, cvae, optimizer, config: dict) -> None:
-        payload = self._record_bytes("cvae_training_state")
-        if payload is None:
+        level = int(config["level"])
+        path = self._cvae_training_state_path(level)
+        if not path.exists():
             return
 
-        state = torch.load(io.BytesIO(payload), map_location=self.device)
+        state = torch.load(path, map_location=self.device)
         if not self._cvae_state_matches(state, config):
             return
 
@@ -220,6 +243,11 @@ class FlowerClient(NumPyClient):
         cvae.fc_mu.load_state_dict(state["fc_mu_state_dict"])
         cvae.fc_logvar.load_state_dict(state["fc_logvar_state_dict"])
         optimizer.load_state_dict(state["optimizer_state_dict"])
+        self._log_memory(
+            "cvae_state_loaded_from_disk",
+            level=level,
+            state_file_mb=path.stat().st_size / 10**6,
+        )
 
     def _save_cvae_training_state(self, cvae, optimizer, config: dict) -> None:
         state = {
@@ -236,27 +264,18 @@ class FlowerClient(NumPyClient):
             "optimizer_state_dict": optimizer.state_dict(),
         }
         self._log_memory(
-            "cvae_state_before_serialize",
+            "cvae_state_before_disk_save",
             level=int(config["level"]),
             cvae_state_tensor_mb=object_tensor_size_mb(state),
         )
-        buffer = io.BytesIO()
-        torch.save(state, buffer)
-        payload = buffer.getvalue()
+        path = self._cvae_training_state_path(int(config["level"]))
+        tmp_path = path.with_suffix(path.suffix + ".tmp")
+        torch.save(state, tmp_path)
+        tmp_path.replace(path)
         self._log_memory(
-            "cvae_state_after_serialize",
+            "cvae_state_saved_to_disk",
             level=int(config["level"]),
-            serialized_state_mb=len(payload) / 10**6,
-        )
-        self._save_bytes_record(
-            "cvae_training_state",
-            payload,
-            int(config["level"]),
-        )
-        self._log_memory(
-            "cvae_state_saved_to_context",
-            level=int(config["level"]),
-            serialized_state_mb=len(payload) / 10**6,
+            state_file_mb=path.stat().st_size / 10**6,
         )
 
     def _extract_embeddings(self, feature_extractor, trainloader):
@@ -513,17 +532,15 @@ class FlowerClient(NumPyClient):
             gen_selected_count=generated_data["stats"].get("gen_selected_count", 0),
         )
         self._save_generated_embeddings(level, generated_data)
+        embeddings_path = self._generated_embeddings_path(level)
         self._log_memory(
-            "generated_embeddings_saved_to_context",
+            "generated_embeddings_saved_to_disk",
             level=level,
             generated_assets_mb=tensor_size_mb(generated_data["assets"]),
             generated_labels_mb=tensor_size_mb(generated_data["labels"]),
+            embeddings_file_mb=embeddings_path.stat().st_size / 10**6,
         )
-        return (
-            self._cached_generated_embeddings(level),
-            generation_time,
-            generated_data["stats"],
-        )
+        return generated_data, generation_time, generated_data["stats"]
 
     def _train_classifier(self, classifier, trainloader, level, strategy, mu, mixup_type):
         criterion = torch.nn.CrossEntropyLoss().to(self.device)
@@ -643,8 +660,13 @@ class FlowerClient(NumPyClient):
                 generation_time,
             )
 
-        gen_assets = torch.from_numpy(generated_data["assets"]).float().to(self.device)
-        gen_labels = torch.from_numpy(generated_data["labels"]).long().to(self.device)
+        gen_assets_np = generated_data["assets"]
+        gen_labels_np = generated_data["labels"]
+        gen_assets = torch.from_numpy(gen_assets_np).float().to(self.device)
+        gen_labels = torch.from_numpy(gen_labels_np).long().to(self.device)
+        del generated_data
+        del gen_assets_np
+        del gen_labels_np
         self._log_memory(
             "build_augmented_loader_generated_tensors_ready",
             level=level,
