@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import gc
-import os
 import pickle
 import time
 from pathlib import Path
@@ -60,8 +59,10 @@ class FlowerClient(NumPyClient):
         continue_epoch: int = 0,
         medmnist_size: int = 28,
         memory_logging: bool = False,
+        run_id: int = 0,
     ):
         self.cid = cid
+        self.run_id = int(run_id)
         self.dataset = normalize_dataset_name(dataset)
         self.batch_size = batch_size
         self.trainloader = trainloader
@@ -72,7 +73,8 @@ class FlowerClient(NumPyClient):
         self.client_cache_dir = (
             Path(self.folder)
             / "client_disk_cache"
-            / f"client_{self.cid}_pid{os.getpid()}"
+            / f"run_{self.run_id}"
+            / f"client_{self.cid}"
         )
         self.client_cache_dir.mkdir(parents=True, exist_ok=True)
         self.seed = seed
@@ -99,6 +101,7 @@ class FlowerClient(NumPyClient):
             train_examples=len(self.trainloader.dataset),
             local_test_examples=len(self.testloader_local.dataset),
             has_validation_loader=self.valloader_local is not None,
+            run_id=self.run_id,
             disk_cache_dir=str(self.client_cache_dir),
         )
 
@@ -1097,6 +1100,7 @@ def client_fn(context: Context):
         continue_epoch=run_config.get("continue_epoch", 0),
         medmnist_size=medmnist_size,
         memory_logging=run_config.get("memory_logging", False),
+        run_id=context.run_id,
     ).to_client()
 
 
