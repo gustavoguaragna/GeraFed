@@ -122,6 +122,7 @@ def server_fn(context: Context):
         medmnist_size=medmnist_size,
         folder=folder,
         strategy_name=strategy_name,
+        classifier_optimizer=_get(run_config, "classifier_optimizer", "sgd"),
         mu=_get(run_config, "mu", 0.5),
         seed=seed,
         patience=patience,

@@ -151,6 +151,16 @@ class FlowerClient(NumPyClient):
     def _cvae_training_state_path(self, level: int) -> Path:
         return self.client_cache_dir / f"cvae_training_state_level{level}.pth"
 
+    def _classifier_optimizer_state_path(
+        self,
+        level: int,
+        optimizer_name: str,
+    ) -> Path:
+        return (
+            self.client_cache_dir
+            / f"classifier_optimizer_{optimizer_name}_level{level}.pth"
+        )
+
     def _feature_extractor(self, level: int, config):
         feature_extractor = create_feature_extractor(
             self.dataset,
@@ -278,6 +288,89 @@ class FlowerClient(NumPyClient):
         self._log_memory(
             "cvae_state_saved_to_disk",
             level=int(config["level"]),
+            state_file_mb=path.stat().st_size / 10**6,
+        )
+
+    def _classifier_optimizer_state_matches(
+        self,
+        state: dict,
+        level: int,
+        optimizer_name: str,
+    ) -> bool:
+        expected = {
+            "level": int(level),
+            "optimizer": str(optimizer_name).lower(),
+            "lr_alvo": float(self.lr_alvo),
+        }
+        return all(state.get(key) == value for key, value in expected.items())
+
+    def _load_classifier_optimizer_state(
+        self,
+        optimizer,
+        level: int,
+        optimizer_name: str,
+    ) -> None:
+        optimizer_name = str(optimizer_name).lower()
+        if optimizer_name != "adam":
+            return
+
+        path = self._classifier_optimizer_state_path(level, optimizer_name)
+        if not path.exists():
+            return
+
+        state = torch.load(path, map_location=self.device)
+        if not self._classifier_optimizer_state_matches(state, level, optimizer_name):
+            return
+
+        try:
+            optimizer.load_state_dict(state["optimizer_state_dict"])
+        except ValueError as exc:
+            self._log_memory(
+                "classifier_optimizer_state_load_skipped",
+                level=level,
+                classifier_optimizer=optimizer_name,
+                reason=str(exc),
+            )
+            return
+
+        self._log_memory(
+            "classifier_optimizer_state_loaded_from_disk",
+            level=level,
+            classifier_optimizer=optimizer_name,
+            optimizer_state_mb=object_tensor_size_mb(optimizer.state_dict()),
+            state_file_mb=path.stat().st_size / 10**6,
+        )
+
+    def _save_classifier_optimizer_state(
+        self,
+        optimizer,
+        level: int,
+        optimizer_name: str,
+    ) -> None:
+        optimizer_name = str(optimizer_name).lower()
+        if optimizer_name != "adam":
+            return
+
+        state = {
+            "level": int(level),
+            "optimizer": optimizer_name,
+            "lr_alvo": float(self.lr_alvo),
+            "optimizer_state_dict": optimizer.state_dict(),
+        }
+        self._log_memory(
+            "classifier_optimizer_state_before_disk_save",
+            level=level,
+            classifier_optimizer=optimizer_name,
+            optimizer_state_mb=object_tensor_size_mb(state),
+        )
+        path = self._classifier_optimizer_state_path(level, optimizer_name)
+        tmp_path = path.with_suffix(path.suffix + ".tmp")
+        torch.save(state, tmp_path)
+        tmp_path.replace(path)
+        self._log_memory(
+            "classifier_optimizer_state_saved_to_disk",
+            level=level,
+            classifier_optimizer=optimizer_name,
             state_file_mb=path.stat().st_size / 10**6,
         )
 
@@ -545,9 +638,31 @@ class FlowerClient(NumPyClient):
         )
         return generated_data, generation_time, generated_data["stats"]
 
-    def _train_classifier(self, classifier, trainloader, level, strategy, mu, mixup_type):
+    def _classifier_optimizer(self, classifier, optimizer_name: str):
+        optimizer_name = str(optimizer_name).lower()
+        if optimizer_name == "sgd":
+            return torch.optim.SGD(classifier.parameters(), lr=self.lr_alvo)
+        if optimizer_name == "adam":
+            return torch.optim.Adam(classifier.parameters(), lr=self.lr_alvo)
+        raise ValueError(
+            "classifier_optimizer must be 'sgd' or 'adam', "
+            f"got {optimizer_name}"
+        )
+
+    def _train_classifier(
+        self,
+        classifier,
+        trainloader,
+        level,
+        strategy,
+        mu,
+        mixup_type,
+        optimizer_name,
+    ):
+        optimizer_name = str(optimizer_name).lower()
         criterion = torch.nn.CrossEntropyLoss().to(self.device)
-        optimizer = torch.optim.SGD(classifier.parameters(), lr=self.lr_alvo)
+        optimizer = self._classifier_optimizer(classifier, optimizer_name)
+        self._load_classifier_optimizer_state(optimizer, level, optimizer_name)
         global_ref = create_classifier(
             self.dataset,
             level=level,
@@ -610,6 +725,7 @@ class FlowerClient(NumPyClient):
                 running_loss += loss.item()
                 batches_seen += 1
 
+        self._save_classifier_optimizer_state(optimizer, level, optimizer_name)
         return running_loss / max(batches_seen, 1)
 
     def _build_augmented_loader(self, trainloader, feature_extractor, level, config):
@@ -706,6 +822,7 @@ class FlowerClient(NumPyClient):
             "fit_classifier_start",
             level=level,
             train_examples=len(trainloader.dataset),
+            classifier_optimizer=config.get("classifier_optimizer", "sgd"),
         )
         classifier = create_classifier(
             self.dataset,
@@ -739,6 +856,7 @@ class FlowerClient(NumPyClient):
             strategy=config["strategy"],
             mu=float(config["mu"]),
             mixup_type=config["mixup_type"],
+            optimizer_name=config.get("classifier_optimizer", "sgd"),
         )
         train_time = time.time() - train_start
         classifier_weights = get_weights(classifier)

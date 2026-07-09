@@ -76,6 +76,7 @@ class FLEG_CVAE(Strategy):
         medmnist_size: int = 28,
         folder: str = ".",
         strategy_name: str = "fedavg",
+        classifier_optimizer: str = "sgd",
         mu: float = 0.5,
         seed: int = 42,
         patience: int = 10,
@@ -125,6 +126,12 @@ class FLEG_CVAE(Strategy):
         self.num_classes = get_num_classes(self.dataset)
         self.folder = folder
         self.strategy_name = strategy_name
+        self.classifier_optimizer = str(classifier_optimizer).lower()
+        if self.classifier_optimizer not in {"sgd", "adam"}:
+            raise ValueError(
+                "classifier_optimizer must be 'sgd' or 'adam', "
+                f"got {classifier_optimizer}"
+            )
         self.mu = mu
         self.seed = seed
         self.patience = patience
@@ -667,6 +674,7 @@ class FLEG_CVAE(Strategy):
                     "model": "classifier",
                     "level": self.lvl,
                     "strategy": self.strategy_name,
+                    "classifier_optimizer": self.classifier_optimizer,
                     "mu": self.mu,
                     "mixup_type": self.mixup_type,
                     "decoder_state": decoder_payload,
