@@ -1178,11 +1178,30 @@ def client_fn(context: Context):
 
 
     method = "baseline" if baseline else "fleg"
+    classifier_optimizer = str(run_config.get("classifier_optimizer", "sgd")).lower()
+    lesslvl = run_config.get("lesslvl", False)
+    folder_parts = [
+        dataset_folder_name,
+        partitioner_for_data,
+        run_config["strategy"],
+        f"netoptim{classifier_optimizer}",
+    ]
+    if not baseline:
+        folder_parts.extend(
+            [
+                f"cvaeepochs{cvae_epochs}",
+                f"depth_{cvae_depth}",
+                str(syn_input),
+            ]
+        )
+    folder_parts.append(method)
+    if lesslvl:
+        folder_parts.append("lesslvl")
+    folder_parts.append(f"trial{trial}")
 
     folder = (
         f"{run_config['Exp_name_folder']}CVAE/"
-        f"{dataset_folder_name}_{partitioner_for_data}_{run_config['strategy']}_"
-        f"cvaeepochs{cvae_epochs}_depth_{cvae_depth}_{syn_input}_{method}_trial{trial}"
+        f"{'_'.join(folder_parts)}"
     )
 
 

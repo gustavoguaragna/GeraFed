@@ -71,12 +71,31 @@ def server_fn(context: Context):
     if dataset.endswith("mnist") and dataset not in {"mnist"}:
         dataset_folder_name = f"{dataset}_size{medmnist_size}"
     baseline = _get(run_config, "baseline", False)
+    classifier_optimizer = str(_get(run_config, "classifier_optimizer", "sgd")).lower()
+    lesslvl = _get(run_config, "lesslvl", False)
     method = "baseline" if baseline else "fleg"
+    folder_parts = [
+        dataset_folder_name,
+        partitioner,
+        strategy_name,
+        f"netoptim{classifier_optimizer}",
+    ]
+    if not baseline:
+        folder_parts.extend(
+            [
+                f"cvaeepochs{cvae_epochs}",
+                f"depth_{cvae_depth}",
+                str(syn_input),
+            ]
+        )
+    folder_parts.append(method)
+    if lesslvl:
+        folder_parts.append("lesslvl")
+    folder_parts.append(f"trial{trial}")
 
     folder = (
         f"{_get(run_config, 'Exp_name_folder', 'Experimentos/Flwr_run/')}CVAE/"
-        f"{dataset_folder_name}_{partitioner}_{strategy_name}_"
-        f"cvaeepochs{cvae_epochs}_depth_{cvae_depth}_{syn_input}_{method}_trial{trial}"
+        f"{'_'.join(folder_parts)}"
     )
     os.makedirs(folder, exist_ok=True)
 
