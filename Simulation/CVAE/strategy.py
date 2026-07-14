@@ -859,7 +859,11 @@ class FLEG_CVAE(Strategy):
             return self.parameters_classifier, {"avg_net_loss": avg_loss}
 
         if self.phase == "cvae":
-            aggregated_ndarrays = aggregate_inplace(results)
+            weights_results = [
+                (parameters_to_ndarrays(fit_res.parameters), 1)
+                for _, fit_res in results
+            ]
+            aggregated_ndarrays = aggregate(weights_results)
             set_weights(self.decoder.decoder, aggregated_ndarrays)
             self.parameters_cvae = ndarrays_to_parameters(aggregated_ndarrays)
             self._log_memory(
