@@ -548,11 +548,11 @@ class FLEG_CVAE(Strategy):
             num_samples = int(
                 max(1, torch.ceil(torch.tensor(total_examples / self.num_clients)).item())
                 / self.levels
-                * self.lvl
+                * self.lvl 
             )
             num_samples = max(1, num_samples)
         elif self.num_syn == "fixed":
-            num_samples = max(1, total_examples)
+            num_samples = max(1, 10000)
         else:
             raise ValueError(f"num_syn must be 'dynamic' or 'fixed', got {self.num_syn}")
 

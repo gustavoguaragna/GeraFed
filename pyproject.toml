@@ -16,8 +16,6 @@ dependencies = [
     "torch==2.2.2",
     "torchvision==0.17.2",
     "medmnist==3.0.2",
-    "medimeta",
-    "wilds",
 
     # Core scientific stack
     "numpy==1.26.4",
@@ -41,21 +39,23 @@ clientapp = "Simulation.CVAE.client_app:app"
 
 [tool.flwr.app.config]
 agg                  = "full"                   # 'disc', 'full', 'f2a', 'none'
-baseline             = true                     # true
+baseline             = false                     # true
+classifier_optimizer = "sgd"                    # 'sgd', 'adam'
 continue_epoch       = 0                        # int
 cvae_annealing       = false                    # boolean
 cvae_beta            = 1.0                      # float
+cvae_depth           = 2                        # number of hidden CVAE blocks after the first projection; 2 preserves the original architecture
 cvae_latent_dim_mode = "fixed"                  # 'fixed', 'dynamic'
 cvae_mixup_type      = "none"                   # 'none', 'intraclass', 'manifold'
 cvae_normalization   = "minmax"                 # 'z', 'minmax'
 cvae_resblock        = false                    # boolean
 criterio_parada      = "global_test_acc"        # 'global_test_acc', 'client_val_loss', 'client_val_acc', 'fixed_rounds'
-data_root            = "data"                   # root for local/downloaded datasets
-dataset              = "cifar10"                # 'mnist', 'cifar10', MedMNIST datasets, 'camelyon17', 'octdl', 'skinl_derm', 'organs_axial'
+data_root            = "../data"                   # root for local/downloaded datasets
+dataset              = "tissuemnist"                # 'mnist', 'cifar10', MedMNIST datasets, 'camelyon17', 'octdl', 'skinl_derm', 'organs_axial'
 download_datasets    = true                     # download datasets when supported
-medmnist_size        = 224                      # 28, 128, or 224 for MedMNIST datasets
+medmnist_size        = 28                      # 28, 128, or 224 for MedMNIST datasets
 epocas_alvo          = 1                        # int
-epocas_gen           = 2                        # int
+epocas_gen           = 50                        # int
 epocas_locais_gen    = 1                        # int
 epocas_disc          = 1                        # int
 Exp_name_folder      = "Experimentos/Flwr_run/" # str
@@ -68,21 +68,22 @@ learn_rate_disc      = 0.0002                   # float
 learn_rate_gen       = 0.0001                   # float
 lesslvl              = true                     # boolean
 levels               = 4                        # int
+memory_logging       = false                     # boolean
 model                = "both"                   # 'alvo', 'gen', 'both'
 num_chunks           = 1                        # int
 num_clients          = 4                        # int
 num_epocas           = 30                       # int, rodadas por nivel quando criterio_parada = 'fixed_rounds'
-partitioner          = "Class"                  # 'Class', 'Dir01', 'Dir05', 'IID' (IID no else)
-patience             = 2                        # int
-reset_best_metric_per_level = true             # boolean
+partitioner          = "Dir01"                  # 'Class', 'Dir01', 'Dir05', 'IID' (IID no else)
+patience             = 10                        # int
+reset_best_metric_per_level = false             # boolean
 resume_from_checkpoint = false                  # boolean
 seed                 = 42                       # int
 strategy             = "fedavg"                 # 'fedavg', 'fedprox', 'scaffold'
-syn_input            = "dynamic"                # 'dynamic', 'fixed'
+syn_input            = "fixed"                # 'dynamic', 'fixed'
 tam_batch            = 32                       # int
 tam_img              = 28                       # int
 tam_ruido            = 100                      # int
-teste                = true                     # boolean
+teste                = false                  # boolean
 
 xgb_params.objective = "binary:logistic"
 xgb_params.eta = 0.1 # Learning rate
@@ -98,5 +99,6 @@ default = "local-simulation"
 
 [tool.flwr.federations.local-simulation]
 options.num-supernodes = 4
-options.backend.client-resources.num-cpus = 4
-options.backend.client-resources.num-gpus = 0
+options.backend.client-resources.num-cpus = 2
+options.backend.client-resources.num-gpus = 0.25
+
