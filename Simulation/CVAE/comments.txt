@@ -2,6 +2,7 @@ STATUS ATUAL:
 proximo item em coisas para verificar
 
 PARA MANDAR PARA O CODEX:
+- local test antes e apos finetunning
 - Vou testar assim, mas acho que a classe da cnn adaptativa está reduzindo muito bruscamente no adaptiveavgpool, para imagens
 224x224, vai de 56x56 para 4x4. Testar uma rede mais longa para esses casos e talvez especifica para cada dataset e nao
 adaptativa.
