@@ -84,7 +84,6 @@ class FLEG_CVAE(Strategy):
         fixed_classifier_rounds: int = 1,
         reset_best_metric_per_level: bool = True,
         levels: int = 4,
-        lesslvl: bool = False,
         baseline: bool = False,
         cvae_epochs: int = 25,
         cvae_local_epochs: int = 1,
@@ -138,8 +137,13 @@ class FLEG_CVAE(Strategy):
         self.stop_criterion = normalize_stop_criterion(stop_criterion)
         self.fixed_classifier_rounds = max(1, int(fixed_classifier_rounds))
         self.reset_best_metric_per_level = reset_best_metric_per_level
-        self.levels = levels
-        self.lesslvl = lesslvl
+        self.final_level = 4
+        self.levels = int(levels)
+        if not 1 <= self.levels <= self.final_level:
+            raise ValueError(
+                f"levels must be between 1 and {self.final_level}, got {levels}"
+            )
+        self.first_cvae_level = self.final_level - self.levels + 1
         self.baseline = baseline
         self.cvae_epochs_target = cvae_epochs
         self.cvae_local_epochs = cvae_local_epochs
@@ -232,6 +236,8 @@ class FLEG_CVAE(Strategy):
             dataset=self.dataset,
             num_clients=self.num_clients,
             levels=self.levels,
+            first_cvae_level=self.first_cvae_level,
+            final_level=self.final_level,
             baseline=self.baseline,
         )
         loaded_checkpoint = False
@@ -239,6 +245,8 @@ class FLEG_CVAE(Strategy):
             loaded_checkpoint = self._load_latest_checkpoint()
         self._ensure_metric_keys()
         if self.phase == "classifier" and self.lvl == 0 and not loaded_checkpoint:
+            if not self.baseline:
+                self._print_level_configuration()
             print("Starting warmup classifier level 0.")
 
     def __repr__(self) -> str:
@@ -343,14 +351,30 @@ class FLEG_CVAE(Strategy):
             return self.classifier_rounds_current_level >= self.fixed_classifier_rounds
         return self.epochs_no_improve > self.patience
 
+    def _print_level_configuration(self) -> None:
+        if self.first_cvae_level <= 1:
+            print(
+                f"Configured levels={self.levels}. Levels 1 through "
+                f"{self.final_level} will be trained after warmup."
+            )
+            return
+
+        skipped_levels = ", ".join(
+            str(level) for level in range(1, self.first_cvae_level)
+        )
+        label = "Level" if self.first_cvae_level == 2 else "Levels"
+        print(
+            f"Configured levels={self.levels}. {label} {skipped_levels} "
+            "will be skipped after warmup."
+        )
+
     def _next_level_after_classifier(self) -> int:
-        if self.lesslvl and self.lvl == 0:
-            print("lesslvl is enabled. Level 1 will be skipped after warmup.")
-            return 2
+        if self.lvl == 0:
+            return self.first_cvae_level
         return self.lvl + 1
 
     def _is_final_level(self) -> bool:
-        return self.lvl >= self.levels
+        return self.lvl >= self.final_level
 
     def _save_completed_level_state(self, final_checkpoint: bool = False) -> None:
         self.metrics_dict["level_time"].append(time.time() - self.init_level_time)
@@ -547,7 +571,7 @@ class FLEG_CVAE(Strategy):
         if self.num_syn == "dynamic":
             num_samples = int(
                 max(1, torch.ceil(torch.tensor(total_examples / self.num_clients)).item())
-                / self.levels
+                / self.final_level
                 * self.lvl 
             )
             num_samples = max(1, num_samples)

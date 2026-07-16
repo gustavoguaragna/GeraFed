@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-LESSLVLS=(
-  "true"
-  "false"
+LEVELS=(
+  "4"
+  "3"
+  "2"
 )
 
 SEEDS=(
@@ -48,14 +49,14 @@ mkdir -p logs
 RUN_CONFIG_EXTRA="${RUN_CONFIG_EXTRA:-}"
 
 should_skip_experiment() {
-  local lesslvl="$1"
+  local levels="$1"
   local seed="$2"
   local dataset="$3"
   local partitioner="$4"
   local baseline="$5"
   local classifier_optimizer="$6"
 
-  if [[ "$lesslvl" == "false" && "$baseline" == "true" ]]; then
+  if [[ "$baseline" == "true" && "$levels" != "${LEVELS[0]}" ]]; then
     return 0
   fi
 
@@ -80,22 +81,22 @@ should_skip_experiment() {
   return 1
 }
 
-for lesslvl in "${LESSLVLS[@]}"; do
+for levels in "${LEVELS[@]}"; do
   for seed in "${SEEDS[@]}"; do
     for dataset in "${DATASETS[@]}"; do
       for partitioner in "${PARTITIONERS[@]}"; do
         for baseline in "${BASELINES[@]}"; do
           for classifier_optimizer in "${CLASSIFIER_OPTIMIZERS[@]}"; do
-            if should_skip_experiment "$lesslvl" "$seed" "$dataset" "$partitioner" "$baseline" "$classifier_optimizer"; then
-              echo "Skipping lesslvl=${lesslvl}, seed=${seed}, dataset=${dataset}, partitioner=${partitioner}, baseline=${baseline}, classifier_optimizer=${classifier_optimizer}"
+            if should_skip_experiment "$levels" "$seed" "$dataset" "$partitioner" "$baseline" "$classifier_optimizer"; then
+              echo "Skipping levels=${levels}, seed=${seed}, dataset=${dataset}, partitioner=${partitioner}, baseline=${baseline}, classifier_optimizer=${classifier_optimizer}"
               continue
             fi
 
             echo "============================================================"
-            echo "Starting experiment: lesslvl=${lesslvl}, seed=${seed}, dataset=${dataset}, partitioner=${partitioner}, baseline=${baseline}, classifier_optimizer=${classifier_optimizer}"
+            echo "Starting experiment: levels=${levels}, seed=${seed}, dataset=${dataset}, partitioner=${partitioner}, baseline=${baseline}, classifier_optimizer=${classifier_optimizer}"
             echo "============================================================"
 
-            run_config="lesslvl=${lesslvl} seed=${seed} dataset='${dataset}' partitioner='${partitioner}' baseline=${baseline} classifier_optimizer='${classifier_optimizer}'"
+            run_config="levels=${levels} seed=${seed} dataset='${dataset}' partitioner='${partitioner}' baseline=${baseline} classifier_optimizer='${classifier_optimizer}'"
             if [[ "$baseline" == "true" ]]; then
               run_config="${run_config} patience=50"
             fi
@@ -107,15 +108,15 @@ for lesslvl in "${LESSLVLS[@]}"; do
             if [[ "$baseline" == "true" ]]; then
               method="baseline"
             fi
-            exp_name="lesslvl_${lesslvl}_seed_${seed}_${dataset}_${partitioner}_${method}_${classifier_optimizer}"
+            exp_name="levels_${levels}_seed_${seed}_${dataset}_${partitioner}_${method}_${classifier_optimizer}"
 
             if flwr run . --stream --run-config "$run_config" 2>&1 | tee "logs/${exp_name}.log"; then
-              echo "Experiment completed: lesslvl=${lesslvl}, seed=${seed}, dataset=${dataset}, partitioner=${partitioner}, baseline=${baseline}, classifier_optimizer=${classifier_optimizer}"
+              echo "Experiment completed: levels=${levels}, seed=${seed}, dataset=${dataset}, partitioner=${partitioner}, baseline=${baseline}, classifier_optimizer=${classifier_optimizer}"
             else
-              echo "Experiment failed: lesslvl=${lesslvl}, seed=${seed}, dataset=${dataset}, partitioner=${partitioner}, baseline=${baseline}, classifier_optimizer=${classifier_optimizer}"
+              echo "Experiment failed: levels=${levels}, seed=${seed}, dataset=${dataset}, partitioner=${partitioner}, baseline=${baseline}, classifier_optimizer=${classifier_optimizer}"
             fi
 
-            echo "Finished experiment: lesslvl=${lesslvl}, seed=${seed}, dataset=${dataset}, partitioner=${partitioner}, baseline=${baseline}, classifier_optimizer=${classifier_optimizer}"
+            echo "Finished experiment: levels=${levels}, seed=${seed}, dataset=${dataset}, partitioner=${partitioner}, baseline=${baseline}, classifier_optimizer=${classifier_optimizer}"
             echo
           done
         done

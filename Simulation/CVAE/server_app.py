@@ -50,7 +50,7 @@ def server_fn(context: Context):
     cvae_depth = int(_get(run_config, "cvae_depth", 2))
     cvae_local_epochs = _get(run_config, "epocas_locais_gen",1)
     patience = _get(run_config, "patience", 10)
-    levels = _get(run_config, "levels", 4)
+    levels = int(_get(run_config, "levels", 4))
     syn_input = _get(run_config, "syn_input", "dynamic")
     latent_dim_mode = _get(run_config, "cvae_latent_dim_mode", "fixed")
     stop_criterion = normalize_stop_criterion(
@@ -72,7 +72,6 @@ def server_fn(context: Context):
         dataset_folder_name = f"{dataset}_size{medmnist_size}"
     baseline = _get(run_config, "baseline", False)
     classifier_optimizer = str(_get(run_config, "classifier_optimizer", "sgd")).lower()
-    lesslvl = _get(run_config, "lesslvl", False)
     method = "baseline" if baseline else "fleg"
     folder_parts = [
         dataset_folder_name,
@@ -89,8 +88,8 @@ def server_fn(context: Context):
             ]
         )
     folder_parts.append(method)
-    if lesslvl:
-        folder_parts.append("lesslvl")
+    if not baseline:
+        folder_parts.append(f"levels{levels}")
     folder_parts.append(f"trial{trial}")
 
     folder = (
@@ -122,10 +121,13 @@ def server_fn(context: Context):
         if stop_criterion == "fixed_rounds"
         else patience * 10
     )
+    trained_levels = max(1, levels)
+    classifier_phases = 1 if baseline else trained_levels + 1
+    cvae_phases = 0 if baseline else trained_levels
     num_rounds = (
-        classifier_rounds_bound * max(1, levels)
-        + cvae_epochs * max(1, levels)
-        + levels
+        classifier_rounds_bound * classifier_phases
+        + cvae_epochs * cvae_phases
+        + cvae_phases
         + 5
     )
 
@@ -153,7 +155,6 @@ def server_fn(context: Context):
             True,
         ),
         levels=levels,
-        lesslvl=_get(run_config, "lesslvl", False),
         baseline=baseline,
         cvae_epochs=cvae_epochs,
         cvae_local_epochs=cvae_local_epochs,

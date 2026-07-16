@@ -66,8 +66,7 @@ gan_arq              = "f2u_gan"                # 'simple_cnn'
 learn_rate_alvo      = 0.01                     # float
 learn_rate_disc      = 0.0002                   # float
 learn_rate_gen       = 0.0001                   # float
-lesslvl              = true                     # boolean
-levels               = 4                        # int
+levels               = 4                        # 1..4; number of post-warmup levels to train, ending at conceptual level 4
 memory_logging       = false                     # boolean
 model                = "both"                   # 'alvo', 'gen', 'both'
 num_chunks           = 1                        # int
@@ -101,4 +100,3 @@ default = "local-simulation"
 options.num-supernodes = 4
 options.backend.client-resources.num-cpus = 2
 options.backend.client-resources.num-gpus = 0.25
-

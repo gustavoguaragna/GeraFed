@@ -1157,6 +1157,7 @@ def client_fn(context: Context):
     syn_input = run_config.get("num_syn", run_config.get("syn_input", "dynamic"))
     medmnist_size = int(run_config.get("medmnist_size", 224))
     cvae_depth = int(run_config.get("cvae_depth", 2))
+    levels = int(run_config.get("levels", 4))
     alpha = run_config.get("alpha", _alpha_from_partitioner(partitioner))
     partitioner_for_data = f"Dir{int(alpha * 10):02d}" if partitioner == "Dirichlet" else partitioner
     stop_criterion = run_config.get("criterio_parada", "global_test_acc")
@@ -1179,7 +1180,6 @@ def client_fn(context: Context):
 
     method = "baseline" if baseline else "fleg"
     classifier_optimizer = str(run_config.get("classifier_optimizer", "sgd")).lower()
-    lesslvl = run_config.get("lesslvl", False)
     folder_parts = [
         dataset_folder_name,
         partitioner_for_data,
@@ -1195,8 +1195,8 @@ def client_fn(context: Context):
             ]
         )
     folder_parts.append(method)
-    if lesslvl:
-        folder_parts.append("lesslvl")
+    if not baseline:
+        folder_parts.append(f"levels{levels}")
     folder_parts.append(f"trial{trial}")
 
     folder = (
