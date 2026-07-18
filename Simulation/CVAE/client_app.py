@@ -801,12 +801,16 @@ class FlowerClient(NumPyClient):
 
         combined_ds = ConcatDataset([embedding_dataset, gen_dataset])
         if stats is None:
-            stats = {"gen_selected_count": len(gen_dataset), "desired_labels": []}
-        print(
-            f"Client {self.cid}: added {stats['gen_selected_count']} CVAE samples "
-            f"for classes {stats['desired_labels']} "
-            f"(requested target: {stats.get('requested_num_samples', 'cached')})."
-        )
+            print(
+                f"Client {self.cid}: using {len(gen_dataset)} "
+                "cached synthetic embeddings."
+            )
+        else:
+            print(
+                f"Client {self.cid}: added {stats['gen_selected_count']} CVAE samples "
+                f"for classes {stats['desired_labels']} "
+                f"(requested target: {stats.get('requested_num_samples', 'cached')})."
+            )
         self._log_memory(
             "build_augmented_loader_done",
             level=level,
