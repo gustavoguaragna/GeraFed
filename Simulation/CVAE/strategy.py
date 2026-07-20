@@ -101,6 +101,7 @@ class FLEG_CVAE(Strategy):
         num_clients: int = 4,
         resume_from_checkpoint: bool = False,
         memory_logging: bool = False,
+        max_server_rounds: Optional[int] = None,
     ) -> None:
         super().__init__()
 
@@ -161,6 +162,9 @@ class FLEG_CVAE(Strategy):
         self.num_clients = num_clients
         self.resume_from_checkpoint = resume_from_checkpoint
         self.memory_logging = memory_logging
+        self.max_server_rounds = (
+            int(max_server_rounds) if max_server_rounds is not None else None
+        )
         self.memory_log_path = (
             f"{self.folder}/memory_server.jsonl" if self.memory_logging else None
         )
@@ -183,6 +187,7 @@ class FLEG_CVAE(Strategy):
         self._level_transmission_mb = 0.0
         self._level_classifier_traffic_mb = 0.0
         self._level_cvae_traffic_mb = 0.0
+        self._round_limit_saved = False
 
         self.global_net = create_full_model(
             self.dataset,
@@ -239,6 +244,7 @@ class FLEG_CVAE(Strategy):
             first_cvae_level=self.first_cvae_level,
             final_level=self.final_level,
             baseline=self.baseline,
+            max_server_rounds=self.max_server_rounds,
         )
         loaded_checkpoint = False
         if self.resume_from_checkpoint:
@@ -386,6 +392,44 @@ class FLEG_CVAE(Strategy):
         )
         self._save_checkpoint(checkpoint_filename, level=self.lvl)
         self._save_metrics()
+
+    def _round_limit_reached(self, server_round: int) -> bool:
+        return (
+            self.max_server_rounds is not None
+            and server_round >= self.max_server_rounds
+        )
+
+    def _client_evaluation_expected_after_fit(self) -> bool:
+        return (
+            self.phase == "classifier"
+            and self.fraction_evaluate_alvo != 0.0
+            and not self._skip_next_client_evaluation
+        )
+
+    def _announce_round_limit(self, server_round: int) -> None:
+        if self._round_limit_saved:
+            return
+
+        print(
+            "Maximum configured server rounds reached "
+            f"({server_round}/{self.max_server_rounds}). "
+            "Saving metrics and final checkpoint before stopping."
+        )
+        self._log_memory(
+            "round_limit_reached",
+            server_round=server_round,
+            max_server_rounds=self.max_server_rounds,
+        )
+
+    def _finish_due_to_round_limit(self, server_round: int) -> None:
+        if self.finished or self._round_limit_saved:
+            return
+
+        self._announce_round_limit(server_round)
+        self._save_completed_level_state(final_checkpoint=True)
+        self._round_limit_saved = True
+        self.finished = True
+        print("Training stopped because the configured server round limit was reached.")
 
     def _switch_to_next_cvae_phase(self) -> None:
         self.lvl = self._next_level_after_classifier()
@@ -880,6 +924,11 @@ class FLEG_CVAE(Strategy):
                 server_round=server_round,
                 global_accuracy=float(self.global_accuracy),
             )
+            if (
+                self._round_limit_reached(server_round)
+                and not self._client_evaluation_expected_after_fit()
+            ):
+                self._finish_due_to_round_limit(server_round)
             return self.parameters_classifier, {"avg_net_loss": avg_loss}
 
         if self.phase == "cvae":
@@ -943,12 +992,16 @@ class FLEG_CVAE(Strategy):
                 self._reset_classifier_stop_state()
                 self._log_memory("aggregate_cvae_switched_to_classifier")
                 print(f"Switching to classifier level {self.lvl}.")
+                if self._round_limit_reached(server_round):
+                    self._finish_due_to_round_limit(server_round)
                 return self.parameters_classifier, {"avg_cvae_loss": avg_cvae_loss}
             self._log_memory(
                 "aggregate_cvae_done",
                 server_round=server_round,
                 cvae_trained_epochs=self.cvae_trained_epochs,
             )
+            if self._round_limit_reached(server_round):
+                self._finish_due_to_round_limit(server_round)
             return self.parameters_cvae, {"avg_cvae_loss": avg_cvae_loss}
 
         return None, {}
@@ -992,17 +1045,30 @@ class FLEG_CVAE(Strategy):
             max(evaluate_res.metrics["local_test_time"] for _, evaluate_res in results)
         )
 
+        round_limit_reached = self._round_limit_reached(server_round)
         if self._classifier_stop_reached():
             self.global_net.load_state_dict(self.best_model.state_dict())
             self.metrics_dict["epoch_transition"].append(self.net_epochs)
-            final_checkpoint = self.baseline or self._is_final_level()
+            natural_final_checkpoint = self.baseline or self._is_final_level()
+            final_checkpoint = natural_final_checkpoint or round_limit_reached
+            if round_limit_reached and not natural_final_checkpoint:
+                self._announce_round_limit(server_round)
             self._save_completed_level_state(final_checkpoint=final_checkpoint)
             print(f"Completed level {self.lvl}.")
             if final_checkpoint:
                 self.finished = True
-                print("Training finished.")
+                if round_limit_reached and not natural_final_checkpoint:
+                    self._round_limit_saved = True
+                    print(
+                        "Training stopped because the configured server round "
+                        "limit was reached."
+                    )
+                else:
+                    print("Training finished.")
             else:
                 self._switch_to_next_cvae_phase()
+        elif round_limit_reached:
+            self._finish_due_to_round_limit(server_round)
 
         metrics = {
             "loss": loss_aggregated,

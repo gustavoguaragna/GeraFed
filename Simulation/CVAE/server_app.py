@@ -172,6 +172,7 @@ def server_fn(context: Context):
         num_clients=num_clients,
         resume_from_checkpoint=_get(run_config, "resume_from_checkpoint", False),
         memory_logging=memory_logging,
+        max_server_rounds=num_rounds,
     )
 
     return ServerAppComponents(
